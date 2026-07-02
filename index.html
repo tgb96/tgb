@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#111827"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="TGB"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icon-192.png"/>
+  <title>TGB</title>
+
+  <style>
+    :root{
+      --bg:#070b12;
+      --card:#111827;
+      --card2:#182235;
+      --green:#22c55e;
+      --green2:#16a34a;
+      --blue:#38bdf8;
+      --yellow:#f59e0b;
+      --red:#ef4444;
+      --text:#f8fafc;
+      --muted:#94a3b8;
+      --border:rgba(255,255,255,.09);
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:
+        radial-gradient(circle at top left,#14532d 0,#070b12 38%),
+        linear-gradient(180deg,#070b12,#020617);
+      color:var(--text);
+      padding:14px;
+      padding-bottom:96px;
+    }
+
+    .app{max-width:520px;margin:auto;}
+
+    header{display:flex;align-items:center;gap:12px;margin:8px 0 16px;}
+
+    .logo{
+      width:58px;height:58px;border-radius:19px;
+      background:linear-gradient(135deg,var(--green),var(--blue));
+      display:grid;place-items:center;font-size:20px;font-weight:1000;letter-spacing:-1px;
+      color:#06111f;box-shadow:0 12px 30px rgba(34,197,94,.25);
+      border:1px solid rgba(255,255,255,.25);
+    }
+
+    h1{margin:0;font-size:29px;line-height:1;letter-spacing:-.5px;}
+    h2{margin-top:0;margin-bottom:8px;}
+    h3{margin:14px 0 8px;}
+
+    .sub{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.4;}
+
+    .card{
+      background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025));
+      border:1px solid var(--border);border-radius:24px;padding:16px;margin-bottom:14px;
+      box-shadow:0 18px 45px rgba(0,0,0,.28);backdrop-filter:blur(10px);
+    }
+
+    .today{background:linear-gradient(135deg,rgba(34,197,94,.23),rgba(56,189,248,.12));}
+    .label{color:var(--muted);font-size:13px;font-weight:700;margin-bottom:4px;}
+    .today-title{font-size:26px;font-weight:900;}
+    .pill{display:inline-block;padding:6px 11px;border-radius:999px;background:rgba(255,255,255,.09);color:var(--muted);font-size:12px;font-weight:800;margin-top:8px;}
+
+    .week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px;}
+    .day{border:1px solid var(--border);border-radius:14px;padding:9px 4px;text-align:center;font-size:12px;background:rgba(255,255,255,.04);cursor:pointer;min-height:58px;}
+    .day.active{border-color:var(--green);background:rgba(34,197,94,.18);}
+    .day.done{outline:2px solid rgba(34,197,94,.35);}
+    .day small{display:block;color:var(--muted);font-size:10px;margin-top:3px;line-height:1.1;}
+
+    .session-box{
+      display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;
+      padding:12px;border-radius:18px;border:1px solid rgba(56,189,248,.20);
+      background:rgba(56,189,248,.08);margin:12px 0 14px;
+    }
+    .session-time{font-size:26px;font-weight:1000;text-align:right;letter-spacing:1px;}
+    .session-running{background:linear-gradient(135deg,var(--yellow),#ea580c)!important;color:#1c0d00!important;}
+
+    .exercise{padding:13px;border-radius:18px;border:1px solid var(--border);background:rgba(0,0,0,.22);margin-bottom:10px;}
+    .ex-title{font-weight:900;font-size:15px;}
+    .ex-meta{color:var(--muted);font-size:13px;margin-top:3px;}
+    .ex-desc{margin-top:8px;padding:9px 10px;border-left:3px solid rgba(34,197,94,.65);background:rgba(34,197,94,.08);border-radius:10px;color:#cbd5e1;font-size:12.5px;line-height:1.42;}
+    .sets{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
+
+    button{border:0;border-radius:14px;padding:11px 13px;font-weight:900;color:var(--text);background:rgba(255,255,255,.09);cursor:pointer;touch-action:manipulation;}
+    button:active{transform:scale(.97);}
+    .done-btn{background:var(--green)!important;color:#031208!important;}
+    .timer-btn{min-width:88px;background:rgba(56,189,248,.14);color:#e0f2fe;border:1px solid rgba(56,189,248,.24);}
+    .timer-running{background:linear-gradient(135deg,var(--blue),#2563eb)!important;color:#02131f!important;}
+    .main{background:linear-gradient(135deg,var(--green),#16a34a);color:#031208;width:100%;margin-top:10px;}
+    .blue{background:linear-gradient(135deg,var(--blue),#2563eb);color:#02131f;width:100%;margin-top:10px;}
+    .secondary{background:rgba(255,255,255,.09);width:100%;margin-top:10px;}
+    .danger{background:linear-gradient(135deg,var(--red),#b91c1c);}
+
+    .timer{font-size:52px;font-weight:1000;text-align:center;margin:12px 0 4px;letter-spacing:1px;}
+    .timer-phase{text-align:center;color:var(--muted);font-size:14px;font-weight:800;margin-bottom:12px;}
+    .timer-row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+    .timer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+    label{display:block;color:var(--muted);font-size:13px;font-weight:800;margin:10px 0 5px;}
+    input,select,textarea{width:100%;border:1px solid var(--border);border-radius:15px;padding:12px;background:rgba(0,0,0,.28);color:var(--text);font-size:15px;outline:0;}
+    textarea{resize:none;}
+    .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .status{margin-top:12px;padding:13px;border-radius:18px;line-height:1.45;font-size:14px;font-weight:700;}
+    .green{background:rgba(34,197,94,.16);border:1px solid rgba(34,197,94,.35)}
+    .yellow{background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.35)}
+    .red{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.35)}
+
+    .history-item{padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.45;}
+    .report-box{width:100%;min-height:260px;margin-top:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;}
+    .report-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+
+    .bottom-nav{position:fixed;bottom:12px;left:12px;right:12px;max-width:520px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:7px;background:rgba(8,11,18,.9);border:1px solid var(--border);border-radius:22px;padding:8px;backdrop-filter:blur(14px);z-index:10;}
+    .nav-btn{padding:10px 5px;font-size:11px;border-radius:16px;}
+    .nav-btn.active{background:rgba(34,197,94,.22);color:var(--green);}
+    .hidden{display:none!important;}
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">TGB</div>
+      <div>
+        <h1>TGB</h1>
+        <div class="sub" id="dateText"></div>
+      </div>
+    </header>
+
+    <section id="tabHoy">
+      <div class="card today">
+        <div class="label">Hoy corresponde</div>
+        <div class="today-title" id="todayName"></div>
+        <div class="pill" id="todayType"></div>
+      </div>
+
+      <div class="card">
+        <div class="label">Semana</div>
+        <div class="week" id="week"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="routineTitle"></h2>
+        <p class="sub" id="routineGoal"></p>
+
+        <div class="session-box">
+          <button id="sessionButton" onclick="toggleSessionTimer()">Iniciar</button>
+          <div class="session-time" id="sessionTime">00:00:00</div>
+        </div>
+
+        <div id="routineBox"></div>
+        <button class="main" onclick="goToRegisterFromRoutine()">Registrar</button>
+      </div>
+    </section>
+
+    <section id="tabRegistrar" class="hidden">
+      <div class="card">
+        <h2>Registrar</h2>
+        <p class="sub">Por defecto se guarda con la fecha actual de Santiago de Chile. Puedes cambiar la fecha si olvidaste registrar un entrenamiento anterior.</p>
+
+        <button class="secondary" onclick="toggleDateField()">Cambiar fecha del registro</button>
+        <div id="dateFieldBox" class="hidden">
+          <label>Fecha del registro</label>
+          <input id="recordDate" type="date">
+        </div>
+
+        <label>¿Qué hiciste?</label>
+        <select id="activityType" onchange="renderActivityFields()">
+          <option>Físico</option>
+          <option>Tenis</option>
+          <option>Cardio</option>
+          <option>Movilidad</option>
+          <option>Descanso</option>
+          <option>Kinesiología</option>
+          <option>Otro</option>
+        </select>
+
+        <div id="activityFields"></div>
+
+        <label>Fatiga general 0–10</label>
+        <input id="fatigue" type="number" min="0" max="10" value="3">
+
+        <label>Dolor pulgar derecho 0–10</label>
+        <input id="thumbPain" type="number" min="0" max="10" value="0">
+
+        <label>Dolor Rodilla / Aquiles 0–10</label>
+        <input id="legPain" type="number" min="0" max="10" value="0">
+
+        <label>Sensación</label>
+        <select id="feeling">
+          <option>Me sentí bien</option>
+          <option>Normal</option>
+          <option>Fatigado</option>
+          <option>Pesado</option>
+          <option>Con molestias</option>
+          <option>Muy bien</option>
+          <option>Muy fatigado</option>
+        </select>
+
+        <label>Notas</label>
+        <textarea id="notes" rows="3" placeholder="Ej: dormí poco, molestia en pulgar, buen ánimo, hice bici suave..."></textarea>
+
+        <button class="blue" onclick="analyzeReadiness()">Analizar estado</button>
+        <button class="main" onclick="saveRegister()">Guardar registro</button>
+
+        <div id="recommendation" class="status green">
+          Ingresa tus sensaciones y presiona “Analizar estado”.
+        </div>
+      </div>
+    </section>
+
+    <section id="tabTimer" class="hidden">
+      <div class="card">
+        <h2>Timer personalizado</h2>
+
+        <div class="timer" id="timer">00:30</div>
+        <div class="timer-phase" id="timerPhase">Listo</div>
+
+        <div class="timer-grid">
+          <div>
+            <label>Actividad (segundos)</label>
+            <input id="workSeconds" type="number" min="1" value="30">
+          </div>
+          <div>
+            <label>Descanso (segundos)</label>
+            <input id="restSeconds" type="number" min="0" value="10">
+          </div>
+          <div>
+            <label>Rondas</label>
+            <input id="rounds" type="number" min="0" value="6">
+          </div>
+          <div>
+            <label>Modo</label>
+            <select id="timerMode">
+              <option value="interval">Actividad + descanso</option>
+              <option value="single">Cuenta única</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="main" onclick="startCustomTimer()">Iniciar</button>
+        <button class="danger secondary" onclick="stopTimer()">Stop</button>
+
+        <div class="timer-row" style="margin-top:12px;">
+          <button onclick="quickTimer(30)">30s</button>
+          <button onclick="quickTimer(40)">40s</button>
+          <button onclick="quickTimer(60)">60s</button>
+          <button onclick="quickTimer(300)">5min</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tabHistorial" class="hidden">
+      <div class="card">
+        <h2>Historial</h2>
+        <div id="history"></div>
+      </div>
+
+      <div class="card">
+        <h2>Informes</h2>
+        <p class="sub">Genera un informe para copiar y pegar a tu entrenador de ChatGPT.</p>
+
+        <div class="report-buttons">
+          <button onclick="generateReport(7)">7 días</button>
+          <button onclick="generateReport(15)">15 días</button>
+          <button onclick="generateReport(30)">30 días</button>
+        </div>
+
+        <textarea id="reportOutput" class="report-box" placeholder="Aquí aparecerá tu informe..."></textarea>
+        <button class="blue" onclick="copyReport()">Copiar informe</button>
+      </div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" onclick="showTab('Hoy', this)">Hoy</button>
+    <button class="nav-btn" onclick="showTab('Registrar', this)">Registrar</button>
+    <button class="nav-btn" onclick="showTab('Timer', this)">Timer</button>
+    <button class="nav-btn" onclick="showTab('Historial', this)">Historial</button>
+  </nav>
+
+<script>
+const TZ = "America/Santiago";
+
+const dayNamesShort = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const dayNamesFull = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+const exerciseDescriptions = {
+  "Bicicleta suave": "Pedaleo cómodo para subir temperatura corporal sin impacto. Debes sentir que despiertas las piernas, no que te agotas.",
+  "Movilidad tobillo/cadera/hombros": "Movimientos controlados de tobillos, cadera y hombros antes de cargar. La idea es preparar articulaciones y mejorar rango de movimiento.",
+  "Puente de glúteo": "Acostado boca arriba, pies apoyados, sube la cadera apretando glúteos. Evita arquear excesivamente la espalda baja.",
+  "Monster walk con banda": "Banda sobre rodillas o tobillos. Baja levemente en posición atlética y camina lateralmente manteniendo tensión. Trabaja glúteo medio y estabilidad de rodilla.",
+  "Sentadilla goblet": "Sostén una mancuerna o pesa frente al pecho. Baja como sentadilla manteniendo torso firme, rodillas alineadas y pies bien apoyados.",
+  "Peso muerto rumano": "Lleva la cadera hacia atrás con espalda neutra y rodillas apenas flexionadas. Debes sentir isquios y glúteos, no dolor lumbar.",
+  "Step-up a banco": "Sube a un banco o escalón con una pierna, empujando desde el talón. Baja controlado. Muy útil para tenis y estabilidad unilateral.",
+  "Elevación de gemelos": "Al inicio hazla bilateral: sube ambos talones, pausa arriba y baja lento. Más adelante puedes progresar a unilateral.",
+  "Plancha": "Apoya antebrazos y pies, abdomen firme y cuerpo recto. No dejes caer la cadera ni eleves demasiado los glúteos.",
+  "Plancha lateral": "Apoya un antebrazo y el borde del pie. Mantén cadera elevada y cuerpo alineado. Trabaja core lateral, clave para estabilidad en golpes.",
+  "Dead bug": "Boca arriba, abdomen firme. Baja pierna y brazo contrario sin despegar la espalda baja del suelo. Control antes que velocidad.",
+  "Movilidad hombro/escápula": "Incluye círculos de hombro, retracción escapular, wall slides y rotaciones suaves. Prepara hombro y escápula para empujar, tirar y golpear.",
+  "Press unilateral mancuerna": "Empuja una mancuerna con un brazo de forma controlada. Mantén abdomen firme para no rotar el tronco.",
+  "Remo unilateral": "Tira la mancuerna hacia el costado del cuerpo llevando el codo atrás. Aprieta escápula y evita encoger el hombro.",
+  "Face pull": "Con banda o polea a la altura de la cara, tira hacia tu rostro abriendo codos y juntando escápulas. Fortalece hombro posterior.",
+  "Rotación externa con banda": "Codo pegado al cuerpo a 90 grados. Gira el antebrazo hacia afuera contra la banda. Controla lento, sin compensar con el tronco.",
+  "Curl martillo": "Curl con agarre neutro, como sosteniendo un martillo. Fortalece bíceps, braquial y antebrazo útil para agarre de raqueta.",
+  "Extensión tríceps unilateral": "Extiende el codo de un brazo con mancuerna o banda. Mantén el hombro estable y evita balancear el cuerpo.",
+  "Pronación/supinación": "Con mancuerna liviana o martillo, gira el antebrazo palma arriba y palma abajo. Útil para codo, muñeca y control de raqueta.",
+  "Excéntrico muñeca": "Apoya el antebrazo. Sube la muñeca ayudándote si hace falta y baja lento en 3-4 segundos. Muy usado para prevenir codo de tenista.",
+  "Excéntricos muñeca suaves": "Versión ligera del excéntrico de muñeca. Apoya el antebrazo, sube la muñeca sin forzar y baja lento. Debe sentirse preventivo, no doloroso.",
+  "Farmer carry unilateral": "Camina sosteniendo una mancuerna en un solo lado. Mantén el tronco recto sin inclinarte. Trabaja agarre y core anti-inclinación.",
+  "Pallof press": "Con banda al costado, empuja al frente sin dejar que el tronco rote. Es un ejercicio anti-rotación muy útil para tenis.",
+  "Movilidad previa": "Antes de tenis: movilidad de tobillos, caderas, columna torácica, hombro y muñeca. Debe dejarte más suelto, no cansado.",
+  "Tenis": "Sesión de cancha. En retorno progresivo, prioriza técnica, ritmo y sensaciones antes que intensidad máxima.",
+  "Estiramientos suaves": "Después del tenis: estira suave gemelos, cuádriceps, glúteos, espalda, hombro y antebrazo. No fuerces rangos dolorosos.",
+  "Vuelta a la calma": "Baja progresivamente pulsaciones con caminata suave, respiración y movilidad ligera. Ayuda a recuperar mejor.",
+  "Movilidad antebrazo/pulgar": "Movimientos suaves de muñeca, dedos y pulgar. Busca circulación y rango sin dolor, especialmente tras volver de lesión.",
+  "Movilidad dinámica": "Movimientos activos: cadera, tobillos, sentadillas suaves, skipping bajo, rotaciones de tronco y hombros. Prepara el cuerpo para moverse rápido.",
+  "Split step": "Pequeño salto/rebote justo antes de reaccionar, cayendo con rodillas flexionadas y listo para salir a cualquier dirección.",
+  "Pies rápidos / escalera": "Pasos cortos y rápidos en escalera real o imaginaria. Mantén postura atlética y contacto rápido con el suelo.",
+  "Desplazamientos laterales": "Muévete lateralmente sin cruzar pies, postura baja y controlada. Simula defensa y recuperación de posición en tenis.",
+  "Sprints cortos": "Aceleraciones de 10 metros. Enfócate en salida explosiva y frenado controlado, no en correr largo.",
+  "Cambios de dirección": "Acelera, frena y cambia de dirección con control. Baja el centro de gravedad y evita que la rodilla colapse hacia adentro.",
+  "Sentadilla explosiva controlada": "Subida rápida y potente, bajada controlada. Debe sentirse atlética, sin perder técnica ni cargar la rodilla con desorden.",
+  "Zancadas caminando": "Da pasos largos controlados, baja la rodilla trasera sin golpear el suelo y avanza empujando desde la pierna delantera.",
+  "Gemelos": "Trabajo de pantorrilla. Hazlo bilateral y con bajada lenta. Ayuda a tobillo, Aquiles y empuje en cancha.",
+  "Bicicleta zona 2": "Ritmo cómodo pero activo. Puedes hablar frases cortas sin ahogarte. Mejora resistencia y recuperación sin impacto.",
+  "Tenis suave": "Sesión liviana de cancha: técnica, peloteo suave y desplazamientos moderados. No es día para competir al máximo.",
+  "Movilidad completa": "Trabajo general de movilidad de tobillos, cadera, espalda, hombro y muñeca. Ideal si estás cargado o recuperando.",
+  "Recuperar rutina perdida": "Usa este bloque para hacer la rutina A, B o C que no pudiste realizar durante la semana.",
+  "Caminata suave": "Camina a ritmo cómodo para mover sangre y recuperar sin impacto. Debe dejarte mejor, no más cansado.",
+  "Movilidad general": "Movilidad global suave para mantener articulaciones activas y bajar rigidez.",
+  "Respiración / estiramientos": "Respira lento y haz estiramientos suaves. Sirve para bajar activación y favorecer recuperación."
+};
+
+const routines = {
+  1:{name:"Fuerza A",type:"Piernas + fuerza base",goal:"Piernas, glúteos, core y base física para tenis.",exercises:[
+    ["Bicicleta suave","5 min",1],
+    ["Movilidad tobillo/cadera/hombros","5 min",1],
+    ["Puente de glúteo","3 x 15",3],
+    ["Monster walk con banda","3 x 12",3],
+    ["Sentadilla goblet","4 x 8",4],
+    ["Peso muerto rumano","4 x 8",4],
+    ["Step-up a banco","3 x 10 por pierna",3],
+    ["Elevación de gemelos","4 x 15",4],
+    ["Plancha","3 x 40-60s",3],
+    ["Plancha lateral","3 x 30s por lado",3],
+    ["Dead bug","3 x 10",3]
+  ]},
+  2:{name:"Tenis",type:"Cancha",goal:"Ritmo, técnica y retorno progresivo.",exercises:[
+    ["Movilidad previa","10 min aprox",1,{noCountdown:true}],
+    ["Tenis","60-90 min aprox",1,{noCountdown:true}],
+    ["Estiramientos suaves","10 min aprox",1,{noCountdown:true}],
+    ["Excéntricos muñeca suaves","2 x 12",2,{noCountdown:true}]
+  ]},
+  3:{name:"Fuerza B",type:"Tren superior + estabilidad",goal:"Hombro, espalda, antebrazo, agarre y core.",exercises:[
+    ["Bicicleta suave","5 min",1],
+    ["Movilidad hombro/escápula","5 min",1],
+    ["Press unilateral mancuerna","4 x 8",4],
+    ["Remo unilateral","4 x 10",4],
+    ["Face pull","4 x 15",4],
+    ["Rotación externa con banda","3 x 15",3],
+    ["Curl martillo","3 x 10",3],
+    ["Extensión tríceps unilateral","3 x 12",3],
+    ["Pronación/supinación","3 x 15",3],
+    ["Excéntrico muñeca","3 x 12",3],
+    ["Farmer carry unilateral","3 x 30 m",3],
+    ["Pallof press","3 x 12",3]
+  ]},
+  4:{name:"Tenis",type:"Cancha",goal:"Sesión de tenis con intensidad controlada.",exercises:[
+    ["Movilidad previa","10 min aprox",1,{noCountdown:true}],
+    ["Tenis","60-90 min aprox",1,{noCountdown:true}],
+    ["Vuelta a la calma","10 min aprox",1,{noCountdown:true}],
+    ["Movilidad antebrazo/pulgar","5 min aprox",1,{noCountdown:true}],
+    ["Excéntricos muñeca suaves","2 x 12",2,{noCountdown:true}]
+  ]},
+  5:{name:"Fuerza C",type:"Agilidad + potencia",goal:"Split step, aceleración, frenado y resistencia específica.",exercises:[
+    ["Bicicleta suave","5 min",1],
+    ["Movilidad dinámica","5 min",1],
+    ["Split step","3 x 20",3],
+    ["Pies rápidos / escalera","5 min",1],
+    ["Desplazamientos laterales","5 x 20s",5],
+    ["Sprints cortos","6 x 10m",6],
+    ["Cambios de dirección","6 repeticiones",6],
+    ["Sentadilla explosiva controlada","3 x 8",3],
+    ["Zancadas caminando","3 x 10",3],
+    ["Gemelos","3 x 15",3],
+    ["Bicicleta zona 2","15 min",1],
+    ["Plancha","2 x 45s",2]
+  ]},
+  6:{name:"Flexible",type:"Tenis / cardio / recuperar",goal:"Elegir según fatiga: tenis suave, bicicleta zona 2, movilidad o recuperar sesión perdida.",exercises:[
+    ["Tenis suave","60 min aprox",1,{noCountdown:true}],
+    ["Bicicleta zona 2","30-45 min",1],
+    ["Movilidad completa","20 min",1],
+    ["Recuperar rutina perdida","según corresponda",1,{noCountdown:true}]
+  ]},
+  0:{name:"Recuperación",type:"Descanso activo",goal:"Recuperar y preparar la semana.",exercises:[
+    ["Caminata suave","20-30 min",1],
+    ["Movilidad general","15 min",1],
+    ["Respiración / estiramientos","5 min",1]
+  ]}
+};
+
+let selectedDay = getChileDayIndex();
+let timerInterval = null;
+let remaining = 30;
+let intervalState = {running:false,phase:"work",currentRound:1,totalRounds:6,work:30,rest:10};
+let exerciseIntervals = {};
+let audioCtx = null;
+let sessionTick = null;
+
+document.getElementById("dateText").textContent = getChileDateText();
+document.getElementById("recordDate").value = getChileDateISO();
+
+document.getElementById("activityType").addEventListener("change", renderActivityFields);
+document.getElementById("recordDate").addEventListener("change", renderActivityFields);
+
+function getChileParts(){
+  const parts = new Intl.DateTimeFormat("es-CL", {timeZone: TZ, year:"numeric", month:"2-digit", day:"2-digit", weekday:"long", hour:"2-digit", minute:"2-digit", hour12:false}).formatToParts(new Date());
+  const obj = {};
+  parts.forEach(p => obj[p.type] = p.value);
+  return obj;
+}
+
+function getChileDateISO(){
+  const p = getChileParts();
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+function dayIndexFromISO(iso){
+  const [y,m,d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+function getChileDayIndex(){
+  return dayIndexFromISO(getChileDateISO());
+}
+
+function getChileDateText(){
+  const p = getChileParts();
+  const day = p.weekday.charAt(0).toUpperCase() + p.weekday.slice(1);
+  return `${day}, ${p.day}/${p.month}/${p.year} · Santiago de Chile`;
+}
+
+function formatDateISO(date){
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2,"0");
+  const d = String(date.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+function getCurrentWeekMonday(){
+  const iso = getChileDateISO();
+  const [y,m,d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function isoForWeekDay(dayIndex){
+  const monday = getCurrentWeekMonday();
+  const offset = dayIndex === 0 ? 6 : dayIndex - 1;
+  const date = new Date(monday);
+  date.setDate(monday.getDate() + offset);
+  return formatDateISO(date);
+}
+
+function routineKey(day = selectedDay){return `routine-${isoForWeekDay(day)}-${day}`;}
+function doneKey(day = selectedDay){return `done-${isoForWeekDay(day)}-${day}`;}
+function sessionKey(day = selectedDay){return `session-${isoForWeekDay(day)}-${day}`;}
+
+function getRecordBase(dateISO){
+  const d = dayIndexFromISO(dateISO);
+  return {id:Date.now(),dateISO,day:dayNamesFull[d],plannedRoutine:routines[d].name,plannedType:routines[d].type};
+}
+
+function showTab(name,btn){
+  ["Hoy","Registrar","Timer","Historial"].forEach(t => document.getElementById("tab"+t).classList.add("hidden"));
+  document.getElementById("tab"+name).classList.remove("hidden");
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  if(name === "Registrar") renderActivityFields();
+  renderHistory();
+}
+
+function showTabByName(name){
+  const buttons = Array.from(document.querySelectorAll(".nav-btn"));
+  const btn = buttons.find(b => b.textContent.trim() === name);
+  if(btn) showTab(name, btn);
+}
+
+function renderWeek(){
+  const week = document.getElementById("week");
+  week.innerHTML = "";
+  [1,2,3,4,5,6,0].forEach(d => {
+    const div = document.createElement("div");
+    div.className = "day";
+    if(d === selectedDay) div.classList.add("active");
+    if(localStorage.getItem(doneKey(d))) div.classList.add("done");
+    div.innerHTML = `<strong>${dayNamesShort[d]}</strong><small>${routines[d].name}</small>`;
+    div.onclick = () => {selectedDay = d; renderAll();};
+    week.appendChild(div);
+  });
+}
+
+function renderRoutine(){
+  const todayDay = getChileDayIndex();
+  const today = routines[todayDay];
+  document.getElementById("todayName").textContent = today.name;
+  document.getElementById("todayType").textContent = today.type;
+
+  const r = routines[selectedDay];
+  document.getElementById("routineTitle").textContent = `${dayNamesFull[selectedDay]} · ${r.name}`;
+  document.getElementById("routineGoal").textContent = r.goal;
+  renderSessionTimer();
+
+  const box = document.getElementById("routineBox");
+  box.innerHTML = "";
+
+  r.exercises.forEach((ex,i) => {
+    const [name,meta,sets,opts = {}] = ex;
+    const desc = exerciseDescriptions[name] ? `<div class="ex-desc">${exerciseDescriptions[name]}</div>` : "";
+    const duration = opts.noCountdown ? null : parseDurationSeconds(meta);
+    let buttons = "";
+
+    for(let s = 1; s <= sets; s++){
+      const setKey = `${routineKey()}-ex-${i}-set-${s}`;
+      const done = localStorage.getItem(setKey);
+      if(duration){
+        const label = done ? "OK" : formatMMSS(duration);
+        buttons += `<button class="timer-btn ${done ? "done-btn" : ""}" onclick="startExerciseTimer('${setKey}', ${duration}, this)">${label}</button>`;
+      }else{
+        buttons += `<button class="${done ? "done-btn" : ""}" onclick="toggleSet('${setKey}', this)">${done ? "OK" : "Hecho"}</button>`;
+      }
+    }
+
+    box.innerHTML += `<div class="exercise"><div class="ex-title">${name}</div><div class="ex-meta">${meta}</div>${desc}<div class="sets">${buttons}</div></div>`;
+  });
+}
+
+function parseDurationSeconds(meta){
+  const text = meta.toLowerCase().replace(",", ".");
+  const minMatch = text.match(/(\d+)(?:\s*-\s*\d+)?\s*min/);
+  if(minMatch) return Number(minMatch[1]) * 60;
+  const secMatch = text.match(/(\d+)(?:\s*-\s*\d+)?\s*s/);
+  if(secMatch) return Number(secMatch[1]);
+  return null;
+}
+
+function toggleSet(k,btn){
+  if(localStorage.getItem(k)){localStorage.removeItem(k);btn.classList.remove("done-btn");btn.textContent="Hecho";}
+  else{localStorage.setItem(k,"done");btn.classList.add("done-btn");btn.textContent="OK";}
+}
+
+function startExerciseTimer(k, seconds, btn){
+  if(localStorage.getItem(k)){localStorage.removeItem(k);btn.classList.remove("done-btn");btn.textContent = formatMMSS(seconds);return;}
+  if(exerciseIntervals[k]){clearInterval(exerciseIntervals[k]);delete exerciseIntervals[k];btn.classList.remove("timer-running");btn.textContent = formatMMSS(seconds);return;}
+  let left = seconds;
+  btn.classList.add("timer-running");
+  btn.textContent = formatMMSS(left);
+  exerciseIntervals[k] = setInterval(() => {
+    left--;
+    btn.textContent = formatMMSS(left);
+    if(left <= 0){
+      clearInterval(exerciseIntervals[k]);
+      delete exerciseIntervals[k];
+      localStorage.setItem(k,"done");
+      btn.classList.remove("timer-running");
+      btn.classList.add("done-btn");
+      btn.textContent = "OK";
+      alertSignal();
+    }
+  },1000);
+}
+
+function getSessionState(day = selectedDay){
+  const raw = localStorage.getItem(sessionKey(day));
+  if(!raw) return {elapsed:0,running:false,startedAt:null};
+  try{return JSON.parse(raw);}catch(e){return {elapsed:0,running:false,startedAt:null};}
+}
+
+function setSessionState(state, day = selectedDay){
+  localStorage.setItem(sessionKey(day), JSON.stringify(state));
+}
+
+function getSessionElapsed(day = selectedDay){
+  const s = getSessionState(day);
+  let elapsed = Number(s.elapsed) || 0;
+  if(s.running && s.startedAt) elapsed += Math.floor((Date.now() - Number(s.startedAt)) / 1000);
+  return elapsed;
+}
+
+function toggleSessionTimer(){
+  const s = getSessionState();
+  if(s.running){
+    s.elapsed = getSessionElapsed();
+    s.running = false;
+    s.startedAt = null;
+    setSessionState(s);
+    stopSessionTick();
+  }else{
+    s.running = true;
+    s.startedAt = Date.now();
+    setSessionState(s);
+    startSessionTick();
+  }
+  renderSessionTimer();
+}
+
+function startSessionTick(){
+  stopSessionTick();
+  sessionTick = setInterval(renderSessionTimer,1000);
+}
+
+function stopSessionTick(){
+  if(sessionTick) clearInterval(sessionTick);
+  sessionTick = null;
+}
+
+function renderSessionTimer(){
+  const btn = document.getElementById("sessionButton");
+  const time = document.getElementById("sessionTime");
+  const s = getSessionState();
+  time.textContent = formatHHMMSS(getSessionElapsed());
+  btn.textContent = s.running ? "Detener" : "Iniciar";
+  btn.classList.toggle("session-running", !!s.running);
+  if(s.running) startSessionTick(); else stopSessionTick();
+}
+
+function goToRegisterFromRoutine(){
+  const d = selectedDay;
+  const dateISO = isoForWeekDay(d);
+  document.getElementById("recordDate").value = dateISO;
+  document.getElementById("dateFieldBox").classList.remove("hidden");
+  const routineName = routines[d].name;
+
+  if(routineName.includes("Fuerza")){
+    document.getElementById("activityType").value = "Físico";
+  }else if(routineName.includes("Tenis")){
+    document.getElementById("activityType").value = "Tenis";
+  }else if(routineName.includes("Recuperación")){
+    document.getElementById("activityType").value = "Movilidad";
+  }else{
+    document.getElementById("activityType").value = "Otro";
+  }
+
+  showTabByName("Registrar");
+  renderActivityFields();
+
+  const mins = Math.round(getSessionElapsed(d) / 60);
+  if(document.getElementById("durationMinutes") && mins > 0){
+    document.getElementById("durationMinutes").value = mins;
+  }
+  const phys = document.getElementById("physicalRoutine");
+  if(phys && routineName === "Fuerza A") phys.value = "A";
+  if(phys && routineName === "Fuerza B") phys.value = "B";
+  if(phys && routineName === "Fuerza C") phys.value = "C";
+}
+
+function toggleDateField(){
+  document.getElementById("dateFieldBox").classList.toggle("hidden");
+}
+
+function renderActivityFields(){
+  const type = document.getElementById("activityType").value;
+  const box = document.getElementById("activityFields");
+  const dateISO = document.getElementById("recordDate").value || getChileDateISO();
+  const d = dayIndexFromISO(dateISO);
+  const planned = routines[d].name;
+  const defaultMins = Math.round(getSessionElapsed(d) / 60) || "";
+
+  if(type === "Físico"){
+    const defaultRoutine = planned === "Fuerza A" ? "A" : planned === "Fuerza B" ? "B" : planned === "Fuerza C" ? "C" : "A";
+    box.innerHTML = `<label>¿Qué físico realizaste?</label><select id="physicalRoutine"><option value="A">Físico A</option><option value="B">Físico B</option><option value="C">Físico C</option><option value="Otro">Otro físico</option></select><div class="field-grid"><div><label>Tiempo total (min)</label><input id="durationMinutes" type="number" min="0" value="${defaultMins}" placeholder="Ej: 65"></div><div><label>Calorías quemadas</label><input id="calories" type="number" min="0" placeholder="Ej: 350"></div></div>`;
+    document.getElementById("physicalRoutine").value = defaultRoutine;
+  }else if(type === "Tenis"){
+    box.innerHTML = `<div class="field-grid"><div><label>Tiempo total tenis (min)</label><input id="durationMinutes" type="number" min="0" value="${defaultMins}" placeholder="Ej: 90"></div><div><label>Calorías quemadas</label><input id="calories" type="number" min="0" placeholder="Ej: 650"></div></div>`;
+  }else if(type === "Cardio"){
+    box.innerHTML = `<label>Tipo de cardio</label><select id="cardioType"><option>Bicicleta</option><option>Trote</option><option>Caminata</option><option>Otro</option></select><div class="field-grid"><div><label>Kilómetros</label><input id="kms" type="number" min="0" step="0.01" placeholder="Ej: 5.2"></div><div><label>Tiempo total (min)</label><input id="durationMinutes" type="number" min="0" value="${defaultMins}" placeholder="Ej: 35"></div></div><label>Calorías quemadas opcional</label><input id="calories" type="number" min="0" placeholder="Ej: 280">`;
+  }else{
+    box.innerHTML = `<div class="field-grid"><div><label>Tiempo total (min)</label><input id="durationMinutes" type="number" min="0" value="${defaultMins}" placeholder="Ej: 20"></div><div><label>Calorías opcional</label><input id="calories" type="number" min="0" placeholder="Ej: 100"></div></div>`;
+  }
+}
+
+function saveRegister(){
+  const dateISO = document.getElementById("recordDate").value || getChileDateISO();
+  const d = dayIndexFromISO(dateISO);
+  const activity = document.getElementById("activityType").value;
+  const data = {
+    ...getRecordBase(dateISO),
+    type:"Registro de actividad",
+    activity,
+    physicalRoutine: document.getElementById("physicalRoutine")?.value || "",
+    cardioType: document.getElementById("cardioType")?.value || "",
+    kms: document.getElementById("kms")?.value || "",
+    durationMinutes: document.getElementById("durationMinutes")?.value || "",
+    calories: document.getElementById("calories")?.value || "",
+    fatigue: document.getElementById("fatigue").value,
+    thumbPain: document.getElementById("thumbPain").value,
+    legPain: document.getElementById("legPain").value,
+    feeling: document.getElementById("feeling").value,
+    notes: document.getElementById("notes").value
+  };
+  localStorage.setItem(doneKey(d), "done");
+  addHistoryRecord(data);
+  renderAll();
+  alert("Registro guardado ✅");
+}
+
+function addHistoryRecord(data){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  h.unshift(data);
+  localStorage.setItem("history", JSON.stringify(h.slice(0,300)));
+}
+
+function analyzeReadiness(){
+  const fatigue = Number(document.getElementById("fatigue").value);
+  const thumb = Number(document.getElementById("thumbPain").value);
+  const leg = Number(document.getElementById("legPain").value);
+  const rec = document.getElementById("recommendation");
+  const total = fatigue + thumb + leg;
+
+  if(thumb >= 6 || leg >= 6 || fatigue >= 8){
+    rec.className = "status red";
+    rec.innerHTML = "<strong>Bajar carga hoy.</strong><br>Haz movilidad, bicicleta suave o recuperación. Evita tenis fuerte, agarres intensos, sprints y cargas pesadas.";
+  }else if(total >= 10 || fatigue >= 6 || thumb >= 4 || leg >= 4){
+    rec.className = "status yellow";
+    rec.innerHTML = "<strong>Sesión moderada.</strong><br>Reduce 20–30% el volumen. Mantén técnica limpia y evita buscar récords.";
+  }else{
+    rec.className = "status green";
+    rec.innerHTML = "<strong>Puedes entrenar normal.</strong><br>Si completas todo bien, la próxima sesión puedes subir levemente repeticiones o carga.";
+  }
+}
+
+function startCustomTimer(){
+  stopTimer();
+  const mode = document.getElementById("timerMode").value;
+  const work = Math.max(1, Number(document.getElementById("workSeconds").value));
+  const rest = Math.max(0, Number(document.getElementById("restSeconds").value));
+  const rounds = Math.max(0, Number(document.getElementById("rounds").value));
+  intervalState = {running:true,phase:"work",currentRound:1,totalRounds:rounds,work,rest,mode};
+  remaining = work;
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    remaining--;
+    updateTimerDisplay();
+    if(remaining <= 0){
+      alertSignal();
+      if(mode === "single"){stopTimer();return;}
+      if(intervalState.phase === "work"){
+        if(rest > 0){intervalState.phase = "rest";remaining = rest;}else{nextRoundOrStop();}
+      }else{nextRoundOrStop();}
+      updateTimerDisplay();
+    }
+  },1000);
+}
+
+function nextRoundOrStop(){
+  if(intervalState.totalRounds !== 0 && intervalState.currentRound >= intervalState.totalRounds){
+    stopTimer();
+    document.getElementById("timerPhase").textContent = "Terminado";
+    return;
+  }
+  intervalState.currentRound++;
+  intervalState.phase = "work";
+  remaining = intervalState.work;
+}
+
+function quickTimer(sec){
+  document.getElementById("timerMode").value = "single";
+  document.getElementById("workSeconds").value = sec;
+  document.getElementById("restSeconds").value = 0;
+  document.getElementById("rounds").value = 1;
+  startCustomTimer();
+}
+
+function stopTimer(){
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+  intervalState.running = false;
+  document.getElementById("timerPhase").textContent = "Detenido";
+}
+
+function updateTimerDisplay(){
+  document.getElementById("timer").textContent = formatMMSS(remaining);
+  if(intervalState.running){
+    const phase = intervalState.phase === "work" ? "Actividad" : "Descanso";
+    const roundsText = intervalState.totalRounds === 0 ? "∞" : intervalState.totalRounds;
+    document.getElementById("timerPhase").textContent = `${phase} · Ronda ${intervalState.currentRound}/${roundsText}`;
+  }
+}
+
+function formatMMSS(seconds){
+  const s = Math.max(0, Number(seconds));
+  const m = String(Math.floor(s / 60)).padStart(2,"0");
+  const sec = String(s % 60).padStart(2,"0");
+  return `${m}:${sec}`;
+}
+
+function formatHHMMSS(seconds){
+  const s = Math.max(0, Number(seconds));
+  const h = String(Math.floor(s / 3600)).padStart(2,"0");
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2,"0");
+  const sec = String(s % 60).padStart(2,"0");
+  return `${h}:${m}:${sec}`;
+}
+
+function alertSignal(){
+  navigator.vibrate?.(350);
+  try{
+    if(!audioCtx){audioCtx = new (window.AudioContext || window.webkitAudioContext)();}
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.08;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    setTimeout(() => {osc.stop();},180);
+  }catch(e){}
+}
+
+function renderHistory(){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  const box = document.getElementById("history");
+  if(!h.length){box.innerHTML = "<p class='sub'>Aún no hay registros.</p>";return;}
+  box.innerHTML = h.slice(0,30).map(x => `<div class="history-item"><strong>${x.dateISO} · ${x.day}</strong><br><span class="sub">Plan: ${x.plannedRoutine || "Sin plan"}</span><br>Actividad: ${x.activity || "-"}${x.physicalRoutine ? " · Físico " + x.physicalRoutine : ""}${x.cardioType ? " · " + x.cardioType : ""}<br>Tiempo: ${x.durationMinutes || "no registrado"} min · Calorías: ${x.calories || "no registradas"}${x.kms ? " · Km: " + x.kms : ""}<br>Fatiga ${x.fatigue || "-"}/10 · Pulgar ${x.thumbPain || "-"}/10 · Rodilla/Aquiles ${x.legPain || "-"}/10<br>Sensación: ${x.feeling || "-"}<br>${x.notes ? "Notas: " + x.notes : ""}</div>`).join("");
+}
+
+function generateReport(days){
+  const h = JSON.parse(localStorage.getItem("history") || "[]");
+  const today = new Date(getChileDateISO() + "T12:00:00");
+  const start = new Date(today);
+  start.setDate(today.getDate() - days + 1);
+  const startISO = formatDateISO(start);
+  const endISO = formatDateISO(today);
+  const records = h.filter(x => x.dateISO >= startISO && x.dateISO <= endISO).sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+  const totalCalories = records.reduce((sum,x) => sum + (Number(x.calories) || 0), 0);
+  const totalMinutes = records.reduce((sum,x) => sum + (Number(x.durationMinutes) || 0), 0);
+  const totalKm = records.reduce((sum,x) => sum + (Number(x.kms) || 0), 0);
+  const activityCount = {};
+  records.forEach(x => {const act = x.activity || "Sin actividad";activityCount[act] = (activityCount[act] || 0) + 1;});
+  const avg = key => {const vals = records.map(x => Number(x[key])).filter(n => !isNaN(n));if(!vals.length) return "sin datos";return (vals.reduce((a,b) => a+b,0) / vals.length).toFixed(1);};
+
+  let report = "";
+  report += `INFORME TGB - ÚLTIMOS ${days} DÍAS\n`;
+  report += `Periodo: ${startISO} a ${endISO}\n`;
+  report += `Zona horaria: Santiago de Chile\n\n`;
+  report += `RESUMEN GENERAL\n`;
+  report += `- Registros totales: ${records.length}\n`;
+  report += `- Tiempo total registrado: ${totalMinutes} min\n`;
+  report += `- Calorías registradas: ${totalCalories} kcal\n`;
+  report += `- Kilómetros registrados: ${totalKm.toFixed(2)} km\n`;
+  report += `- Fatiga promedio: ${avg("fatigue")}/10\n`;
+  report += `- Dolor pulgar promedio: ${avg("thumbPain")}/10\n`;
+  report += `- Dolor rodilla/Aquiles promedio: ${avg("legPain")}/10\n\n`;
+  report += `ACTIVIDADES REALIZADAS\n`;
+  Object.keys(activityCount).forEach(k => {report += `- ${k}: ${activityCount[k]} registro(s)\n`;});
+  report += `\nDETALLE DÍA A DÍA\n`;
+  if(!records.length){report += `Sin registros en este periodo.\n`;}
+  else{
+    records.forEach(x => {
+      report += `\n${x.dateISO} - ${x.day}\n`;
+      report += `Plan del día: ${x.plannedRoutine || "-"} (${x.plannedType || "-"})\n`;
+      report += `Actividad real: ${x.activity || "-"}\n`;
+      if(x.physicalRoutine) report += `Físico realizado: ${x.physicalRoutine}\n`;
+      if(x.cardioType) report += `Tipo cardio: ${x.cardioType}\n`;
+      if(x.kms) report += `Kilómetros: ${x.kms}\n`;
+      report += `Tiempo: ${x.durationMinutes || "no registrado"} min\n`;
+      report += `Calorías: ${x.calories || "no registradas"}\n`;
+      report += `Fatiga: ${x.fatigue || "-"}/10\n`;
+      report += `Pulgar derecho: ${x.thumbPain || "-"}/10\n`;
+      report += `Rodilla/Aquiles: ${x.legPain || "-"}/10\n`;
+      report += `Sensación: ${x.feeling || "-"}\n`;
+      if(x.notes) report += `Notas: ${x.notes}\n`;
+    });
+  }
+  document.getElementById("reportOutput").value = report;
+}
+
+function copyReport(){
+  const txt = document.getElementById("reportOutput");
+  txt.select();txt.setSelectionRange(0,999999);document.execCommand("copy");alert("Informe copiado ✅");
+}
+
+function renderAll(){renderWeek();renderRoutine();renderHistory();renderActivityFields();}
+
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js");}
+
+renderAll();
+document.getElementById("timer").textContent = formatMMSS(30);
+document.getElementById("timerPhase").textContent = "Listo";
+</script>
+</body>
+</html>
