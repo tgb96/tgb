@@ -86,6 +86,7 @@
     .ex-title{font-weight:900;font-size:15px;}
     .ex-meta{color:var(--muted);font-size:13px;margin-top:3px;}
     .ex-desc{margin-top:8px;padding:9px 10px;border-left:3px solid rgba(34,197,94,.65);background:rgba(34,197,94,.08);border-radius:10px;color:#cbd5e1;font-size:12.5px;line-height:1.42;}
+    .weight-box{border-left-color:rgba(56,189,248,.75);background:rgba(56,189,248,.08);color:#dbeafe;}
     .sets{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
 
     button{border:0;border-radius:14px;padding:11px 13px;font-weight:900;color:var(--text);background:rgba(255,255,255,.09);cursor:pointer;touch-action:manipulation;}
@@ -338,6 +339,56 @@ const exerciseDescriptions = {
   "Respiración / estiramientos": "Respira lento y haz estiramientos suaves. Sirve para bajar activación y favorecer recuperación."
 };
 
+const suggestedWeights = {
+  "Bicicleta suave": "Sin peso. Ritmo cómodo para calentar, sin agotarte.",
+  "Movilidad tobillo/cadera/hombros": "Sin peso. Movimiento controlado y suave.",
+  "Puente de glúteo": "Peso corporal. Si se siente muy fácil: 10–15 kg sobre la cadera.",
+  "Monster walk con banda": "Banda liviana o media. Debe sentirse en glúteos, sin perder técnica.",
+  "Sentadilla goblet": "8–12 kg al inicio. Objetivo: RPE 6–7/10, sin llegar al fallo.",
+  "Peso muerto rumano": "8–12 kg total al inicio. Prioriza espalda neutra y bajada controlada.",
+  "Step-up a banco": "Peso corporal al inicio. Si es fácil: 4–8 kg total.",
+  "Elevación de gemelos": "Peso corporal al inicio. Luego 6–12 kg. Parte bilateral y progresa a unilateral.",
+  "Plancha": "Peso corporal.",
+  "Plancha lateral": "Peso corporal.",
+  "Dead bug": "Peso corporal. Hazlo más lento antes de aumentar dificultad.",
+
+  "Press unilateral mancuerna": "4–8 kg al inicio. No forzar el pulgar derecho.",
+  "Remo unilateral": "8–12 kg al inicio. Controla la escápula y no tires con el cuello.",
+  "Face pull": "Banda liviana/media o polea liviana. Prioriza técnica y control.",
+  "Rotación externa con banda": "Banda liviana. Debe sentirse controlado, no pesado.",
+  "Curl martillo": "4–8 kg. Si molesta el pulgar, baja carga o evita ese día.",
+  "Extensión tríceps unilateral": "4–8 kg. Movimiento lento, sin bloquear agresivamente el codo.",
+  "Pronación/supinación": "1–3 kg. Ideal con mancuerna liviana o martillo. Movimiento lento.",
+  "Excéntrico muñeca": "1–3 kg. Baja lento en 3–4 segundos.",
+  "Farmer carry unilateral": "8–14 kg. Tronco recto, sin inclinarte hacia el peso.",
+  "Pallof press": "Banda media. Debe sentirse en el core, no en el hombro.",
+
+  "Movilidad dinámica": "Sin peso. Debe prepararte para moverte rápido, no fatigarte.",
+  "Split step": "Peso corporal.",
+  "Pies rápidos / escalera": "Peso corporal.",
+  "Desplazamientos laterales": "Peso corporal.",
+  "Sprints cortos": "Peso corporal. Intensidad controlada si vienes retomando.",
+  "Cambios de dirección": "Peso corporal. Prioriza frenar bien y rodillas alineadas.",
+  "Sentadilla explosiva controlada": "Peso corporal al inicio. Luego 4–8 kg si no hay molestias.",
+  "Zancadas caminando": "Peso corporal al inicio. Luego 4–8 kg total.",
+  "Gemelos": "Peso corporal al inicio. Luego 6–12 kg. Bajada lenta.",
+  "Bicicleta zona 2": "Sin peso. Ritmo cómodo y sostenido.",
+
+  "Movilidad previa": "Sin peso. Activación articular antes de tenis.",
+  "Tenis": "Sin peso. Controla intensidad por sensación y pulgar.",
+  "Estiramientos suaves": "Sin peso. Estiramiento cómodo, nunca doloroso.",
+  "Excéntricos muñeca suaves": "1–2 kg máximo o solo peso de la mano si hay molestia.",
+  "Vuelta a la calma": "Sin peso. Baja pulsaciones y relaja piernas/brazo.",
+  "Movilidad antebrazo/pulgar": "Sin peso o banda muy suave. Movimiento cómodo.",
+  "Tenis suave": "Sin peso. Peloteo técnico, no partido intenso.",
+  "Movilidad completa": "Sin peso.",
+  "Recuperar rutina perdida": "Usa los pesos sugeridos de la rutina que recuperes.",
+  "Caminata suave": "Sin peso.",
+  "Movilidad general": "Sin peso.",
+  "Respiración / estiramientos": "Sin peso."
+};
+
+
 const routines = {
   1:{name:"Fuerza A",type:"Piernas + fuerza base",goal:"Piernas, glúteos, core y base física para tenis.",exercises:[
     ["Bicicleta suave","5 min",1],
@@ -527,6 +578,7 @@ function renderRoutine(){
   r.exercises.forEach((ex,i) => {
     const [name,meta,sets,opts = {}] = ex;
     const desc = exerciseDescriptions[name] ? `<div class="ex-desc">${exerciseDescriptions[name]}</div>` : "";
+    const weight = suggestedWeights[name] ? `<div class="ex-desc weight-box"><strong>Peso sugerido:</strong> ${suggestedWeights[name]}</div>` : "";
     const duration = opts.noCountdown ? null : parseDurationSeconds(meta);
     let buttons = "";
 
@@ -541,7 +593,7 @@ function renderRoutine(){
       }
     }
 
-    box.innerHTML += `<div class="exercise"><div class="ex-title">${name}</div><div class="ex-meta">${meta}</div>${desc}<div class="sets">${buttons}</div></div>`;
+    box.innerHTML += `<div class="exercise"><div class="ex-title">${name}</div><div class="ex-meta">${meta}</div>${desc}${weight}<div class="sets">${buttons}</div></div>`;
   });
 }
 
