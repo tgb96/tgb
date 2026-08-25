@@ -9,7 +9,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Resumen semanal de sesiones, minutos y calorías.
 - Registro guiado por tres categorías: físico, cardio y tenis.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
-- Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis y series marcables.
+- Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 
@@ -24,7 +24,7 @@ Incluye cuatro rutinas configuradas en `assets/js/data.js`:
 3. Día 3: potencia y desplazamientos.
 4. Día 4 extra: antebrazo, core y técnica.
 
-Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo.
+Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Cada rutina puede iniciarse con un cronómetro propio y finalizarse ingresando las calorías. Al cerrar, se registra automáticamente como entrenamiento físico y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
 
 ### Cardio
 
@@ -50,7 +50,7 @@ TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo de
 
 ## Datos y migración
 
-Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 3 y migra automáticamente:
+Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 4 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.

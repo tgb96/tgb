@@ -4,7 +4,7 @@ import {
   dayNamesFull,
   physicalRoutineById,
   TZ
-} from "./data.js?v=14";
+} from "./data.js?v=15";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -151,6 +151,15 @@ export function normalizeRecord(record) {
     durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
     calories: optionalNumber(record?.calories, { min: 0 }),
     sensations,
+    routineCompletedSets: optionalNumber(record?.routineCompletedSets, { min: 0 }),
+    routinePlannedSets: optionalNumber(record?.routinePlannedSets, { min: 0 }),
+    routineCompletedExercises: optionalNumber(record?.routineCompletedExercises, { min: 0 }),
+    routineStartedExercises: optionalNumber(record?.routineStartedExercises, { min: 0 }),
+    routineTotalExercises: optionalNumber(record?.routineTotalExercises, { min: 0 }),
+    routineTotalReps: optionalNumber(record?.routineTotalReps, { min: 0 }),
+    routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
+    routineStartedAt: String(record?.routineStartedAt || ""),
+    routineEndedAt: String(record?.routineEndedAt || ""),
     createdAt: String(record?.createdAt || ""),
     updatedAt: String(record?.updatedAt || "")
   };
@@ -197,6 +206,10 @@ export function recordDetails(record) {
   if (normalized.distanceKm !== "") details.push(formatDistance(normalized.distanceKm));
   if (normalized.elevationGainM !== "") details.push(`${normalized.elevationGainM} m desnivel`);
   if (normalized.surface) details.push(normalized.surface);
+  if (normalized.category === "physical" && normalized.routinePlannedSets !== "") {
+    details.push(`${normalized.routineCompletedSets}/${normalized.routinePlannedSets} series`);
+    details.push(`${Number(normalized.routineVolumeKg || 0).toLocaleString("es-CL")} kg volumen`);
+  }
   return details.join(" · ");
 }
 
@@ -273,6 +286,13 @@ export function weeklyReport(records, week) {
       if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;
       if (record.surface) report += `   Superficie: ${record.surface}\n`;
+      if (record.category === "physical" && record.routinePlannedSets !== "") {
+        report += `   Series: ${record.routineCompletedSets}/${record.routinePlannedSets}\n`;
+        report += `   Ejercicios trabajados: ${record.routineStartedExercises}/${record.routineTotalExercises}\n`;
+        report += `   Ejercicios completados: ${record.routineCompletedExercises}/${record.routineTotalExercises}\n`;
+        report += `   Repeticiones contabilizadas: ${record.routineTotalReps}\n`;
+        report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
+      }
       if (record.sensations) report += `   Sensaciones: ${record.sensations}\n`;
     });
   }
@@ -290,7 +310,12 @@ export function recordsToCSV(records) {
     ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
     ["cardio", "cardioTypeName"], ["lugar", "location"], ["superficie", "surface"],
     ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
-    ["precisión_duración", "durationPrecision"], ["calorías", "calories"], ["sensaciones", "sensations"]
+    ["precisión_duración", "durationPrecision"], ["calorías", "calories"],
+    ["series_completadas", "routineCompletedSets"], ["series_planificadas", "routinePlannedSets"],
+    ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
+    ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
+    ["volumen_kg", "routineVolumeKg"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
+    ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];
   for (const record of records.map(normalizeRecord)) rows.push(columns.map(([, key]) => csvCell(record[key])).join(","));

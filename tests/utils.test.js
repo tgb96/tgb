@@ -6,6 +6,7 @@ import {
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
+  recordDetails,
   recordsToCSV,
   validateRecord,
   weekDays,
@@ -91,6 +92,28 @@ test("migra registros anteriores al nuevo modelo sin perder su contenido", () =>
   assert.equal(migrated.durationMinutes, 55);
   assert.equal(migrated.durationSeconds, 3300);
   assert.equal(migrated.sensations, "Bien · Sin molestias");
+});
+
+test("conserva el balance de una rutina registrada desde el seguimiento", () => {
+  const record = normalizeRecord({
+    ...physicalRecord,
+    durationSeconds: 3675,
+    durationPrecision: "hms",
+    routineCompletedSets: 24,
+    routinePlannedSets: 28,
+    routineCompletedExercises: 7,
+    routineStartedExercises: 9,
+    routineTotalExercises: 9,
+    routineTotalReps: 210,
+    routineVolumeKg: 1680,
+    routineStartedAt: "2026-08-24T20:00:00.000Z",
+    routineEndedAt: "2026-08-24T21:01:15.000Z"
+  });
+  assert.equal(record.routineCompletedSets, 24);
+  assert.equal(record.routineVolumeKg, 1680);
+  assert.equal(record.routineStartedExercises, 9);
+  assert.match(recordDetails(record), /24\/28 series/);
+  assert.match(recordDetails(record), /1\.680 kg volumen/);
 });
 
 test("formatea duraciones exactas para trote, trekking y tenis", () => {

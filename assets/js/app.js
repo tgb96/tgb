@@ -11,8 +11,8 @@ import {
   tennisSurfaces,
   trekkingLocations,
   trainingCategories
-} from "./data.js?v=14";
-import { createRepository } from "./storage.js?v=14";
+} from "./data.js?v=15";
+import { createRepository } from "./storage.js?v=15";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -27,7 +27,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=14";
+} from "./utils.js?v=15";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -37,9 +37,12 @@ let editingRecordId = null;
 let waitingServiceWorker = null;
 let toastTimer = null;
 let timerTicker = null;
+let routineSessionTicker = null;
+let openRoutineId = "";
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
+const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const timerState = {
   status: "idle",
@@ -779,6 +782,7 @@ function formRecord() {
   const routineId = document.querySelector('input[name="routineId"]:checked')?.value || "";
   const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value || "";
   const duration = currentDurationValues();
+  const preserveRoutineBalance = existing?.category === "physical" && existing.routineId === routineId;
   return {
     id: editingRecordId || createId(),
     dateISO: $("recordDate").value,
@@ -799,6 +803,15 @@ function formRecord() {
     durationPrecision: durationMode(),
     calories: $("calories").value,
     sensations: $("sensations").value,
+    routineCompletedSets: preserveRoutineBalance ? existing.routineCompletedSets : "",
+    routinePlannedSets: preserveRoutineBalance ? existing.routinePlannedSets : "",
+    routineCompletedExercises: preserveRoutineBalance ? existing.routineCompletedExercises : "",
+    routineStartedExercises: preserveRoutineBalance ? existing.routineStartedExercises : "",
+    routineTotalExercises: preserveRoutineBalance ? existing.routineTotalExercises : "",
+    routineTotalReps: preserveRoutineBalance ? existing.routineTotalReps : "",
+    routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
+    routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
+    routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -894,6 +907,112 @@ function saveRoutineSettings(settings) {
   }
 }
 
+function loadRoutineSession() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROUTINE_SESSION_KEY) || "null");
+    if (!parsed || typeof parsed !== "object" || !physicalRoutineById(parsed.routineId)) return null;
+    if (!["active", "complete"].includes(parsed.status)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveRoutineSession(session) {
+  try {
+    if (session) window.localStorage.setItem(ROUTINE_SESSION_KEY, JSON.stringify(session));
+    else window.localStorage.removeItem(ROUTINE_SESSION_KEY);
+  } catch {
+    showToast("No se pudo guardar el estado de la sesión.");
+  }
+}
+
+function routineSessionElapsedSeconds(session = loadRoutineSession()) {
+  if (!session) return 0;
+  if (session.status === "complete") return Math.max(0, Number(session.elapsedSeconds) || 0);
+  const startedAt = Date.parse(session.startedAt);
+  return Number.isFinite(startedAt) ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
+}
+
+function formatClock(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return [hours, minutes, seconds % 60].map(value => String(value).padStart(2, "0")).join(":");
+}
+
+function targetRepetitions(target) {
+  const text = String(target || "").toLowerCase();
+  if (/\b(seg|segundos?|min|minutos?)\b/.test(text)) return 0;
+  const match = text.match(/\d+(?:[.,]\d+)?/);
+  if (!match) return 0;
+  const repetitions = Number(match[0].replace(",", "."));
+  const sideFactor = /por (lado|pierna|brazo)/.test(text) ? 2 : 1;
+  return Number.isFinite(repetitions) ? repetitions * sideFactor : 0;
+}
+
+function routineSessionSummary(routine, progress, settings, dateISO) {
+  let completedSets = 0;
+  let plannedSets = 0;
+  let completedExercises = 0;
+  let startedExercises = 0;
+  let totalReps = 0;
+  let volumeKg = 0;
+
+  routine.exercises.forEach(exercise => {
+    const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
+    const checkedSets = Array.from({ length: exerciseSettings.sets }, (_, setIndex) => setIndex)
+      .filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length;
+    const repsPerSet = targetRepetitions(exerciseSettings.target);
+    const weight = Number(exerciseSettings.weightKg) || 0;
+    plannedSets += exerciseSettings.sets;
+    completedSets += checkedSets;
+    if (checkedSets > 0) startedExercises += 1;
+    if (checkedSets === exerciseSettings.sets) completedExercises += 1;
+    totalReps += repsPerSet * checkedSets;
+    volumeKg += weight * repsPerSet * checkedSets;
+  });
+
+  return {
+    completedSets,
+    plannedSets,
+    completedExercises,
+    startedExercises,
+    totalExercises: routine.exercises.length,
+    totalReps: Math.round(totalReps),
+    volumeKg: Math.round(volumeKg * 100) / 100
+  };
+}
+
+function clearRoutineProgress(progress, dateISO, routineId) {
+  const prefix = `${dateISO}:${routineId}:`;
+  Object.keys(progress).forEach(key => {
+    if (key.startsWith(prefix)) delete progress[key];
+  });
+  saveRoutineProgress(progress);
+}
+
+function updateRoutineSessionClock() {
+  const session = loadRoutineSession();
+  if (!session || session.status !== "active") {
+    if (routineSessionTicker) clearInterval(routineSessionTicker);
+    routineSessionTicker = null;
+    return;
+  }
+  const elapsed = formatClock(routineSessionElapsedSeconds(session));
+  const display = $(`routineElapsed-${session.routineId}`);
+  if (display) display.textContent = elapsed;
+  const preview = $("routinePreview-time")?.querySelector("strong");
+  if (preview) preview.textContent = elapsed;
+}
+
+function ensureRoutineSessionTicker() {
+  updateRoutineSessionClock();
+  if (!routineSessionTicker && loadRoutineSession()?.status === "active") {
+    routineSessionTicker = setInterval(updateRoutineSessionClock, 1000);
+  }
+}
+
 function routineSettingsKey(routineId, exerciseId) {
   return `${routineId}:${exerciseId}`;
 }
@@ -925,9 +1044,262 @@ function completedRoutineSets(routine, progress, settings, dateISO) {
   }, 0);
 }
 
+function startRoutineSession(routine) {
+  const existing = loadRoutineSession();
+  if (existing?.status === "active") {
+    const activeRoutine = physicalRoutineById(existing.routineId);
+    showToast(existing.routineId === routine.id
+      ? "Esta rutina ya está en curso."
+      : `Primero finaliza ${activeRoutine?.name || "la rutina en curso"}.`);
+    return;
+  }
+
+  const dateISO = getChileDateISO();
+  const alreadyRecordedToday = repository.list().some(record =>
+    record.dateISO === dateISO && record.routineId === routine.id && record.routinePlannedSets !== ""
+  );
+  if ((existing?.status === "complete" && existing.routineId === routine.id && existing.dateISO === dateISO) || alreadyRecordedToday) {
+    clearRoutineProgress(loadRoutineProgress(), dateISO, routine.id);
+  }
+  const now = new Date().toISOString();
+  saveRoutineSession({
+    status: "active",
+    routineId: routine.id,
+    dateISO,
+    startedAt: now,
+    endedAt: "",
+    elapsedSeconds: 0
+  });
+  openRoutineId = routine.id;
+  renderRoutines();
+  ensureRoutineSessionTicker();
+  showToast("Rutina iniciada. El tiempo ya está corriendo.");
+}
+
+function finishRoutineSession(routine) {
+  const session = loadRoutineSession();
+  if (!session || session.status !== "active" || session.routineId !== routine.id) return;
+  const caloriesInput = $(`routineCalories-${routine.id}`);
+  const message = $(`routineFinishMessage-${routine.id}`);
+  const calories = caloriesInput?.value === "" ? null : Number(caloriesInput?.value);
+  const progress = loadRoutineProgress();
+  const settings = loadRoutineSettings();
+  const summary = routineSessionSummary(routine, progress, settings, session.dateISO);
+
+  if (summary.completedSets === 0) {
+    message.textContent = "Marca al menos una serie antes de finalizar.";
+    message.classList.remove("hidden");
+    return;
+  }
+  if (calories === null || !Number.isFinite(calories) || calories < 0) {
+    message.textContent = "Anota las calorías quemadas para registrar la sesión.";
+    message.classList.remove("hidden");
+    caloriesInput?.focus();
+    return;
+  }
+
+  const endedAt = new Date().toISOString();
+  const elapsedSeconds = Math.max(1, routineSessionElapsedSeconds(session));
+  const record = {
+    id: createId(),
+    dateISO: session.dateISO,
+    category: "physical",
+    categoryName: "Físico",
+    routineId: routine.id,
+    routineName: routine.name,
+    cardioTypeId: "",
+    cardioTypeName: "",
+    location: "",
+    surface: "",
+    distanceKm: "",
+    elevationGainM: "",
+    durationMinutes: elapsedSeconds / 60,
+    durationSeconds: elapsedSeconds,
+    durationPrecision: "hms",
+    calories,
+    sensations: "",
+    routineCompletedSets: summary.completedSets,
+    routinePlannedSets: summary.plannedSets,
+    routineCompletedExercises: summary.completedExercises,
+    routineStartedExercises: summary.startedExercises,
+    routineTotalExercises: summary.totalExercises,
+    routineTotalReps: summary.totalReps,
+    routineVolumeKg: summary.volumeKg,
+    routineStartedAt: session.startedAt,
+    routineEndedAt: endedAt,
+    createdAt: session.startedAt,
+    updatedAt: endedAt
+  };
+
+  try {
+    repository.upsert(record);
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.remove("hidden");
+    return;
+  }
+
+  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, recordId: record.id, summary });
+  if (routineSessionTicker) clearInterval(routineSessionTicker);
+  routineSessionTicker = null;
+  openRoutineId = routine.id;
+  renderRoutines();
+  renderHome();
+  showToast("Rutina finalizada y registrada como entrenamiento de hoy.");
+}
+
+function balanceMetric(label, value) {
+  const metric = document.createElement("div");
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  const span = document.createElement("span");
+  span.textContent = label;
+  metric.append(strong, span);
+  return metric;
+}
+
+function routineBalanceGrid(summary, elapsedSeconds, calories, preview = false) {
+  const grid = document.createElement("div");
+  grid.className = "routine-balance-grid";
+  const metrics = [
+    ["Tiempo", formatClock(elapsedSeconds), "time"],
+    ["Calorías", calories === "" || calories === null || calories === undefined ? "—" : `${calories} kcal`, "calories"],
+    ["Series", `${summary.completedSets}/${summary.plannedSets}`, "sets"],
+    ["Ejercicios trabajados", `${summary.startedExercises}/${summary.totalExercises}`, "exercises"],
+    ["Repeticiones", String(summary.totalReps), "reps"],
+    ["Volumen estimado", `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`, "volume"]
+  ];
+  metrics.forEach(([label, value, key]) => {
+    const metric = balanceMetric(label, value);
+    if (preview) metric.id = `routinePreview-${key}`;
+    grid.append(metric);
+  });
+  return grid;
+}
+
+function updateRoutineSessionPreview(routine, progress, settings, dateISO) {
+  const session = loadRoutineSession();
+  if (!session || session.status !== "active" || session.routineId !== routine.id) return;
+  const summary = routineSessionSummary(routine, progress, settings, dateISO);
+  const values = {
+    sets: `${summary.completedSets}/${summary.plannedSets}`,
+    exercises: `${summary.startedExercises}/${summary.totalExercises}`,
+    reps: String(summary.totalReps),
+    volume: `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`
+  };
+  Object.entries(values).forEach(([key, value]) => {
+    const target = $(`routinePreview-${key}`)?.querySelector("strong");
+    if (target) target.textContent = value;
+  });
+}
+
+function createRoutineSessionHeader(routine, session) {
+  const panel = document.createElement("section");
+  panel.className = "routine-session-card";
+  const copy = document.createElement("div");
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "routine-session-status";
+  const title = document.createElement("strong");
+  const description = document.createElement("p");
+  const isActive = session?.status === "active" && session.routineId === routine.id;
+  const isComplete = session?.status === "complete" && session.routineId === routine.id;
+  const anotherActive = session?.status === "active" && session.routineId !== routine.id;
+
+  if (isActive) {
+    eyebrow.textContent = "En curso";
+    title.textContent = "Tiempo de entrenamiento";
+    description.textContent = `Iniciada hoy a las ${new Date(session.startedAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`;
+  } else if (isComplete) {
+    eyebrow.textContent = "Registrada";
+    title.textContent = "Última sesión finalizada";
+    description.textContent = "El balance quedó guardado en tu historial.";
+  } else {
+    eyebrow.textContent = anotherActive ? "Otra rutina en curso" : "Lista para comenzar";
+    title.textContent = "Registra esta rutina completa";
+    description.textContent = "El cronómetro seguirá corriendo aunque cambies de pestaña.";
+  }
+  copy.append(eyebrow, title, description);
+
+  const action = document.createElement("div");
+  action.className = "routine-session-action";
+  if (isActive || isComplete) {
+    const clock = document.createElement("strong");
+    clock.id = `routineElapsed-${routine.id}`;
+    clock.className = "routine-elapsed";
+    clock.textContent = formatClock(routineSessionElapsedSeconds(session));
+    action.append(clock);
+  }
+  if (!isActive) {
+    const start = document.createElement("button");
+    start.type = "button";
+    start.textContent = isComplete ? "Iniciar otra" : "Iniciar";
+    start.disabled = anotherActive;
+    start.addEventListener("click", () => startRoutineSession(routine));
+    action.append(start);
+  }
+  panel.append(copy, action);
+  return panel;
+}
+
+function createRoutineFinishPanel(routine, session, progress, settings, dateISO) {
+  if (!session || session.routineId !== routine.id) return null;
+  const panel = document.createElement("section");
+  panel.className = `routine-finish-card ${session.status}`;
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "routine-session-status";
+  const heading = document.createElement("h3");
+  const copy = document.createElement("p");
+
+  if (session.status === "complete") {
+    eyebrow.textContent = "Balance final";
+    heading.textContent = "Entrenamiento registrado";
+    copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
+    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories));
+    const note = document.createElement("small");
+    note.textContent = "Volumen estimado = peso anotado × repeticiones de las series marcadas. No incluye ejercicios por tiempo ni sin carga.";
+    const history = document.createElement("button");
+    history.type = "button";
+    history.className = "routine-history-button";
+    history.textContent = "Ver en historial";
+    history.addEventListener("click", () => showView("history"));
+    panel.append(note, history);
+    return panel;
+  }
+
+  const preview = routineSessionSummary(routine, progress, settings, dateISO);
+  eyebrow.textContent = "Cierre de la sesión";
+  heading.textContent = "Finaliza y guarda tu entrenamiento";
+  copy.textContent = "Puedes terminar aunque la rutina haya quedado parcial. Solo se contará lo que marcaste.";
+  const caloriesLabel = document.createElement("label");
+  caloriesLabel.htmlFor = `routineCalories-${routine.id}`;
+  caloriesLabel.textContent = "Calorías quemadas";
+  const calories = document.createElement("input");
+  calories.id = `routineCalories-${routine.id}`;
+  calories.type = "number";
+  calories.inputMode = "numeric";
+  calories.min = "0";
+  calories.step = "1";
+  calories.placeholder = "Ej: 420";
+  const message = document.createElement("div");
+  message.id = `routineFinishMessage-${routine.id}`;
+  message.className = "form-message error hidden";
+  message.setAttribute("role", "status");
+  const finish = document.createElement("button");
+  finish.type = "button";
+  finish.className = "routine-finish-button";
+  finish.textContent = "Finalizar y registrar";
+  finish.addEventListener("click", () => finishRoutineSession(routine));
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", true), caloriesLabel, calories, message, finish);
+  const note = document.createElement("small");
+  note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
+  panel.append(note);
+  return panel;
+}
+
 function renderRoutines() {
   const container = $("routineLibrary");
-  const dateISO = getChileDateISO();
+  const session = loadRoutineSession();
+  const dateISO = session?.status === "active" ? session.dateISO : getChileDateISO();
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
   container.replaceChildren();
@@ -935,6 +1307,11 @@ function renderRoutines() {
   physicalRoutines.forEach((routine, routineIndex) => {
     const card = document.createElement("details");
     card.className = "routine-card";
+    card.open = openRoutineId === routine.id || session?.routineId === routine.id;
+    card.addEventListener("toggle", () => {
+      if (card.open) openRoutineId = routine.id;
+      else if (openRoutineId === routine.id) openRoutineId = "";
+    });
     const summary = document.createElement("summary");
     const number = document.createElement("span");
     number.className = "routine-number";
@@ -964,7 +1341,7 @@ function renderRoutines() {
     const objective = document.createElement("p");
     objective.className = "routine-objective";
     objective.textContent = routine.objective;
-    body.append(note, objective);
+    body.append(note, objective, createRoutineSessionHeader(routine, session));
 
     routine.exercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
@@ -1064,6 +1441,7 @@ function renderRoutines() {
             saveRoutineProgress(progress);
             updateCounter();
             updateExerciseComplete();
+            updateRoutineSessionPreview(routine, progress, settings, dateISO);
           });
           series.append(input, label);
         });
@@ -1081,6 +1459,7 @@ function renderRoutines() {
         saveRoutineSettings(settings);
         renderSeries();
         updateCounter();
+        updateRoutineSessionPreview(routine, progress, settings, dateISO);
       };
       setsInput.addEventListener("input", persistExerciseSettings);
       targetInput.addEventListener("input", persistExerciseSettings);
@@ -1089,9 +1468,12 @@ function renderRoutines() {
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
+    const finishPanel = createRoutineFinishPanel(routine, session, progress, settings, dateISO);
+    if (finishPanel) body.append(finishPanel);
     card.append(summary, body);
     container.append(card);
   });
+  ensureRoutineSessionTicker();
 }
 
 function renderHistory() {
@@ -1176,6 +1558,17 @@ function createHistoryEntry(sourceRecord) {
     const sensations = document.createElement("p");
     sensations.textContent = record.sensations;
     copy.append(sensations);
+  }
+  if (record.category === "physical" && record.routinePlannedSets !== "") {
+    const balance = document.createElement("div");
+    balance.className = "history-routine-balance";
+    [
+      ["Series", `${record.routineCompletedSets}/${record.routinePlannedSets}`],
+      ["Ejercicios", `${record.routineStartedExercises}/${record.routineTotalExercises}`],
+      ["Reps", String(record.routineTotalReps || 0)],
+      ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`]
+    ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
+    copy.append(balance);
   }
   const actions = document.createElement("div");
   actions.className = "entry-actions";

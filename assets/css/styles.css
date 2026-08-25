@@ -186,6 +186,27 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-body { padding: 0 14px 14px; border-top: 1px solid var(--line); }
 .routine-note { margin: 12px 2px; color: var(--blue); font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.8px; }
 .routine-objective { margin: -2px 2px 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.routine-session-card { margin: 0 0 12px; padding: 15px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border-radius: 19px; background: var(--night); color: white; }
+.routine-session-card strong { display: block; margin-top: 4px; font-size: 14px; }
+.routine-session-card p { margin: 4px 0 0; color: rgba(255, 255, 255, 0.65); font-size: 10px; line-height: 1.4; }
+.routine-session-status { color: var(--lime); font-size: 9px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.8px; }
+.routine-session-action { display: grid; justify-items: end; gap: 7px; }
+.routine-session-action button { min-height: 41px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
+.routine-session-action button:disabled { opacity: 0.42; cursor: default; }
+.routine-elapsed { margin: 0 !important; color: white; font-size: 20px !important; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+.routine-finish-card { margin-top: 12px; padding: 17px; border: 1px solid #d9dcd2; border-radius: 21px; background: #f6f7f2; }
+.routine-finish-card.complete { border-color: #b5dc4a; background: #f1f9dd; }
+.routine-finish-card h3 { margin: 5px 0 0; font-size: 18px; letter-spacing: -0.4px; }
+.routine-finish-card > p { margin: 6px 0 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.routine-finish-card > label { display: block; margin-top: 14px; color: var(--ink); font-size: 11px; font-weight: 850; }
+.routine-finish-card > input { margin-top: 7px; background: white; }
+.routine-finish-card > small { display: block; margin-top: 10px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.routine-balance-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.routine-balance-grid > div { min-width: 0; padding: 10px 8px; border-radius: 13px; background: white; }
+.routine-balance-grid strong { display: block; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.routine-balance-grid span { display: block; margin-top: 5px; color: var(--muted); font-size: 8px; font-weight: 850; line-height: 1.25; text-transform: uppercase; }
+.routine-finish-button, .routine-history-button { width: 100%; min-height: 50px; margin-top: 12px; border: 0; border-radius: 15px; background: var(--blue); color: white; font-size: 12px; font-weight: 900; }
+.routine-history-button { background: var(--night); }
 .exercise-card { padding: 14px; border: 1px solid #e2e3df; border-radius: 19px; background: #f8f8f5; }
 .exercise-card + .exercise-card { margin-top: 9px; }
 .exercise-card.complete { border-color: #a8d62f; background: #f3fae4; }
@@ -228,6 +249,10 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .history-entry-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .history-entry h3 { margin: 0; font-size: 14px; }
 .history-entry p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.history-routine-balance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
+.history-routine-balance > div { min-width: 0; padding: 7px; border-radius: 10px; background: white; }
+.history-routine-balance strong { display: block; overflow-wrap: anywhere; font-size: 11px; font-variant-numeric: tabular-nums; }
+.history-routine-balance span { display: block; margin-top: 3px; color: var(--muted); font-size: 7px; font-weight: 850; text-transform: uppercase; }
 .entry-actions { display: flex; gap: 5px; }
 .entry-actions button { min-width: 40px; min-height: 40px; border: 0; border-radius: 12px; background: white; color: var(--muted); font-size: 11px; font-weight: 850; }
 .entry-actions .delete { color: var(--danger); }
@@ -260,6 +285,10 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
   .routine-card summary { grid-template-columns: 40px 1fr; }
   .routine-number { width: 40px; height: 40px; }
   .routine-progress { grid-column: 2; justify-self: start; }
+  .routine-session-card { grid-template-columns: 1fr; }
+  .routine-session-action { grid-template-columns: 1fr auto; justify-items: start; align-items: center; }
+  .routine-balance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-routine-balance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nav-item small { font-size: 9px; }
 }
 
