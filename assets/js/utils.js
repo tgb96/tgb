@@ -128,6 +128,10 @@ export function normalizeRecord(record) {
   const category = legacyCategory(record);
   const categoryInfo = categoryById(category);
   const sensations = String(record?.sensations || [record?.feeling, record?.notes].filter(Boolean).join(" · ") || "").slice(0, 5000);
+  const rawMinutes = optionalNumber(record?.durationMinutes, { min: 0 });
+  const rawSeconds = optionalNumber(record?.durationSeconds, { min: 0 });
+  const durationSeconds = rawSeconds === "" ? (typeof rawMinutes === "number" ? Math.round(rawMinutes * 60) : rawMinutes) : rawSeconds;
+  const durationMinutes = rawMinutes === "" ? (typeof durationSeconds === "number" ? durationSeconds / 60 : durationSeconds) : rawMinutes;
   return {
     id: String(record?.id || ""),
     dateISO,
@@ -141,7 +145,9 @@ export function normalizeRecord(record) {
     location: String(record?.location || "").slice(0, 300),
     surface: String(record?.surface || "").slice(0, 100),
     distanceKm: optionalNumber(record?.distanceKm ?? record?.kms, { min: 0 }),
-    durationMinutes: optionalNumber(record?.durationMinutes, { min: 0 }),
+    durationMinutes,
+    durationSeconds,
+    durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
     calories: optionalNumber(record?.calories, { min: 0 }),
     sensations,
     createdAt: String(record?.createdAt || ""),
@@ -154,7 +160,7 @@ export function validateRecord(record) {
   const errors = [];
   if (!isValidISODate(normalized.dateISO)) errors.push("Selecciona una fecha válida.");
   if (!categoryById(normalized.category)) errors.push("Selecciona un tipo de entrenamiento.");
-  if (normalized.durationMinutes === "" || normalized.durationMinutes === null) errors.push("Ingresa una duración válida.");
+  if (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0) errors.push("Ingresa una duración mayor que cero.");
   if (normalized.calories === "" || normalized.calories === null) errors.push("Ingresa las calorías quemadas.");
 
   if (normalized.category === "physical") {
@@ -184,10 +190,25 @@ export function recordTitle(record) {
 
 export function recordDetails(record) {
   const normalized = normalizeRecord(record);
-  const details = [`${normalized.durationMinutes === "" ? "—" : normalized.durationMinutes} min`, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  const details = [formatDuration(normalized), `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
   if (normalized.distanceKm !== "") details.push(`${normalized.distanceKm} km`);
   if (normalized.surface) details.push(normalized.surface);
   return details.join(" · ");
+}
+
+export function formatDuration(record) {
+  const normalized = record?.durationPrecision ? record : normalizeRecord(record);
+  if (normalized.durationMinutes === "" || normalized.durationMinutes === null) return "—";
+  if (normalized.durationPrecision === "minutes") return `${Math.round(normalized.durationMinutes)} min`;
+  const totalSeconds = Math.round(Number(normalized.durationSeconds) || (Number(normalized.durationMinutes) * 60));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [];
+  if (hours) parts.push(`${hours} h`);
+  parts.push(`${String(minutes).padStart(hours ? 2 : 1, "0")} min`);
+  if (normalized.durationPrecision === "hms") parts.push(`${String(seconds).padStart(2, "0")} s`);
+  return parts.join(" ");
 }
 
 export function groupRecordsByWeek(records) {
@@ -216,7 +237,7 @@ export function weeklyReport(records, week) {
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
   report += "RESUMEN\n";
   report += `- Entrenamientos: ${normalized.length}\n`;
-  report += `- Tiempo total: ${totalMinutes} min\n`;
+  report += `- Tiempo total: ${Math.round(totalMinutes)} min\n`;
   report += `- Calorías registradas: ${totalCalories} kcal\n`;
   report += `- Distancia registrada: ${totalDistance.toFixed(2)} km\n`;
   for (const [category, count] of Object.entries(categoryCounts)) report += `- ${category}: ${count}\n`;
@@ -233,7 +254,7 @@ export function weeklyReport(records, week) {
     dayRecords.forEach((record, index) => {
       report += `${index + 1}. ${recordTitle(record)}\n`;
       report += `   Tipo: ${record.categoryName}\n`;
-      report += `   Duración: ${record.durationMinutes} min\n`;
+      report += `   Duración: ${formatDuration(record)}\n`;
       report += `   Calorías: ${record.calories} kcal\n`;
       if (record.distanceKm !== "") report += `   Distancia: ${record.distanceKm} km\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;
@@ -254,7 +275,8 @@ export function recordsToCSV(records) {
   const columns = [
     ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
     ["cardio", "cardioTypeName"], ["lugar", "location"], ["superficie", "surface"],
-    ["distancia_km", "distanceKm"], ["duración_min", "durationMinutes"], ["calorías", "calories"], ["sensaciones", "sensations"]
+    ["distancia_km", "distanceKm"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
+    ["precisión_duración", "durationPrecision"], ["calorías", "calories"], ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];
   for (const record of records.map(normalizeRecord)) rows.push(columns.map(([, key]) => csvCell(record[key])).join(","));

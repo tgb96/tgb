@@ -6,7 +6,10 @@ import {
   dayNamesShort,
   physicalRoutines,
   physicalRoutineById,
+  sensationSuggestions,
+  tennisLocations,
   tennisSurfaces,
+  trekkingLocations,
   trainingCategories
 } from "./data.js";
 import { createRepository } from "./storage.js";
@@ -34,8 +37,10 @@ let editingRecordId = null;
 let waitingServiceWorker = null;
 let toastTimer = null;
 
+const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
+
 function showView(name) {
-  for (const viewName of ["Home", "Register", "History"]) {
+  for (const viewName of ["Home", "Register", "Routines", "History"]) {
     const view = $(`view${viewName}`);
     const visible = viewName.toLowerCase() === name;
     view.hidden = !visible;
@@ -48,6 +53,7 @@ function showView(name) {
     else button.removeAttribute("aria-current");
   });
   if (name === "home") renderHome();
+  if (name === "routines") renderRoutines();
   if (name === "history") renderHistory();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -69,7 +75,7 @@ function renderHome() {
   $("homeTitle").textContent = formatLongDate(todayISO);
   $("weekRange").textContent = `${formatShortDate(week.startISO)} — ${formatShortDate(week.endISO)}`;
   $("weekSessionCount").textContent = String(records.length);
-  $("weekMinutes").textContent = String(records.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0));
+  $("weekMinutes").textContent = String(Math.round(records.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
   $("weekCalories").textContent = String(records.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
 
@@ -128,7 +134,6 @@ function renderHome() {
 function renderCategoryChooser() {
   const chooser = $("categoryChooser");
   chooser.replaceChildren();
-  const icons = { physical: "F", cardio: "C", tennis: "T" };
   for (const category of trainingCategories) {
     const button = document.createElement("button");
     button.type = "button";
@@ -141,13 +146,22 @@ function renderCategoryChooser() {
     description.textContent = category.description;
     copy.append(title, description);
     const icon = document.createElement("span");
-    icon.className = "category-icon";
+    icon.className = `category-icon ${category.id}`;
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = icons[category.id];
+    icon.innerHTML = categoryIcon(category.id);
     button.append(copy, icon);
     button.addEventListener("click", () => selectCategory(category.id));
     chooser.append(button);
   }
+}
+
+function categoryIcon(categoryId) {
+  const icons = {
+    physical: `<svg viewBox="0 0 64 64" role="img"><path d="M8 25v14M15 20v24M49 20v24M56 25v14M15 32h34"/></svg>`,
+    cardio: `<svg viewBox="0 0 64 64" role="img"><path d="M8 34h11l5-14 9 28 7-21 5 7h11"/><path d="M49 13c-7 0-11 5-11 5s-4-5-11-5c-8 0-14 6-14 14"/></svg>`,
+    tennis: `<svg viewBox="0 0 64 64" role="img"><ellipse cx="27" cy="23" rx="15" ry="20" transform="rotate(38 27 23)"/><path d="M36 38l14 14M44 46l-7 7M14 15l25 19M11 24l20 15"/><circle cx="52" cy="14" r="5"/></svg>`
+  };
+  return icons[categoryId] || "";
 }
 
 function createChoice({ name, value, title, description, checked }) {
@@ -198,9 +212,62 @@ function renderPhysicalFields(record = {}) {
 
 function currentCardioExtraValues() {
   return {
-    location: $("cardioLocation")?.value || "",
+    location: selectedLocation("cardioLocationSelect", "cardioLocationOther"),
     distanceKm: $("distanceKm")?.value || ""
   };
+}
+
+function selectedLocation(selectId, otherId) {
+  const selected = $(selectId)?.value || "";
+  return selected === "other" ? $(otherId)?.value.trim() || "" : selected;
+}
+
+function createLocationPicker({ idPrefix, labelText, values, currentValue, placeholder }) {
+  const fragment = document.createDocumentFragment();
+  const label = document.createElement("label");
+  label.htmlFor = `${idPrefix}Select`;
+  label.textContent = labelText;
+  const select = document.createElement("select");
+  select.id = `${idPrefix}Select`;
+  select.required = true;
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = "Selecciona una opción";
+  select.append(placeholderOption);
+  values.forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  });
+  const otherOption = document.createElement("option");
+  otherOption.value = "other";
+  otherOption.textContent = "Otro";
+  select.append(otherOption);
+
+  const otherLabel = document.createElement("label");
+  otherLabel.htmlFor = `${idPrefix}Other`;
+  otherLabel.textContent = "Escribe el lugar";
+  const otherInput = document.createElement("input");
+  otherInput.id = `${idPrefix}Other`;
+  otherInput.type = "text";
+  otherInput.maxLength = 300;
+  otherInput.placeholder = placeholder;
+
+  const isKnown = values.includes(currentValue);
+  select.value = currentValue ? (isKnown ? currentValue : "other") : "";
+  otherInput.value = currentValue && !isKnown ? currentValue : "";
+  const updateOtherVisibility = () => {
+    const visible = select.value === "other";
+    otherLabel.classList.toggle("hidden", !visible);
+    otherInput.classList.toggle("hidden", !visible);
+    otherInput.required = visible;
+    if (visible) otherInput.focus({ preventScroll: true });
+  };
+  select.addEventListener("change", updateOtherVisibility);
+  updateOtherVisibility();
+  fragment.append(label, select, otherLabel, otherInput);
+  return fragment;
 }
 
 function updateCardioExtraFields(values = {}) {
@@ -210,17 +277,13 @@ function updateCardioExtraFields(values = {}) {
   if (!box || !cardio) return;
   box.replaceChildren();
   if (cardio.location) {
-    const label = document.createElement("label");
-    label.htmlFor = "cardioLocation";
-    label.textContent = "Cerro o lugar del trekking";
-    const input = document.createElement("input");
-    input.id = "cardioLocation";
-    input.type = "text";
-    input.maxLength = 300;
-    input.placeholder = "Ej: Cerro Manquehue";
-    input.value = values.location || "";
-    input.required = true;
-    box.append(label, input);
+    box.append(createLocationPicker({
+      idPrefix: "cardioLocation",
+      labelText: "Cerro o lugar del trekking",
+      values: trekkingLocations,
+      currentValue: values.location || "",
+      placeholder: "Escribe el cerro o lugar"
+    }));
   }
   if (cardio.distance) {
     const label = document.createElement("label");
@@ -253,7 +316,11 @@ function renderCardioFields(record = {}) {
       description: cardio.description,
       checked: record.cardioTypeId ? record.cardioTypeId === cardio.id : index === 0
     });
-    choice.input.addEventListener("change", () => updateCardioExtraFields(currentCardioExtraValues()));
+    choice.input.addEventListener("change", () => {
+      const duration = currentDurationValues();
+      updateCardioExtraFields(currentCardioExtraValues());
+      renderDurationField(duration);
+    });
     grid.append(choice.wrapper);
   });
   const extras = document.createElement("div");
@@ -264,17 +331,6 @@ function renderCardioFields(record = {}) {
 }
 
 function renderTennisFields(record = {}) {
-  const locationLabel = document.createElement("label");
-  locationLabel.htmlFor = "tennisLocation";
-  locationLabel.textContent = "Lugar";
-  const location = document.createElement("input");
-  location.id = "tennisLocation";
-  location.type = "text";
-  location.maxLength = 300;
-  location.placeholder = "Ej: Club Open Tennis";
-  location.value = record.location || "";
-  location.required = true;
-
   const surfaceLabel = document.createElement("label");
   surfaceLabel.htmlFor = "tennisSurface";
   surfaceLabel.textContent = "Superficie";
@@ -291,7 +347,141 @@ function renderTennisFields(record = {}) {
     surface.append(option);
   });
   surface.value = record.surface || "";
-  $("categoryFields").append(locationLabel, location, surfaceLabel, surface);
+  $("categoryFields").append(
+    createLocationPicker({
+      idPrefix: "tennisLocation",
+      labelText: "Lugar",
+      values: tennisLocations,
+      currentValue: record.location || "",
+      placeholder: "Escribe el lugar donde jugaste"
+    }),
+    surfaceLabel,
+    surface
+  );
+}
+
+function durationMode() {
+  if (currentCategory === "tennis") return "hms";
+  if (currentCategory === "cardio") {
+    const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value;
+    if (cardioTypeId === "running") return "hms";
+    if (cardioTypeId === "trekking") return "hm";
+  }
+  return "minutes";
+}
+
+function currentDurationValues() {
+  const simpleMinutes = $("durationMinutes")?.value;
+  if (simpleMinutes !== undefined && simpleMinutes !== "") {
+    return { durationMinutes: Number(simpleMinutes), durationSeconds: Math.round(Number(simpleMinutes) * 60) };
+  }
+  const hours = Number($("durationHours")?.value || 0);
+  const minutes = Number($("durationMinutesPart")?.value || 0);
+  const seconds = Number($("durationSecondsPart")?.value || 0);
+  const durationSeconds = (hours * 3600) + (minutes * 60) + seconds;
+  return { durationMinutes: durationSeconds / 60, durationSeconds };
+}
+
+function durationParts(record = {}) {
+  const totalSeconds = record.durationSeconds !== "" && record.durationSeconds !== undefined && record.durationSeconds !== null
+    ? Number(record.durationSeconds)
+    : Math.round((Number(record.durationMinutes) || 0) * 60);
+  return {
+    hours: Math.floor(totalSeconds / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: Math.floor(totalSeconds % 60)
+  };
+}
+
+function durationPart({ id, label, max, value, placeholder = "00" }) {
+  const wrapper = document.createElement("div");
+  const input = document.createElement("input");
+  input.id = id;
+  input.type = "number";
+  input.inputMode = "numeric";
+  input.min = "0";
+  input.max = String(max);
+  input.step = "1";
+  input.placeholder = placeholder;
+  input.value = value || "";
+  input.setAttribute("aria-label", label);
+  const caption = document.createElement("small");
+  caption.textContent = label;
+  wrapper.append(input, caption);
+  return wrapper;
+}
+
+function renderDurationField(record = {}) {
+  const box = $("durationField");
+  box.replaceChildren();
+  const label = document.createElement("label");
+  const mode = durationMode();
+  if (mode === "minutes") {
+    label.htmlFor = "durationMinutes";
+    label.textContent = "Duración (min)";
+    const input = document.createElement("input");
+    input.id = "durationMinutes";
+    input.name = "durationMinutes";
+    input.type = "number";
+    input.inputMode = "numeric";
+    input.min = "0";
+    input.step = "1";
+    input.placeholder = "Ej: 60";
+    input.required = true;
+    input.value = record.durationMinutes ?? "";
+    box.append(label, input);
+    return;
+  }
+
+  label.textContent = mode === "hms" ? "Duración exacta" : "Duración";
+  const parts = durationParts(record);
+  const fields = document.createElement("div");
+  fields.className = `duration-parts ${mode}`;
+  fields.append(
+    durationPart({ id: "durationHours", label: "Horas", max: 99, value: parts.hours }),
+    durationPart({ id: "durationMinutesPart", label: "Min", max: 59, value: parts.minutes })
+  );
+  if (mode === "hms") fields.append(durationPart({ id: "durationSecondsPart", label: "Seg", max: 59, value: parts.seconds }));
+  box.append(label, fields);
+}
+
+function renderSensationSuggestions() {
+  const container = $("sensationSuggestions");
+  container.replaceChildren();
+  const suggestions = [...sensationSuggestions.common, ...(sensationSuggestions[currentCategory] || [])];
+  suggestions.forEach(suggestion => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-chip";
+    button.textContent = suggestion;
+    button.dataset.suggestion = suggestion;
+    button.addEventListener("click", () => toggleSensationSuggestion(suggestion));
+    container.append(button);
+  });
+  syncSensationSuggestions();
+}
+
+function sensationParts() {
+  return $("sensations").value.split(" · ").map(value => value.trim()).filter(Boolean);
+}
+
+function toggleSensationSuggestion(suggestion) {
+  const values = sensationParts();
+  const index = values.indexOf(suggestion);
+  if (index >= 0) values.splice(index, 1);
+  else values.push(suggestion);
+  $("sensations").value = values.join(" · ");
+  syncSensationSuggestions();
+  $("sensations").focus({ preventScroll: true });
+}
+
+function syncSensationSuggestions() {
+  const selected = new Set(sensationParts());
+  document.querySelectorAll(".suggestion-chip").forEach(button => {
+    const active = selected.has(button.dataset.suggestion);
+    button.classList.toggle("selected", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
 }
 
 function selectCategory(categoryId, record = null) {
@@ -311,9 +501,10 @@ function selectCategory(categoryId, record = null) {
   if (categoryId === "tennis") renderTennisFields(record || {});
 
   $("recordDate").value = record?.dateISO || getChileDateISO();
-  $("durationMinutes").value = record?.durationMinutes ?? "";
+  renderDurationField(record || {});
   $("calories").value = record?.calories ?? "";
   $("sensations").value = record?.sensations || "";
+  renderSensationSuggestions();
   $("saveTrainingButton").textContent = editingRecordId ? "Guardar cambios" : "Guardar entrenamiento";
   $("cancelEditButton").classList.toggle("hidden", !editingRecordId);
   updateFormWeekBadge();
@@ -334,6 +525,8 @@ function resetRegistration() {
   $("formMessage").className = "form-message hidden";
   $("cancelEditButton").classList.add("hidden");
   $("categoryFields").replaceChildren();
+  $("durationField").replaceChildren();
+  $("sensationSuggestions").replaceChildren();
   $("recordDate").value = getChileDateISO();
 }
 
@@ -353,6 +546,7 @@ function formRecord() {
   const category = categoryById(currentCategory);
   const routineId = document.querySelector('input[name="routineId"]:checked')?.value || "";
   const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value || "";
+  const duration = currentDurationValues();
   return {
     id: editingRecordId || createId(),
     dateISO: $("recordDate").value,
@@ -362,10 +556,14 @@ function formRecord() {
     routineName: physicalRoutineById(routineId)?.name || "",
     cardioTypeId,
     cardioTypeName: cardioTypeById(cardioTypeId)?.name || "",
-    location: currentCategory === "tennis" ? $("tennisLocation")?.value || "" : $("cardioLocation")?.value || "",
+    location: currentCategory === "tennis"
+      ? selectedLocation("tennisLocationSelect", "tennisLocationOther")
+      : selectedLocation("cardioLocationSelect", "cardioLocationOther"),
     surface: $("tennisSurface")?.value || "",
     distanceKm: $("distanceKm")?.value ?? "",
-    durationMinutes: $("durationMinutes").value,
+    durationMinutes: duration.durationMinutes,
+    durationSeconds: duration.durationSeconds,
+    durationPrecision: durationMode(),
     calories: $("calories").value,
     sensations: $("sensations").value,
     createdAt: existing?.createdAt || new Date().toISOString(),
@@ -378,8 +576,17 @@ function showFormError(text) {
   $("formMessage").className = "form-message error";
 }
 
+function durationPartsAreValid() {
+  if (durationMode() === "minutes") return true;
+  const hours = Number($("durationHours")?.value || 0);
+  const minutes = Number($("durationMinutesPart")?.value || 0);
+  const seconds = Number($("durationSecondsPart")?.value || 0);
+  return hours >= 0 && hours <= 99 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59;
+}
+
 function saveTraining(event) {
   event.preventDefault();
+  if (!durationPartsAreValid()) return showFormError("Revisa la duración: los minutos y segundos deben estar entre 0 y 59.");
   const candidate = formRecord();
   const validation = validateRecord(candidate);
   if (!validation.valid) return showFormError(validation.errors.join(" "));
@@ -411,6 +618,115 @@ function deleteRecord(id) {
   renderHistory();
   renderHome();
   showToast("Registro eliminado.");
+}
+
+function loadRoutineProgress() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROUTINE_PROGRESS_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRoutineProgress(progress) {
+  try {
+    window.localStorage.setItem(ROUTINE_PROGRESS_KEY, JSON.stringify(progress));
+  } catch {
+    showToast("No se pudo guardar el avance de la rutina.");
+  }
+}
+
+function routineProgressKey(dateISO, routineId, exerciseId, setIndex) {
+  return `${dateISO}:${routineId}:${exerciseId}:${setIndex}`;
+}
+
+function completedRoutineSets(routine, progress, dateISO) {
+  return routine.exercises.reduce((total, exercise) => total + [0, 1, 2].filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length, 0);
+}
+
+function renderRoutines() {
+  const container = $("routineLibrary");
+  const dateISO = getChileDateISO();
+  const progress = loadRoutineProgress();
+  container.replaceChildren();
+
+  physicalRoutines.forEach((routine, routineIndex) => {
+    const card = document.createElement("details");
+    card.className = "routine-card";
+    const summary = document.createElement("summary");
+    const number = document.createElement("span");
+    number.className = "routine-number";
+    number.textContent = String(routineIndex + 1).padStart(2, "0");
+    const summaryCopy = document.createElement("div");
+    const title = document.createElement("h2");
+    title.textContent = routine.name;
+    const focus = document.createElement("p");
+    focus.textContent = routine.focus;
+    summaryCopy.append(title, focus);
+    const counter = document.createElement("span");
+    counter.className = "routine-progress";
+    const updateCounter = () => {
+      const completed = completedRoutineSets(routine, progress, dateISO);
+      counter.textContent = `${completed}/${routine.exercises.length * 3} series`;
+      counter.classList.toggle("complete", completed === routine.exercises.length * 3);
+    };
+    updateCounter();
+    summary.append(number, summaryCopy, counter);
+
+    const body = document.createElement("div");
+    body.className = "routine-body";
+    const note = document.createElement("p");
+    note.className = "routine-note";
+    note.textContent = `Contenido provisorio · avance del ${formatShortDate(dateISO)}`;
+    body.append(note);
+
+    routine.exercises.forEach((exercise, exerciseIndex) => {
+      const exerciseCard = document.createElement("article");
+      exerciseCard.className = "exercise-card";
+      const exerciseTop = document.createElement("div");
+      exerciseTop.className = "exercise-top";
+      const exerciseTitle = document.createElement("h3");
+      exerciseTitle.textContent = `${exerciseIndex + 1}. ${exercise.name}`;
+      const prescription = document.createElement("span");
+      prescription.textContent = exercise.prescription;
+      exerciseTop.append(exerciseTitle, prescription);
+      const description = document.createElement("p");
+      description.textContent = exercise.description;
+      const benefit = document.createElement("p");
+      benefit.className = "tennis-benefit";
+      const benefitLabel = document.createElement("strong");
+      benefitLabel.textContent = "Para el tenis: ";
+      benefit.append(benefitLabel, exercise.benefit);
+      const series = document.createElement("div");
+      series.className = "series-checks";
+
+      [0, 1, 2].forEach(setIndex => {
+        const id = `set-${routine.id}-${exercise.id}-${setIndex}`;
+        const key = routineProgressKey(dateISO, routine.id, exercise.id, setIndex);
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.id = id;
+        input.checked = Boolean(progress[key]);
+        const label = document.createElement("label");
+        label.htmlFor = id;
+        label.textContent = `Serie ${setIndex + 1}`;
+        input.addEventListener("change", () => {
+          if (input.checked) progress[key] = true;
+          else delete progress[key];
+          saveRoutineProgress(progress);
+          updateCounter();
+          exerciseCard.classList.toggle("complete", [...series.querySelectorAll('input[type="checkbox"]')].every(item => item.checked));
+        });
+        series.append(input, label);
+      });
+      exerciseCard.classList.toggle("complete", [...series.querySelectorAll('input[type="checkbox"]')].every(item => item.checked));
+      exerciseCard.append(exerciseTop, description, benefit, series);
+      body.append(exerciseCard);
+    });
+    card.append(summary, body);
+    container.append(card);
+  });
 }
 
 function renderHistory() {
@@ -620,6 +936,7 @@ function bindEvents() {
   });
   $("trainingForm").addEventListener("submit", saveTraining);
   $("recordDate").addEventListener("change", updateFormWeekBadge);
+  $("sensations").addEventListener("input", syncSensationSuggestions);
   $("cancelEditButton").addEventListener("click", resetRegistration);
   $("exportJsonButton").addEventListener("click", exportJSON);
   $("exportCsvButton").addEventListener("click", exportCSV);
@@ -633,6 +950,7 @@ function initialize() {
   resetRegistration();
   bindEvents();
   renderHome();
+  renderRoutines();
   renderHistory();
   registerServiceWorker();
 }

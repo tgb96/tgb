@@ -25,7 +25,7 @@
     <header class="app-header">
       <button class="brand" type="button" data-view-target="home" aria-label="Ir al inicio">
         <span class="brand-mark">T</span>
-        <span><strong>TGB</strong><small>Training journal</small></span>
+        <span><strong>TGB</strong><small>Entrenamiento semanal</small></span>
       </button>
       <span class="local-badge">Datos locales</span>
     </header>
@@ -87,11 +87,8 @@
         <div id="categoryFields"></div>
 
         <div class="common-fields">
-          <div class="two-columns">
-            <div>
-              <label for="durationMinutes">Duración (min)</label>
-              <input id="durationMinutes" name="durationMinutes" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 60" required>
-            </div>
+          <div class="two-columns common-metrics">
+            <div id="durationField"></div>
             <div>
               <label for="calories">Calorías quemadas</label>
               <input id="calories" name="calories" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 420" required>
@@ -99,6 +96,11 @@
           </div>
 
           <label for="sensations">Impresiones o sensaciones</label>
+          <div class="suggestion-heading">
+            <span>Ideas rápidas</span>
+            <small>Puedes elegir más de una</small>
+          </div>
+          <div id="sensationSuggestions" class="suggestion-chips" aria-label="Sugerencias de sensaciones"></div>
           <textarea id="sensations" name="sensations" rows="4" maxlength="5000" placeholder="¿Cómo te sentiste? ¿Qué salió bien? ¿Hubo molestias?"></textarea>
         </div>
 
@@ -106,6 +108,18 @@
         <button id="saveTrainingButton" class="save-button" type="submit">Guardar entrenamiento</button>
         <button id="cancelEditButton" class="text-button hidden" type="button">Cancelar edición</button>
       </form>
+    </section>
+
+    <section id="viewRoutines" class="view hidden" hidden aria-labelledby="routinesHeading">
+      <div class="page-heading routines-heading">
+        <div>
+          <p class="eyebrow dark">Biblioteca de trabajo</p>
+          <h1 id="routinesHeading">Tus cuatro rutinas</h1>
+          <p class="page-subtitle">Abre una rutina y marca cada serie a medida que avanzas. El progreso de hoy queda guardado en este dispositivo.</p>
+        </div>
+        <span class="provisional-badge">Provisorias</span>
+      </div>
+      <div id="routineLibrary" class="routine-library"></div>
     </section>
 
     <section id="viewHistory" class="view hidden" hidden aria-labelledby="historyHeading">
@@ -142,6 +156,9 @@
     </button>
     <button class="nav-item" type="button" data-view-target="register">
       <span aria-hidden="true">＋</span><small>Registrar</small>
+    </button>
+    <button class="nav-item" type="button" data-view-target="routines">
+      <span aria-hidden="true">▦</span><small>Rutinas</small>
     </button>
     <button class="nav-item" type="button" data-view-target="history">
       <span aria-hidden="true">≡</span><small>Historial</small>

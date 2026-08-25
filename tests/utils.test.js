@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatDuration,
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
@@ -86,7 +87,14 @@ test("migra registros anteriores al nuevo modelo sin perder su contenido", () =>
   assert.equal(migrated.category, "physical");
   assert.equal(migrated.routineName, "Físico A");
   assert.equal(migrated.durationMinutes, 55);
+  assert.equal(migrated.durationSeconds, 3300);
   assert.equal(migrated.sensations, "Bien · Sin molestias");
+});
+
+test("formatea duraciones exactas para trote, trekking y tenis", () => {
+  assert.equal(formatDuration({ durationMinutes: 62.5, durationSeconds: 3750, durationPrecision: "hms" }), "1 h 02 min 30 s");
+  assert.equal(formatDuration({ durationMinutes: 135, durationSeconds: 8100, durationPrecision: "hm" }), "2 h 15 min");
+  assert.equal(formatDuration({ durationMinutes: 60, durationSeconds: 3600, durationPrecision: "minutes" }), "60 min");
 });
 
 test("agrupa por semana y genera el informe completo de lunes a domingo", () => {

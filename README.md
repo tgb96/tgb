@@ -8,6 +8,8 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Vista completa de lunes a domingo con las actividades realmente realizadas cada día.
 - Resumen semanal de sesiones, minutos y calorías.
 - Registro guiado por tres categorías: físico, cardio y tenis.
+- Sugerencias de sensaciones que pueden combinarse y editarse como texto.
+- Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis y series marcables.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 
 ## Tipos de entrenamiento
@@ -21,7 +23,7 @@ Incluye cuatro rutinas provisorias configuradas en `assets/js/data.js`:
 3. Potencia y agilidad.
 4. Fuerza integral.
 
-Los nombres, focos y ejercicios se reemplazarán cuando se definan las rutinas finales.
+Los nombres, focos y ejercicios se reemplazarán cuando se definan las rutinas finales. El avance de cada serie se guarda por fecha en el dispositivo.
 
 ### Cardio
 
@@ -31,11 +33,11 @@ Los nombres, focos y ejercicios se reemplazarán cuando se definan las rutinas f
 - Caminata.
 - Trekking.
 
-Trekking solicita cerro o lugar, distancia, duración, calorías y sensaciones. Las actividades al aire libre también permiten registrar distancia.
+Trote registra horas, minutos y segundos. Trekking ofrece lugares frecuentes, opción personalizada y duración en horas y minutos. Las actividades al aire libre también permiten registrar distancia.
 
 ### Tenis
 
-Solicita lugar, superficie, duración, calorías y sensaciones.
+Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración exacta en horas, minutos y segundos.
 
 ## Semanas e informes
 
@@ -52,7 +54,7 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 
 ## Estructura
 
-- `index.html`: Inicio, registro e historial.
+- `index.html`: Inicio, registro, rutinas e historial.
 - `assets/css/styles.css`: diseño adaptable.
 - `assets/js/data.js`: categorías, rutinas provisorias y opciones.
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.
