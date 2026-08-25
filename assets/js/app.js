@@ -38,6 +38,7 @@ let waitingServiceWorker = null;
 let toastTimer = null;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
+const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 
 function showView(name) {
   for (const viewName of ["Home", "Register", "Routines", "History"]) {
@@ -637,18 +638,59 @@ function saveRoutineProgress(progress) {
   }
 }
 
+function loadRoutineSettings() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROUTINE_SETTINGS_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRoutineSettings(settings) {
+  try {
+    window.localStorage.setItem(ROUTINE_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    showToast("No se pudieron guardar los ajustes de la rutina.");
+  }
+}
+
+function routineSettingsKey(routineId, exerciseId) {
+  return `${routineId}:${exerciseId}`;
+}
+
+function currentExerciseSettings(routine, exercise, settings) {
+  const saved = settings[routineSettingsKey(routine.id, exercise.id)] || {};
+  const requestedSets = Number.parseInt(saved.sets ?? exercise.sets, 10);
+  const sets = Number.isFinite(requestedSets) ? Math.min(12, Math.max(1, requestedSets)) : exercise.sets;
+  const target = String(saved.target ?? exercise.target).slice(0, 40);
+  const rawWeight = saved.weightKg ?? exercise.weightKg;
+  const numericWeight = rawWeight === "" ? "" : Number(rawWeight);
+  const weightKg = numericWeight === "" || (Number.isFinite(numericWeight) && numericWeight >= 0) ? numericWeight : exercise.weightKg;
+  return { sets, target, weightKg };
+}
+
 function routineProgressKey(dateISO, routineId, exerciseId, setIndex) {
   return `${dateISO}:${routineId}:${exerciseId}:${setIndex}`;
 }
 
-function completedRoutineSets(routine, progress, dateISO) {
-  return routine.exercises.reduce((total, exercise) => total + [0, 1, 2].filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length, 0);
+function totalRoutineSets(routine, settings) {
+  return routine.exercises.reduce((total, exercise) => total + currentExerciseSettings(routine, exercise, settings).sets, 0);
+}
+
+function completedRoutineSets(routine, progress, settings, dateISO) {
+  return routine.exercises.reduce((total, exercise) => {
+    const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
+    return total + Array.from({ length: exerciseSettings.sets }, (_, index) => index)
+      .filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length;
+  }, 0);
 }
 
 function renderRoutines() {
   const container = $("routineLibrary");
   const dateISO = getChileDateISO();
   const progress = loadRoutineProgress();
+  const settings = loadRoutineSettings();
   container.replaceChildren();
 
   physicalRoutines.forEach((routine, routineIndex) => {
@@ -667,9 +709,10 @@ function renderRoutines() {
     const counter = document.createElement("span");
     counter.className = "routine-progress";
     const updateCounter = () => {
-      const completed = completedRoutineSets(routine, progress, dateISO);
-      counter.textContent = `${completed}/${routine.exercises.length * 3} series`;
-      counter.classList.toggle("complete", completed === routine.exercises.length * 3);
+      const completed = completedRoutineSets(routine, progress, settings, dateISO);
+      const total = totalRoutineSets(routine, settings);
+      counter.textContent = `${completed}/${total} series`;
+      counter.classList.toggle("complete", completed === total);
     };
     updateCounter();
     summary.append(number, summaryCopy, counter);
@@ -678,19 +721,26 @@ function renderRoutines() {
     body.className = "routine-body";
     const note = document.createElement("p");
     note.className = "routine-note";
-    note.textContent = `Contenido provisorio · avance del ${formatShortDate(dateISO)}`;
-    body.append(note);
+    note.textContent = `Avance del ${formatShortDate(dateISO)} · tus cambios quedan guardados`;
+    const objective = document.createElement("p");
+    objective.className = "routine-objective";
+    objective.textContent = routine.objective;
+    body.append(note, objective);
 
     routine.exercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
       exerciseCard.className = "exercise-card";
+      const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
       const exerciseTop = document.createElement("div");
       exerciseTop.className = "exercise-top";
+      const titleBox = document.createElement("div");
+      const phase = document.createElement("span");
+      phase.className = "exercise-phase";
+      phase.textContent = exercise.phase;
       const exerciseTitle = document.createElement("h3");
       exerciseTitle.textContent = `${exerciseIndex + 1}. ${exercise.name}`;
-      const prescription = document.createElement("span");
-      prescription.textContent = exercise.prescription;
-      exerciseTop.append(exerciseTitle, prescription);
+      titleBox.append(phase, exerciseTitle);
+      exerciseTop.append(titleBox);
       const description = document.createElement("p");
       description.textContent = exercise.description;
       const benefit = document.createElement("p");
@@ -698,30 +748,106 @@ function renderRoutines() {
       const benefitLabel = document.createElement("strong");
       benefitLabel.textContent = "Para el tenis: ";
       benefit.append(benefitLabel, exercise.benefit);
+      const guidance = document.createElement("div");
+      guidance.className = "exercise-guidance";
+      if (exercise.weightSuggestion) {
+        const weightSuggestion = document.createElement("p");
+        weightSuggestion.textContent = exercise.weightSuggestion;
+        guidance.append(weightSuggestion);
+      }
+      if (exercise.caution) {
+        const caution = document.createElement("p");
+        caution.className = "exercise-caution";
+        caution.textContent = exercise.caution;
+        guidance.append(caution);
+      }
+
+      const controls = document.createElement("div");
+      controls.className = "exercise-controls";
+      const createControl = ({ labelText, input }) => {
+        const wrapper = document.createElement("label");
+        const caption = document.createElement("span");
+        caption.textContent = labelText;
+        wrapper.append(caption, input);
+        return wrapper;
+      };
+      const setsInput = document.createElement("input");
+      setsInput.type = "number";
+      setsInput.inputMode = "numeric";
+      setsInput.min = "1";
+      setsInput.max = "12";
+      setsInput.step = "1";
+      setsInput.value = String(exerciseSettings.sets);
+      setsInput.setAttribute("aria-label", `Series de ${exercise.name}`);
+      const targetInput = document.createElement("input");
+      targetInput.type = "text";
+      targetInput.maxLength = 40;
+      targetInput.value = exerciseSettings.target;
+      targetInput.setAttribute("aria-label", `Repeticiones o tiempo de ${exercise.name}`);
+      const weightInput = document.createElement("input");
+      weightInput.type = "number";
+      weightInput.inputMode = "decimal";
+      weightInput.min = "0";
+      weightInput.max = "200";
+      weightInput.step = "0.25";
+      weightInput.placeholder = "Sin carga";
+      weightInput.value = exerciseSettings.weightKg;
+      weightInput.setAttribute("aria-label", `Peso en kilos de ${exercise.name}`);
+      controls.append(
+        createControl({ labelText: "Series", input: setsInput }),
+        createControl({ labelText: "Reps / tiempo", input: targetInput }),
+        createControl({ labelText: "Peso (kg)", input: weightInput })
+      );
+
       const series = document.createElement("div");
       series.className = "series-checks";
 
-      [0, 1, 2].forEach(setIndex => {
-        const id = `set-${routine.id}-${exercise.id}-${setIndex}`;
-        const key = routineProgressKey(dateISO, routine.id, exercise.id, setIndex);
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.id = id;
-        input.checked = Boolean(progress[key]);
-        const label = document.createElement("label");
-        label.htmlFor = id;
-        label.textContent = `Serie ${setIndex + 1}`;
-        input.addEventListener("change", () => {
-          if (input.checked) progress[key] = true;
-          else delete progress[key];
-          saveRoutineProgress(progress);
-          updateCounter();
-          exerciseCard.classList.toggle("complete", [...series.querySelectorAll('input[type="checkbox"]')].every(item => item.checked));
+      const updateExerciseComplete = () => {
+        const checkboxes = [...series.querySelectorAll('input[type="checkbox"]')];
+        exerciseCard.classList.toggle("complete", checkboxes.length > 0 && checkboxes.every(item => item.checked));
+      };
+      const renderSeries = () => {
+        series.replaceChildren();
+        const setCount = currentExerciseSettings(routine, exercise, settings).sets;
+        Array.from({ length: setCount }, (_, index) => index).forEach(setIndex => {
+          const id = `set-${routine.id}-${exercise.id}-${setIndex}`;
+          const key = routineProgressKey(dateISO, routine.id, exercise.id, setIndex);
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.id = id;
+          input.checked = Boolean(progress[key]);
+          const label = document.createElement("label");
+          label.htmlFor = id;
+          label.textContent = `Serie ${setIndex + 1}`;
+          input.addEventListener("change", () => {
+            if (input.checked) progress[key] = true;
+            else delete progress[key];
+            saveRoutineProgress(progress);
+            updateCounter();
+            updateExerciseComplete();
+          });
+          series.append(input, label);
         });
-        series.append(input, label);
-      });
-      exerciseCard.classList.toggle("complete", [...series.querySelectorAll('input[type="checkbox"]')].every(item => item.checked));
-      exerciseCard.append(exerciseTop, description, benefit, series);
+        updateExerciseComplete();
+      };
+      const persistExerciseSettings = () => {
+        const setCount = Math.min(12, Math.max(1, Number.parseInt(setsInput.value, 10) || exercise.sets));
+        const target = targetInput.value.trim().slice(0, 40) || exercise.target;
+        const enteredWeight = weightInput.value === "" ? "" : Number(weightInput.value);
+        const weightKg = enteredWeight === "" || (Number.isFinite(enteredWeight) && enteredWeight >= 0) ? enteredWeight : exercise.weightKg;
+        settings[routineSettingsKey(routine.id, exercise.id)] = { sets: setCount, target, weightKg };
+        setsInput.value = String(setCount);
+        targetInput.value = target;
+        weightInput.value = weightKg;
+        saveRoutineSettings(settings);
+        renderSeries();
+        updateCounter();
+      };
+      setsInput.addEventListener("input", persistExerciseSettings);
+      targetInput.addEventListener("input", persistExerciseSettings);
+      weightInput.addEventListener("input", persistExerciseSettings);
+      renderSeries();
+      exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
     card.append(summary, body);

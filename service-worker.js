@@ -1,4 +1,4 @@
-const CACHE_NAME = "tgb-shell-v8";
+const CACHE_NAME = "tgb-shell-v11";
 
 const APP_SHELL = [
   "./",

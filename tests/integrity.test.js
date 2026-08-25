@@ -18,12 +18,16 @@ test("la interfaz usa módulos, cuatro vistas y ningún evento inline", async ()
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("hay cuatro rutinas físicas provisorias configurables", async () => {
+test("hay cuatro rutinas físicas completas y configurables", async () => {
   const data = await import("../assets/js/data.js");
   assert.equal(data.physicalRoutines.length, 4);
-  assert.ok(data.physicalRoutines.every(routine => routine.exercises.length > 0));
+  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [9, 12, 10, 11]);
+  assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking"]);
   assert.deepEqual(data.tennisSurfaces, ["Arcilla", "Cemento"]);
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.match(app, /tgb-routine-settings-v1/);
+  assert.match(app, /exercise-controls/);
 });
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
@@ -31,5 +35,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v8/);
+  assert.match(worker, /tgb-shell-v11/);
 });

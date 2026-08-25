@@ -16,14 +16,14 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 
 ### Entrenamiento físico
 
-Incluye cuatro rutinas provisorias configuradas en `assets/js/data.js`:
+Incluye cuatro rutinas configuradas en `assets/js/data.js`:
 
-1. Fuerza de piernas.
-2. Tren superior.
-3. Potencia y agilidad.
-4. Fuerza integral.
+1. Día 1: piernas, glúteos y core.
+2. Día 2: tren superior y estabilidad.
+3. Día 3: potencia y desplazamientos.
+4. Día 4 extra: antebrazo, core y técnica.
 
-Los nombres, focos y ejercicios se reemplazarán cuando se definan las rutinas finales. El avance de cada serie se guarda por fecha en el dispositivo.
+Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo.
 
 ### Cardio
 
@@ -56,7 +56,7 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 
 - `index.html`: Inicio, registro, rutinas e historial.
 - `assets/css/styles.css`: diseño adaptable.
-- `assets/js/data.js`: categorías, rutinas provisorias y opciones.
+- `assets/js/data.js`: categorías, rutinas y opciones.
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.
 - `assets/js/storage.js`: migración, validación y persistencia.
 - `assets/js/app.js`: interacción de la aplicación.
