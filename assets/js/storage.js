@@ -1,8 +1,9 @@
-import { normalizeRecord, validateRecord } from "./utils.js";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js";
 
-export const DATA_KEY = "tgb-data-v2";
+export const DATA_KEY = "tgb-data-v3";
+export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 function parseJSON(value, fallback) {
   try {
@@ -25,11 +26,13 @@ function ensureIds(records) {
 
 export function loadData(storage) {
   const current = parseJSON(storage.getItem(DATA_KEY), null);
-  if (current && Array.isArray(current.records)) {
-    return { schemaVersion: SCHEMA_VERSION, records: ensureIds(current.records), migrated: false };
-  }
+  if (current && Array.isArray(current.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(current.records), migrated: false, sourceKey: DATA_KEY };
+
+  const previous = parseJSON(storage.getItem(PREVIOUS_DATA_KEY), null);
+  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), migrated: true, sourceKey: PREVIOUS_DATA_KEY };
+
   const legacy = parseJSON(storage.getItem(LEGACY_HISTORY_KEY), []);
-  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), migrated: true };
+  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), migrated: true, sourceKey: LEGACY_HISTORY_KEY };
 }
 
 export function saveData(storage, data) {
@@ -37,7 +40,7 @@ export function saveData(storage, data) {
   try {
     storage.setItem(DATA_KEY, JSON.stringify(payload));
   } catch (error) {
-    const wrapped = new Error("No fue posible guardar. Exporta un respaldo y libera espacio del navegador.");
+    const wrapped = new Error("No fue posible guardar. Descarga un respaldo y libera espacio del navegador.");
     wrapped.cause = error;
     throw wrapped;
   }
@@ -48,10 +51,9 @@ export function parseBackup(jsonText) {
   const parsed = parseJSON(jsonText, null);
   const records = Array.isArray(parsed) ? parsed : parsed?.records;
   if (!Array.isArray(records)) throw new Error("El archivo no contiene un respaldo TGB válido.");
-  if (records.length > 10000) throw new Error("El respaldo supera el máximo de 10.000 registros por importación.");
-  const invalidSource = records.find(record => !validateRecord(record).valid);
-  if (invalidSource) throw new Error(`El respaldo contiene un registro inválido (${invalidSource.dateISO || "sin fecha"}).`);
+  if (records.length > 10000) throw new Error("El respaldo supera el máximo de 10.000 registros.");
   const normalized = ensureIds(records);
+  if (normalized.some(record => !isValidISODate(record.dateISO))) throw new Error("El respaldo contiene uno o más registros sin fecha válida.");
   return normalized;
 }
 
@@ -59,16 +61,16 @@ export function createRepository(storage) {
   let state = loadData(storage);
   if (state.migrated) {
     try {
-      state = { ...saveData(storage, state), migrated: true };
-      storage.removeItem(LEGACY_HISTORY_KEY);
+      const sourceKey = state.sourceKey;
+      state = { ...saveData(storage, state), migrated: true, sourceKey: DATA_KEY };
+      if (sourceKey && sourceKey !== DATA_KEY) storage.removeItem(sourceKey);
     } catch {
-      // El historial antiguo permanece disponible en memoria y puede exportarse.
       state = { ...state, migrated: true };
     }
   }
 
   const persist = records => {
-    state = { ...saveData(storage, { records }), migrated: false };
+    state = { ...saveData(storage, { records }), migrated: false, sourceKey: DATA_KEY };
     return state.records;
   };
 
@@ -92,25 +94,20 @@ export function createRepository(storage) {
       return next;
     },
     remove(id) {
-      const next = state.records.filter(record => record.id !== String(id));
-      if (next.length === state.records.length) return false;
-      persist(next);
+      const records = state.records.filter(record => record.id !== String(id));
+      if (records.length === state.records.length) return false;
+      persist(records);
       return true;
     },
     importMerge(jsonText) {
       const incoming = parseBackup(jsonText);
       const merged = new Map(state.records.map(record => [record.id, record]));
-      for (const record of incoming) merged.set(record.id, record);
+      incoming.forEach(record => merged.set(record.id, record));
       persist([...merged.values()]);
       return incoming.length;
     },
     backup() {
-      return JSON.stringify({
-        app: "TGB",
-        schemaVersion: SCHEMA_VERSION,
-        exportedAt: new Date().toISOString(),
-        records: this.list()
-      }, null, 2);
+      return JSON.stringify({ app: "TGB", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list() }, null, 2);
     }
   };
 }

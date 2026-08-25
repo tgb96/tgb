@@ -1,76 +1,122 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  advanceIntervalState,
-  averageMetric,
-  doneKeyForDate,
-  isoForWeekDay,
+  groupRecordsByWeek,
+  isoWeekInfo,
+  normalizeRecord,
   recordsToCSV,
-  reportForPeriod,
-  sessionKeyForDate,
-  validateRecord
+  validateRecord,
+  weekDays,
+  weeklyReport
 } from "../assets/js/utils.js";
 
-const baseRecord = {
-  id: "record-1",
-  dateISO: "2026-08-20",
-  activity: "Tenis",
-  durationMinutes: 0,
-  calories: 0,
-  kms: "",
-  fatigue: 0,
-  thumbPain: 0,
-  legPain: 0,
-  feeling: "Normal",
-  notes: ""
+const physicalRecord = {
+  id: "physical-1",
+  dateISO: "2026-08-24",
+  category: "physical",
+  categoryName: "Físico",
+  routineId: "legs",
+  routineName: "Fuerza de piernas",
+  durationMinutes: 60,
+  calories: 420,
+  sensations: "Buena energía"
 };
 
-test("las claves y fechas usan la fecha exacta, incluso para registros pasados", () => {
-  assert.equal(isoForWeekDay(1, "2026-08-24"), "2026-08-24");
-  assert.equal(isoForWeekDay(0, "2026-08-24"), "2026-08-30");
-  assert.equal(doneKeyForDate("2026-07-06"), "done-2026-07-06");
-  assert.equal(sessionKeyForDate("2026-07-06"), "session-2026-07-06");
+test("el 24 de agosto de 2026 pertenece a la semana ISO 35", () => {
+  assert.deepEqual(isoWeekInfo("2026-08-24"), {
+    key: "2026-W35",
+    weekNumber: 35,
+    weekYear: 2026,
+    startISO: "2026-08-24",
+    endISO: "2026-08-30"
+  });
+  assert.deepEqual(weekDays("2026-08-26"), [
+    "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30"
+  ]);
 });
 
-test("cero es un valor válido y no se confunde con un dato vacío", () => {
-  const result = validateRecord(baseRecord);
-  assert.equal(result.valid, true);
-  assert.equal(averageMetric([baseRecord, { ...baseRecord, fatigue: "" }], "fatigue"), 0);
-  const report = reportForPeriod([baseRecord], 7, "2026-08-24");
-  assert.match(report, /Fatiga: 0\/10/);
-  assert.match(report, /Tiempo: 0 min/);
+test("las semanas respetan el año ISO en cambios de año", () => {
+  assert.equal(isoWeekInfo("2027-01-01").key, "2026-W53");
 });
 
-test("rechaza valores de bienestar fuera de 0 a 10", () => {
-  const result = validateRecord({ ...baseRecord, fatigue: 11 });
-  assert.equal(result.valid, false);
-  assert.match(result.errors.join(" "), /fatiga/);
+test("valida los tres tipos de entrenamiento y los campos especiales", () => {
+  assert.equal(validateRecord(physicalRecord).valid, true);
+  assert.equal(validateRecord({
+    ...physicalRecord,
+    id: "trekking-1",
+    category: "cardio",
+    categoryName: "Cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "trekking",
+    cardioTypeName: "Trekking",
+    location: "Cerro Manquehue",
+    distanceKm: 8.5
+  }).valid, true);
+  assert.equal(validateRecord({
+    ...physicalRecord,
+    category: "cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "trekking",
+    location: "",
+    distanceKm: ""
+  }).valid, false);
+  assert.equal(validateRecord({
+    ...physicalRecord,
+    category: "tennis",
+    routineId: "",
+    routineName: "",
+    location: "Club",
+    surface: "Arcilla"
+  }).valid, true);
 });
 
-test("CSV neutraliza fórmulas y conserva notas entre comillas", () => {
-  const csv = recordsToCSV([{ ...baseRecord, notes: "=HYPERLINK(\"x\")" }]);
-  assert.match(csv, /'=HYPERLINK/);
-  assert.ok(csv.startsWith("\uFEFF"));
+test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
+  const migrated = normalizeRecord({
+    id: "old-1",
+    dateISO: "2026-08-20",
+    activity: "Físico",
+    physicalRoutine: "A",
+    durationMinutes: "55",
+    calories: "300",
+    feeling: "Bien",
+    notes: "Sin molestias"
+  });
+  assert.equal(migrated.category, "physical");
+  assert.equal(migrated.routineName, "Físico A");
+  assert.equal(migrated.durationMinutes, 55);
+  assert.equal(migrated.sensations, "Bien · Sin molestias");
 });
 
-test("el timer avanza por descanso y rondas usando plazos reales", () => {
-  let state = {
-    running: true,
-    phase: "work",
-    currentRound: 1,
-    totalRounds: 2,
-    work: 30,
-    rest: 10,
-    mode: "interval",
-    deadline: 1000
+test("agrupa por semana y genera el informe completo de lunes a domingo", () => {
+  const tennis = {
+    ...physicalRecord,
+    id: "tennis-1",
+    dateISO: "2026-08-26",
+    category: "tennis",
+    categoryName: "Tenis",
+    routineId: "",
+    routineName: "",
+    location: "Club Open",
+    surface: "Arcilla",
+    durationMinutes: 90,
+    calories: 650
   };
-  ({ state } = advanceIntervalState(state, 1000));
-  assert.equal(state.phase, "rest");
-  assert.equal(state.deadline, 11000);
-  ({ state } = advanceIntervalState(state, 11000));
-  assert.equal(state.phase, "work");
-  assert.equal(state.currentRound, 2);
-  assert.equal(state.deadline, 41000);
-  ({ state } = advanceIntervalState(state, 51000));
-  assert.equal(state.running, false);
+  const groups = groupRecordsByWeek([physicalRecord, tennis]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].weekNumber, 35);
+  const report = weeklyReport([physicalRecord, tennis], groups[0]);
+  assert.match(report, /SEMANA 35 DE 2026/);
+  assert.match(report, /Tiempo total: 150 min/);
+  assert.match(report, /LUNES 2026-08-24/);
+  assert.match(report, /DOMINGO 2026-08-30/);
+  assert.match(report, /Sin entrenamiento registrado/);
+});
+
+test("CSV conserva los campos nuevos y neutraliza fórmulas", () => {
+  const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)" }]);
+  assert.ok(csv.startsWith("\uFEFF"));
+  assert.match(csv, /Fuerza de piernas/);
+  assert.match(csv, /'=SUM/);
 });

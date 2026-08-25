@@ -1,4 +1,10 @@
-import { activityTypes, dayNamesFull, routines, TZ } from "./data.js";
+import {
+  cardioTypeById,
+  categoryById,
+  dayNamesFull,
+  physicalRoutineById,
+  TZ
+} from "./data.js";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -19,10 +25,24 @@ export function getChileDateISO(now = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export function getChileDateText(now = new Date()) {
-  const parts = getChileParts(now);
-  const weekday = parts.weekday.charAt(0).toUpperCase() + parts.weekday.slice(1);
-  return `${weekday}, ${parts.day}/${parts.month}/${parts.year} · Santiago de Chile`;
+export function formatLongDate(dateISO = getChileDateISO()) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  const text = new Intl.DateTimeFormat("es-CL", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(date);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function formatShortDate(dateISO) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-CL", { timeZone: "UTC", day: "numeric", month: "short" })
+    .format(new Date(Date.UTC(year, month - 1, day, 12)))
+    .replace(".", "");
 }
 
 export function isValidISODate(value) {
@@ -52,167 +72,174 @@ export function mondayForISO(iso) {
   return addDaysISO(iso, day === 0 ? -6 : 1 - day);
 }
 
-export function isoForWeekDay(dayIndex, anchorISO = getChileDateISO()) {
-  const monday = mondayForISO(anchorISO);
-  return addDaysISO(monday, dayIndex === 0 ? 6 : dayIndex - 1);
+export function isoWeekInfo(dateISO) {
+  if (!isValidISODate(dateISO)) throw new Error("Fecha inválida");
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const isoDay = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - isoDay);
+  const weekYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+  const weekNumber = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  const startISO = mondayForISO(dateISO);
+  const endISO = addDaysISO(startISO, 6);
+  return {
+    key: `${weekYear}-W${String(weekNumber).padStart(2, "0")}`,
+    weekNumber,
+    weekYear,
+    startISO,
+    endISO
+  };
 }
 
-export function doneKeyForDate(dateISO) {
-  return `done-${dateISO}`;
+export function weekDays(dateISO = getChileDateISO()) {
+  const start = mondayForISO(dateISO);
+  return Array.from({ length: 7 }, (_, index) => addDaysISO(start, index));
 }
 
-export function legacyDoneKey(dateISO) {
-  return `done-${dateISO}-${dayIndexFromISO(dateISO)}`;
-}
-
-export function sessionKeyForDate(dateISO) {
-  return `session-${dateISO}`;
-}
-
-export function legacySessionKey(dateISO) {
-  return `session-${dateISO}-${dayIndexFromISO(dateISO)}`;
-}
-
-export function exerciseSetKey(dateISO, exerciseIndex, setNumber) {
-  return `routine-${dateISO}-ex-${exerciseIndex}-set-${setNumber}`;
-}
-
-export function legacyExerciseSetKey(dateISO, exerciseIndex, setNumber) {
-  return `routine-${dateISO}-${dayIndexFromISO(dateISO)}-ex-${exerciseIndex}-set-${setNumber}`;
-}
-
-export function parseDurationSeconds(meta) {
-  const text = String(meta).toLowerCase().replace(",", ".");
-  const minuteMatch = text.match(/(\d+)(?:\s*-\s*\d+)?\s*min/);
-  if (minuteMatch) return Number(minuteMatch[1]) * 60;
-  const secondMatch = text.match(/(\d+)(?:\s*-\s*\d+)?\s*s/);
-  if (secondMatch) return Number(secondMatch[1]);
-  return null;
-}
-
-export function formatMMSS(seconds) {
-  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
-  const minutes = String(Math.floor(safeSeconds / 60)).padStart(2, "0");
-  const remainder = String(safeSeconds % 60).padStart(2, "0");
-  return `${minutes}:${remainder}`;
-}
-
-export function formatHHMMSS(seconds) {
-  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
-  const hours = String(Math.floor(safeSeconds / 3600)).padStart(2, "0");
-  const minutes = String(Math.floor((safeSeconds % 3600) / 60)).padStart(2, "0");
-  const remainder = String(safeSeconds % 60).padStart(2, "0");
-  return `${hours}:${minutes}:${remainder}`;
-}
-
-function optionalNumber(value, { min = 0, max = Number.POSITIVE_INFINITY, integer = false } = {}) {
+function optionalNumber(value, { min = 0 } = {}) {
   if (value === "" || value === null || value === undefined) return "";
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < min || parsed > max || (integer && !Number.isInteger(parsed))) return null;
-  return parsed;
+  return Number.isFinite(parsed) && parsed >= min ? parsed : null;
+}
+
+function legacyCategory(record) {
+  if (record?.category) return record.category;
+  if (record?.activity === "Físico") return "physical";
+  if (record?.activity === "Cardio") return "cardio";
+  if (record?.activity === "Tenis") return "tennis";
+  return "other";
+}
+
+function legacyRoutine(record) {
+  if (record?.routineName) return record.routineName;
+  if (record?.physicalRoutine) return `Físico ${record.physicalRoutine}`;
+  return record?.plannedRoutine || "";
+}
+
+function legacyCardio(record) {
+  if (record?.cardioTypeName) return record.cardioTypeName;
+  return record?.cardioType || "";
 }
 
 export function normalizeRecord(record) {
   const dateISO = String(record?.dateISO || "");
   const dayIndex = dayIndexFromISO(dateISO);
-  const activity = activityTypes.includes(record?.activity) ? record.activity : String(record?.activity || "Otro");
-  const normalized = {
+  const category = legacyCategory(record);
+  const categoryInfo = categoryById(category);
+  const sensations = String(record?.sensations || [record?.feeling, record?.notes].filter(Boolean).join(" · ") || "").slice(0, 5000);
+  return {
     id: String(record?.id || ""),
     dateISO,
     day: dayIndex === null ? String(record?.day || "") : dayNamesFull[dayIndex],
-    plannedRoutine: dayIndex === null ? String(record?.plannedRoutine || "") : String(record?.plannedRoutine || routines[dayIndex].name),
-    plannedType: dayIndex === null ? String(record?.plannedType || "") : String(record?.plannedType || routines[dayIndex].type),
-    type: "Registro de actividad",
-    activity,
-    physicalRoutine: String(record?.physicalRoutine || ""),
-    cardioType: String(record?.cardioType || ""),
-    kms: optionalNumber(record?.kms, { min: 0 }),
+    category,
+    categoryName: String(record?.categoryName || categoryInfo?.shortName || record?.activity || "Otro"),
+    routineId: String(record?.routineId || ""),
+    routineName: String(legacyRoutine(record)),
+    cardioTypeId: String(record?.cardioTypeId || ""),
+    cardioTypeName: String(legacyCardio(record)),
+    location: String(record?.location || "").slice(0, 300),
+    surface: String(record?.surface || "").slice(0, 100),
+    distanceKm: optionalNumber(record?.distanceKm ?? record?.kms, { min: 0 }),
     durationMinutes: optionalNumber(record?.durationMinutes, { min: 0 }),
     calories: optionalNumber(record?.calories, { min: 0 }),
-    fatigue: optionalNumber(record?.fatigue, { min: 0, max: 10 }),
-    thumbPain: optionalNumber(record?.thumbPain, { min: 0, max: 10 }),
-    legPain: optionalNumber(record?.legPain, { min: 0, max: 10 }),
-    feeling: String(record?.feeling || "Normal"),
-    notes: String(record?.notes || "").slice(0, 5000),
+    sensations,
     createdAt: String(record?.createdAt || ""),
     updatedAt: String(record?.updatedAt || "")
   };
-  return normalized;
 }
 
 export function validateRecord(record) {
   const normalized = normalizeRecord(record);
   const errors = [];
   if (!isValidISODate(normalized.dateISO)) errors.push("Selecciona una fecha válida.");
-  if (!activityTypes.includes(normalized.activity)) errors.push("Selecciona una actividad válida.");
-  if (normalized.durationMinutes === null) errors.push("La duración debe ser un número igual o mayor que cero.");
-  if (normalized.calories === null) errors.push("Las calorías deben ser un número igual o mayor que cero.");
-  if (normalized.kms === null) errors.push("Los kilómetros deben ser un número igual o mayor que cero.");
-  for (const [key, label] of [["fatigue", "fatiga"], ["thumbPain", "dolor de pulgar"], ["legPain", "dolor de rodilla/Aquiles"]]) {
-    if (normalized[key] === "" || normalized[key] === null) errors.push(`El valor de ${label} debe estar entre 0 y 10.`);
+  if (!categoryById(normalized.category)) errors.push("Selecciona un tipo de entrenamiento.");
+  if (normalized.durationMinutes === "" || normalized.durationMinutes === null) errors.push("Ingresa una duración válida.");
+  if (normalized.calories === "" || normalized.calories === null) errors.push("Ingresa las calorías quemadas.");
+
+  if (normalized.category === "physical") {
+    if (!physicalRoutineById(normalized.routineId) && !normalized.routineName) errors.push("Selecciona una rutina física.");
   }
+  if (normalized.category === "cardio") {
+    const cardio = cardioTypeById(normalized.cardioTypeId);
+    if (!cardio) errors.push("Selecciona un tipo de cardio.");
+    if (cardio?.id === "trekking" && !normalized.location.trim()) errors.push("Ingresa el cerro o lugar del trekking.");
+    if (cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
+  }
+  if (normalized.category === "tennis") {
+    if (!normalized.location.trim()) errors.push("Ingresa el lugar de la sesión de tenis.");
+    if (!normalized.surface.trim()) errors.push("Selecciona la superficie.");
+  }
+  if (normalized.distanceKm === null) errors.push("La distancia debe ser un número igual o mayor que cero.");
   return { valid: errors.length === 0, errors, record: normalized };
 }
 
-export function metricText(value, fallback = "no registrado") {
-  return value === "" || value === null || value === undefined ? fallback : String(value);
+export function recordTitle(record) {
+  const normalized = normalizeRecord(record);
+  if (normalized.category === "physical") return normalized.routineName || "Entrenamiento físico";
+  if (normalized.category === "cardio") return normalized.cardioTypeName || "Cardio";
+  if (normalized.category === "tennis") return normalized.location ? `Tenis · ${normalized.location}` : "Tenis";
+  return normalized.categoryName || "Entrenamiento";
 }
 
-export function averageMetric(records, key) {
-  const values = records
-    .map(record => record[key])
-    .filter(value => value !== "" && value !== null && value !== undefined)
-    .map(Number)
-    .filter(Number.isFinite);
-  if (!values.length) return null;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+export function recordDetails(record) {
+  const normalized = normalizeRecord(record);
+  const details = [`${normalized.durationMinutes === "" ? "—" : normalized.durationMinutes} min`, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  if (normalized.distanceKm !== "") details.push(`${normalized.distanceKm} km`);
+  if (normalized.surface) details.push(normalized.surface);
+  return details.join(" · ");
 }
 
-export function reportForPeriod(records, days, endISO) {
-  const startISO = addDaysISO(endISO, -days + 1);
-  const selected = records
-    .map(normalizeRecord)
-    .filter(record => record.dateISO >= startISO && record.dateISO <= endISO)
-    .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
-  const sum = key => selected.reduce((total, record) => total + (Number(record[key]) || 0), 0);
-  const activityCount = selected.reduce((counts, record) => {
-    counts[record.activity || "Sin actividad"] = (counts[record.activity || "Sin actividad"] || 0) + 1;
+export function groupRecordsByWeek(records) {
+  const groups = new Map();
+  for (const record of records.map(normalizeRecord).filter(item => isValidISODate(item.dateISO))) {
+    const week = isoWeekInfo(record.dateISO);
+    if (!groups.has(week.key)) groups.set(week.key, { ...week, records: [] });
+    groups.get(week.key).records.push(record);
+  }
+  return [...groups.values()]
+    .map(group => ({ ...group, records: group.records.sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.createdAt.localeCompare(b.createdAt)) }))
+    .sort((a, b) => b.key.localeCompare(a.key));
+}
+
+export function weeklyReport(records, week) {
+  const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+  const totalMinutes = normalized.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
+  const totalCalories = normalized.reduce((sum, record) => sum + (Number(record.calories) || 0), 0);
+  const totalDistance = normalized.reduce((sum, record) => sum + (Number(record.distanceKm) || 0), 0);
+  const categoryCounts = normalized.reduce((counts, record) => {
+    counts[record.categoryName] = (counts[record.categoryName] || 0) + 1;
     return counts;
   }, {});
-  const average = key => {
-    const value = averageMetric(selected, key);
-    return value === null ? "sin datos" : value.toFixed(1);
-  };
 
-  let report = `INFORME TGB - ÚLTIMOS ${days} DÍAS\n`;
-  report += `Periodo: ${startISO} a ${endISO}\n`;
-  report += "Zona horaria: Santiago de Chile\n\n";
-  report += "RESUMEN GENERAL\n";
-  report += `- Registros totales: ${selected.length}\n`;
-  report += `- Tiempo total registrado: ${sum("durationMinutes")} min\n`;
-  report += `- Calorías registradas: ${sum("calories")} kcal\n`;
-  report += `- Kilómetros registrados: ${sum("kms").toFixed(2)} km\n`;
-  report += `- Fatiga promedio: ${average("fatigue")}/10\n`;
-  report += `- Dolor pulgar promedio: ${average("thumbPain")}/10\n`;
-  report += `- Dolor rodilla/Aquiles promedio: ${average("legPain")}/10\n\n`;
-  report += "ACTIVIDADES REALIZADAS\n";
-  for (const [activity, count] of Object.entries(activityCount)) report += `- ${activity}: ${count} registro(s)\n`;
-  report += "\nDETALLE DÍA A DÍA\n";
-  if (!selected.length) report += "Sin registros en este periodo.\n";
-  for (const record of selected) {
-    report += `\n${record.dateISO} - ${record.day}\n`;
-    report += `Plan del día: ${record.plannedRoutine || "-"} (${record.plannedType || "-"})\n`;
-    report += `Actividad real: ${record.activity || "-"}\n`;
-    if (record.physicalRoutine) report += `Físico realizado: ${record.physicalRoutine}\n`;
-    if (record.cardioType) report += `Tipo cardio: ${record.cardioType}\n`;
-    if (record.kms !== "") report += `Kilómetros: ${record.kms}\n`;
-    report += `Tiempo: ${metricText(record.durationMinutes)} min\n`;
-    report += `Calorías: ${metricText(record.calories, "no registradas")}\n`;
-    report += `Fatiga: ${metricText(record.fatigue, "-")}/10\n`;
-    report += `Pulgar derecho: ${metricText(record.thumbPain, "-")}/10\n`;
-    report += `Rodilla/Aquiles: ${metricText(record.legPain, "-")}/10\n`;
-    report += `Sensación: ${record.feeling || "-"}\n`;
-    if (record.notes) report += `Notas: ${record.notes}\n`;
+  let report = `REGISTRO TGB — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
+  report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
+  report += "RESUMEN\n";
+  report += `- Entrenamientos: ${normalized.length}\n`;
+  report += `- Tiempo total: ${totalMinutes} min\n`;
+  report += `- Calorías registradas: ${totalCalories} kcal\n`;
+  report += `- Distancia registrada: ${totalDistance.toFixed(2)} km\n`;
+  for (const [category, count] of Object.entries(categoryCounts)) report += `- ${category}: ${count}\n`;
+
+  report += "\nDETALLE DE LA SEMANA\n";
+  for (const dateISO of weekDays(week.startISO)) {
+    const dayRecords = normalized.filter(record => record.dateISO === dateISO);
+    const dayName = dayNamesFull[dayIndexFromISO(dateISO)];
+    report += `\n${dayName.toUpperCase()} ${dateISO}\n`;
+    if (!dayRecords.length) {
+      report += "Sin entrenamiento registrado.\n";
+      continue;
+    }
+    dayRecords.forEach((record, index) => {
+      report += `${index + 1}. ${recordTitle(record)}\n`;
+      report += `   Tipo: ${record.categoryName}\n`;
+      report += `   Duración: ${record.durationMinutes} min\n`;
+      report += `   Calorías: ${record.calories} kcal\n`;
+      if (record.distanceKm !== "") report += `   Distancia: ${record.distanceKm} km\n`;
+      if (record.location) report += `   Lugar: ${record.location}\n`;
+      if (record.surface) report += `   Superficie: ${record.surface}\n`;
+      if (record.sensations) report += `   Sensaciones: ${record.sensations}\n`;
+    });
   }
   return report;
 }
@@ -225,45 +252,11 @@ function csvCell(value) {
 
 export function recordsToCSV(records) {
   const columns = [
-    ["fecha", "dateISO"], ["día", "day"], ["plan", "plannedRoutine"], ["actividad", "activity"],
-    ["rutina_física", "physicalRoutine"], ["cardio", "cardioType"], ["kilómetros", "kms"],
-    ["duración_min", "durationMinutes"], ["calorías", "calories"], ["fatiga", "fatigue"],
-    ["dolor_pulgar", "thumbPain"], ["dolor_rodilla_aquiles", "legPain"], ["sensación", "feeling"], ["notas", "notes"]
+    ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
+    ["cardio", "cardioTypeName"], ["lugar", "location"], ["superficie", "surface"],
+    ["distancia_km", "distanceKm"], ["duración_min", "durationMinutes"], ["calorías", "calories"], ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];
   for (const record of records.map(normalizeRecord)) rows.push(columns.map(([, key]) => csvCell(record[key])).join(","));
   return `\uFEFF${rows.join("\r\n")}`;
-}
-
-export function advanceIntervalState(inputState, now = Date.now()) {
-  const state = { ...inputState };
-  let completed = false;
-  let transitions = 0;
-  while (state.running && now >= state.deadline && transitions < 10000) {
-    transitions += 1;
-    if (state.mode === "single") {
-      state.running = false;
-      completed = true;
-      break;
-    }
-    if (state.phase === "work" && state.rest > 0) {
-      state.phase = "rest";
-      state.deadline += state.rest * 1000;
-      continue;
-    }
-    if (state.totalRounds !== 0 && state.currentRound >= state.totalRounds) {
-      state.running = false;
-      completed = true;
-      break;
-    }
-    state.currentRound += 1;
-    state.phase = "work";
-    state.deadline += state.work * 1000;
-  }
-  if (transitions === 10000 && state.running) state.deadline = now + state.work * 1000;
-  return { state, completed, transitions };
-}
-
-export function remainingSeconds(state, now = Date.now()) {
-  return state.running ? Math.max(0, Math.ceil((state.deadline - now) / 1000)) : 0;
 }

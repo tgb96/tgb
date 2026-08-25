@@ -3,210 +3,152 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#111522">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TGB">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Registro personal de entrenamientos, sensaciones y progreso.">
+  <meta name="description" content="Diario semanal personal de entrenamiento.">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="assets/css/styles.css">
-  <title>TGB</title>
+  <title>TGB · Diario de entrenamiento</title>
 </head>
 
 <body>
   <div id="updateBanner" class="update-banner hidden" role="status">
-    <span>Hay una versión nueva disponible.</span>
+    <span>Hay una versión nueva de TGB.</span>
     <button id="updateButton" type="button">Actualizar</button>
   </div>
 
-  <main class="app">
-    <header>
-      <div class="logo" aria-hidden="true">TGB</div>
-      <div>
-        <h1>TGB</h1>
-        <p class="sub header-date" id="dateText"></p>
-      </div>
+  <main class="app-shell">
+    <header class="app-header">
+      <button class="brand" type="button" data-view-target="home" aria-label="Ir al inicio">
+        <span class="brand-mark">T</span>
+        <span><strong>TGB</strong><small>Training journal</small></span>
+      </button>
+      <span class="local-badge">Datos locales</span>
     </header>
 
-    <section id="tabHoy" aria-labelledby="todayName">
-      <div class="card today">
-        <div class="label">Hoy corresponde</div>
-        <div class="today-title" id="todayName"></div>
-        <div class="pill" id="todayType"></div>
-      </div>
-
-      <div class="card">
-        <div class="label">Semana</div>
-        <div class="week" id="week" aria-label="Seleccionar día de la semana"></div>
-      </div>
-
-      <div class="card">
-        <h2 id="routineTitle"></h2>
-        <p class="sub" id="routineGoal"></p>
-
-        <div class="session-box">
-          <button id="sessionButton" type="button">Iniciar</button>
-          <time class="session-time" id="sessionTime">00:00:00</time>
+    <section id="viewHome" class="view" aria-labelledby="homeTitle">
+      <div class="hero">
+        <div class="hero-topline">
+          <span id="currentWeekBadge" class="week-badge"></span>
+          <span id="todayStatus" class="today-status"></span>
         </div>
-
-        <div id="routineBox"></div>
-        <button class="main" id="registerFromRoutine" type="button">Registrar</button>
+        <p class="eyebrow">Hoy</p>
+        <h1 id="homeTitle"></h1>
+        <p id="weekRange" class="hero-range"></p>
+        <div class="hero-stats" aria-label="Resumen semanal">
+          <div><strong id="weekSessionCount">0</strong><span>sesiones</span></div>
+          <div><strong id="weekMinutes">0</strong><span>minutos</span></div>
+          <div><strong id="weekCalories">0</strong><span>kcal</span></div>
+        </div>
       </div>
+
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow dark">Esta semana</p>
+          <h2>Tu actividad, día por día</h2>
+        </div>
+        <span id="weekProgress" class="progress-pill"></span>
+      </div>
+
+      <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
+
+      <button id="homeRegisterButton" class="primary-cta" type="button">
+        <span class="cta-plus" aria-hidden="true">+</span>
+        <span><strong>Registrar entrenamiento</strong><small>Físico, cardio o tenis</small></span>
+        <span class="cta-arrow" aria-hidden="true">→</span>
+      </button>
     </section>
 
-    <section id="tabRegistrar" class="hidden" hidden aria-labelledby="registerTitle">
-      <div class="card">
-        <div class="section-heading">
-          <h2 id="registerTitle">Registrar</h2>
-          <span id="editingBadge" class="pill edit-badge hidden">Editando</span>
+    <section id="viewRegister" class="view hidden" hidden aria-labelledby="registerHeading">
+      <div class="page-heading">
+        <button id="registrationBackButton" class="back-button hidden" type="button" aria-label="Volver a elegir tipo">←</button>
+        <div>
+          <p class="eyebrow dark">Nuevo registro</p>
+          <h1 id="registerHeading">¿Qué entrenamiento hiciste?</h1>
+          <p id="registerIntro" class="page-subtitle">Elige uno de los tres grandes grupos.</p>
         </div>
-        <p class="sub">Por defecto se guarda con la fecha actual de Santiago de Chile. Puedes cambiar la fecha si olvidaste registrar un entrenamiento anterior.</p>
+      </div>
 
-        <form id="registerForm" novalidate>
-          <button class="secondary" id="toggleDateButton" type="button" aria-expanded="false" aria-controls="dateFieldBox">Cambiar fecha del registro</button>
-          <div id="dateFieldBox" class="hidden">
-            <label for="recordDate">Fecha del registro</label>
+      <div id="categoryChooser" class="category-grid"></div>
+
+      <form id="trainingForm" class="training-form hidden" hidden novalidate>
+        <div class="form-date-row">
+          <div>
+            <label for="recordDate">Fecha</label>
             <input id="recordDate" name="recordDate" type="date" required>
           </div>
+          <span id="formWeekBadge" class="form-week-badge"></span>
+        </div>
 
-          <label for="activityType">¿Qué hiciste?</label>
-          <select id="activityType" name="activityType">
-            <option>Físico</option>
-            <option>Tenis</option>
-            <option>Cardio</option>
-            <option>Movilidad</option>
-            <option>Descanso</option>
-            <option>Kinesiología</option>
-            <option>Otro</option>
-          </select>
+        <div id="categoryFields"></div>
 
-          <div id="activityFields"></div>
-
-          <label for="fatigue">Fatiga general 0–10</label>
-          <input id="fatigue" name="fatigue" type="number" inputmode="decimal" min="0" max="10" step="0.5" value="3" required>
-
-          <label for="thumbPain">Dolor pulgar derecho 0–10</label>
-          <input id="thumbPain" name="thumbPain" type="number" inputmode="decimal" min="0" max="10" step="0.5" value="0" required>
-
-          <label for="legPain">Dolor rodilla / Aquiles 0–10</label>
-          <input id="legPain" name="legPain" type="number" inputmode="decimal" min="0" max="10" step="0.5" value="0" required>
-
-          <label for="feeling">Sensación</label>
-          <select id="feeling" name="feeling">
-            <option>Me sentí bien</option>
-            <option>Normal</option>
-            <option>Fatigado</option>
-            <option>Pesado</option>
-            <option>Con molestias</option>
-            <option>Muy bien</option>
-            <option>Muy fatigado</option>
-          </select>
-
-          <label for="notes">Notas</label>
-          <textarea id="notes" name="notes" rows="3" maxlength="5000" placeholder="Ej: dormí poco, molestia en pulgar, buen ánimo, hice bici suave..."></textarea>
-
-          <button class="blue" id="analyzeButton" type="button">Analizar estado</button>
-          <p class="medical-note">Orientación personal basada en tus valores, no un diagnóstico médico. Si aparece dolor intenso, nuevo o creciente, detén la actividad y consulta a un profesional.</p>
-          <button class="main" id="saveButton" type="submit">Guardar registro</button>
-          <button class="secondary hidden" id="cancelEditButton" type="button">Cancelar edición</button>
-
-          <div id="formMessage" class="status hidden" role="status" aria-live="polite"></div>
-          <div id="recommendation" class="status green" aria-live="polite">
-            Ingresa tus sensaciones y presiona “Analizar estado”.
+        <div class="common-fields">
+          <div class="two-columns">
+            <div>
+              <label for="durationMinutes">Duración (min)</label>
+              <input id="durationMinutes" name="durationMinutes" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 60" required>
+            </div>
+            <div>
+              <label for="calories">Calorías quemadas</label>
+              <input id="calories" name="calories" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 420" required>
+            </div>
           </div>
-        </form>
-      </div>
+
+          <label for="sensations">Impresiones o sensaciones</label>
+          <textarea id="sensations" name="sensations" rows="4" maxlength="5000" placeholder="¿Cómo te sentiste? ¿Qué salió bien? ¿Hubo molestias?"></textarea>
+        </div>
+
+        <div id="formMessage" class="form-message hidden" role="status" aria-live="polite"></div>
+        <button id="saveTrainingButton" class="save-button" type="submit">Guardar entrenamiento</button>
+        <button id="cancelEditButton" class="text-button hidden" type="button">Cancelar edición</button>
+      </form>
     </section>
 
-    <section id="tabTimer" class="hidden" hidden aria-labelledby="timerTitle">
-      <div class="card">
-        <h2 id="timerTitle">Timer personalizado</h2>
-
-        <div class="timer" id="timer" aria-live="off">00:30</div>
-        <div class="timer-phase" id="timerPhase" role="status" aria-live="polite">Listo</div>
-
-        <div class="timer-grid">
-          <div>
-            <label for="workSeconds">Actividad (segundos)</label>
-            <input id="workSeconds" type="number" inputmode="numeric" min="1" step="1" value="30">
-          </div>
-          <div>
-            <label for="restSeconds">Descanso (segundos)</label>
-            <input id="restSeconds" type="number" inputmode="numeric" min="0" step="1" value="10">
-          </div>
-          <div>
-            <label for="rounds">Rondas</label>
-            <input id="rounds" type="number" inputmode="numeric" min="0" step="1" value="6" aria-describedby="roundsHelp">
-            <span class="field-help" id="roundsHelp">Usa 0 para rondas infinitas.</span>
-          </div>
-          <div>
-            <label for="timerMode">Modo</label>
-            <select id="timerMode">
-              <option value="interval">Actividad + descanso</option>
-              <option value="single">Cuenta única</option>
-            </select>
-          </div>
+    <section id="viewHistory" class="view hidden" hidden aria-labelledby="historyHeading">
+      <div class="page-heading history-heading">
+        <div>
+          <p class="eyebrow dark">Registro anual</p>
+          <h1 id="historyHeading">Historial por semanas</h1>
+          <p class="page-subtitle">Cada semana comprende de lunes a domingo.</p>
         </div>
-
-        <button class="main" id="startTimerButton" type="button">Iniciar</button>
-        <button class="danger secondary" id="stopTimerButton" type="button">Detener</button>
-
-        <div class="timer-row" aria-label="Temporizadores rápidos">
-          <button type="button" data-quick-timer="30">30s</button>
-          <button type="button" data-quick-timer="40">40s</button>
-          <button type="button" data-quick-timer="60">60s</button>
-          <button type="button" data-quick-timer="300">5min</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="tabHistorial" class="hidden" hidden aria-labelledby="historyTitle">
-      <div class="card">
-        <div class="section-heading">
-          <h2 id="historyTitle">Historial</h2>
-          <span class="pill" id="historyCount">0 registros</span>
-        </div>
-        <div id="history"></div>
+        <span id="historyTotal" class="history-total"></span>
       </div>
 
-      <div class="card">
-        <h2>Respaldo de datos</h2>
-        <p class="sub">Tus registros siguen guardándose en este dispositivo. Descarga respaldos periódicos para poder recuperarlos o llevarlos a otro teléfono.</p>
-        <div class="data-tools">
+      <div id="historyWeeks" class="history-weeks"></div>
+
+      <section class="data-card" aria-labelledby="dataTitle">
+        <div>
+          <p class="eyebrow dark">Seguridad</p>
+          <h2 id="dataTitle">Respalda tu historial</h2>
+          <p>Tus datos permanecen en este dispositivo. Guarda una copia periódicamente.</p>
+        </div>
+        <div class="data-actions">
           <button id="exportJsonButton" type="button">Respaldar JSON</button>
           <button id="importJsonButton" type="button">Importar JSON</button>
           <button id="exportCsvButton" type="button">Exportar CSV</button>
         </div>
         <input id="backupFileInput" type="file" accept="application/json,.json" hidden>
-        <div id="backupMessage" class="status hidden" role="status" aria-live="polite"></div>
-      </div>
-
-      <div class="card">
-        <h2>Informes</h2>
-        <p class="sub">Genera un informe para copiar y compartir únicamente con quien tú decidas.</p>
-
-        <div class="report-buttons">
-          <button type="button" data-report-days="7">7 días</button>
-          <button type="button" data-report-days="15">15 días</button>
-          <button type="button" data-report-days="30">30 días</button>
-        </div>
-
-        <label class="visually-hidden" for="reportOutput">Informe generado</label>
-        <textarea id="reportOutput" class="report-box" placeholder="Aquí aparecerá tu informe..."></textarea>
-        <button class="blue" id="copyReportButton" type="button">Copiar informe</button>
-        <div id="reportMessage" class="status hidden" role="status" aria-live="polite"></div>
-      </div>
+      </section>
     </section>
   </main>
 
   <nav class="bottom-nav" aria-label="Navegación principal">
-    <button class="nav-btn active" type="button" data-tab="Hoy" aria-controls="tabHoy" aria-current="page">Hoy</button>
-    <button class="nav-btn" type="button" data-tab="Registrar" aria-controls="tabRegistrar">Registrar</button>
-    <button class="nav-btn" type="button" data-tab="Timer" aria-controls="tabTimer">Timer</button>
-    <button class="nav-btn" type="button" data-tab="Historial" aria-controls="tabHistorial">Historial</button>
+    <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
+      <span aria-hidden="true">⌂</span><small>Inicio</small>
+    </button>
+    <button class="nav-item" type="button" data-view-target="register">
+      <span aria-hidden="true">＋</span><small>Registrar</small>
+    </button>
+    <button class="nav-item" type="button" data-view-target="history">
+      <span aria-hidden="true">≡</span><small>Historial</small>
+    </button>
   </nav>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script type="module" src="assets/js/app.js"></script>
 </body>

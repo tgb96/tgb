@@ -1,7 +1,7 @@
 {
   "name": "TGB",
   "short_name": "TGB",
-  "description": "App personal de entrenamiento, tenis, sensaciones e informes físicos.",
+  "description": "Diario semanal personal para registrar entrenamiento físico, cardio y tenis.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",
