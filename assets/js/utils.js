@@ -4,7 +4,7 @@ import {
   dayNamesFull,
   physicalRoutineById,
   TZ
-} from "./data.js";
+} from "./data.js?v=12";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {

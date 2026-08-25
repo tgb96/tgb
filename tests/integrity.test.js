@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 test("la interfaz usa módulos, cuatro vistas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   assert.match(html, /assets\/css\/styles\.css/);
-  assert.match(html, /type="module" src="assets\/js\/app\.js"/);
+  assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
   assert.equal([...html.matchAll(/class="nav-item/g)].length, 4);
   assert.match(html, /id="viewRoutines"/);
@@ -35,5 +35,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v11/);
+  assert.match(worker, /tgb-shell-v12/);
 });

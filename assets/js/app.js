@@ -11,8 +11,8 @@ import {
   tennisSurfaces,
   trekkingLocations,
   trainingCategories
-} from "./data.js";
-import { createRepository } from "./storage.js";
+} from "./data.js?v=12";
+import { createRepository } from "./storage.js?v=12";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -27,7 +27,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js";
+} from "./utils.js?v=12";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
