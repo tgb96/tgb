@@ -11,8 +11,8 @@ import {
   tennisSurfaces,
   trekkingLocations,
   trainingCategories
-} from "./data.js?v=15";
-import { createRepository } from "./storage.js?v=15";
+} from "./data.js?v=16";
+import { createRepository } from "./storage.js?v=16";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -27,7 +27,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=15";
+} from "./utils.js?v=16";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -37,6 +37,8 @@ let editingRecordId = null;
 let waitingServiceWorker = null;
 let toastTimer = null;
 let timerTicker = null;
+let timerAudioContext = null;
+let timerLastCountdownSecond = null;
 let routineSessionTicker = null;
 let openRoutineId = "";
 
@@ -564,6 +566,46 @@ function formatTimerClock(totalSeconds) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function ensureTimerAudio() {
+  const AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  try {
+    if (!timerAudioContext || timerAudioContext.state === "closed") timerAudioContext = new AudioContextClass();
+    if (timerAudioContext.state === "suspended") timerAudioContext.resume().catch(() => {});
+    return timerAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+function playTimerSound(kind) {
+  const context = ensureTimerAudio();
+  if (!context) return;
+  const patterns = {
+    countdown: [[1040, 0.07, 0]],
+    work: [[820, 0.1, 0], [1120, 0.14, 0.13]],
+    rest: [[520, 0.2, 0]],
+    complete: [[660, 0.12, 0], [880, 0.12, 0.17], [1120, 0.28, 0.34]]
+  };
+  const notes = patterns[kind] || patterns.work;
+  const startAt = context.currentTime + 0.025;
+  notes.forEach(([frequency, duration, delay]) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const noteStart = startAt + delay;
+    const noteEnd = noteStart + duration;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, noteStart);
+    gain.gain.setValueAtTime(0.0001, noteStart);
+    gain.gain.exponentialRampToValueAtTime(0.2, noteStart + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(noteStart);
+    oscillator.stop(noteEnd + 0.02);
+  });
+}
+
 function updateTimerDisplay() {
   const settings = timerSettingsFromFields();
   const phaseLabels = {
@@ -575,6 +617,13 @@ function updateTimerDisplay() {
   const phaseKey = timerState.status === "idle" || timerState.status === "complete" ? timerState.status : timerState.phase;
   $("timerPhase").textContent = timerState.status === "paused" ? `Pausa · ${phaseLabels[timerState.phase]}` : phaseLabels[phaseKey];
   $("timerPhase").className = `timer-phase ${phaseKey}`;
+  const stageLabel = timerState.status === "complete"
+    ? "Completado"
+    : timerState.phase === "rest"
+      ? "Descanso"
+      : `Serie ${Math.min(timerState.currentSet, settings.totalSets)}`;
+  $("timerStageLabel").textContent = timerState.status === "paused" ? `${stageLabel} · Pausa` : stageLabel;
+  $("timerStageLabel").className = `timer-stage-label ${phaseKey}`;
   $("timerSetStatus").textContent = timerState.status === "complete"
     ? `${settings.totalSets}/${settings.totalSets} series`
     : `Serie ${Math.min(timerState.currentSet, settings.totalSets)} de ${settings.totalSets}`;
@@ -602,11 +651,13 @@ function resetTimer(showMessage = true) {
   timerState.remainingSeconds = settings.workSeconds;
   timerState.phaseTotalSeconds = settings.workSeconds;
   timerState.endAt = 0;
+  timerLastCountdownSecond = null;
   updateTimerDisplay();
   if (showMessage) showToast("Timer reiniciado.");
 }
 
-function notifyTimerChange(message) {
+function notifyTimerChange(message, sound = "work") {
+  playTimerSound(sound);
   globalThis.navigator?.vibrate?.([120, 60, 120]);
   showToast(message);
 }
@@ -616,6 +667,7 @@ function beginTimerPhase(phase, seconds) {
   timerState.remainingSeconds = seconds;
   timerState.phaseTotalSeconds = seconds;
   timerState.endAt = Date.now() + (seconds * 1000);
+  timerLastCountdownSecond = null;
 }
 
 function completeTimer() {
@@ -623,7 +675,7 @@ function completeTimer() {
   timerTicker = null;
   timerState.status = "complete";
   timerState.remainingSeconds = 0;
-  notifyTimerChange("Bloque de series completado.");
+  notifyTimerChange("Bloque de series completado.", "complete");
   updateTimerDisplay();
 }
 
@@ -633,7 +685,7 @@ function advanceTimerPhase() {
     if (timerState.currentSet >= settings.totalSets) return completeTimer();
     if (settings.restSeconds > 0) {
       beginTimerPhase("rest", settings.restSeconds);
-      notifyTimerChange(`Descanso antes de la serie ${timerState.currentSet + 1}.`);
+      notifyTimerChange(`Descanso antes de la serie ${timerState.currentSet + 1}.`, "rest");
     } else {
       timerState.currentSet += 1;
       beginTimerPhase("work", settings.workSeconds);
@@ -651,12 +703,18 @@ function tickTimer() {
   if (timerState.status !== "running") return;
   timerState.remainingSeconds = Math.max(0, Math.ceil((timerState.endAt - Date.now()) / 1000));
   if (timerState.remainingSeconds <= 0) return advanceTimerPhase();
+  if (timerState.remainingSeconds <= 3 && timerState.remainingSeconds !== timerLastCountdownSecond) {
+    timerLastCountdownSecond = timerState.remainingSeconds;
+    playTimerSound("countdown");
+  }
   updateTimerDisplay();
 }
 
 function startTimer() {
   const settings = timerSettingsFromFields();
   if (settings.workSeconds <= 0) return showToast("Selecciona un tiempo de intervalo mayor que cero.");
+  ensureTimerAudio();
+  const wasPaused = timerState.status === "paused";
   if (timerState.status === "idle" || timerState.status === "complete") {
     timerState.phase = "work";
     timerState.currentSet = 1;
@@ -667,6 +725,7 @@ function startTimer() {
   timerState.endAt = Date.now() + (timerState.remainingSeconds * 1000);
   if (timerTicker) clearInterval(timerTicker);
   timerTicker = setInterval(tickTimer, 250);
+  if (!wasPaused) playTimerSound("work");
   updateTimerDisplay();
 }
 

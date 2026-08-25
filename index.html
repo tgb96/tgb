@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=15">
+  <link rel="stylesheet" href="assets/css/styles.css?v=16">
   <title>TGB · Diario de entrenamiento</title>
 </head>
 
@@ -140,8 +140,10 @@
           <span id="timerPhase" class="timer-phase">Preparado</span>
           <span id="timerSetStatus" class="timer-set-status">Serie 1 de 3</span>
         </div>
+        <strong id="timerStageLabel" class="timer-stage-label">Serie 1</strong>
         <strong id="timerDisplay" class="timer-display">00:00:00</strong>
         <div class="timer-progress-track" aria-hidden="true"><span id="timerProgressBar"></span></div>
+        <p class="timer-sound-note"><span aria-hidden="true">♪</span> Sonido y vibración en cada cambio</p>
         <div class="timer-actions">
           <button id="timerStartButton" class="timer-start" type="button">Iniciar</button>
           <button id="timerPauseButton" type="button" disabled>Pausar</button>
@@ -209,6 +211,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=15"></script>
+  <script type="module" src="assets/js/app.js?v=16"></script>
 </body>
 </html>

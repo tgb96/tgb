@@ -42,7 +42,7 @@ Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o c
 
 ## Timer
 
-Permite configurar hasta 12 horas, 59 minutos y 59 segundos para el intervalo y el descanso, además de 1 a 50 series. Alterna automáticamente las fases, puede pausarse y mantiene la marcha al visitar Rutinas. Su configuración queda guardada en el dispositivo.
+Permite configurar hasta 12 horas, 59 minutos y 59 segundos para el intervalo y el descanso, además de 1 a 50 series. Alterna automáticamente las fases, muestra en grande la serie o el descanso actual, emite alertas sonoras y vibración en los cambios y avisa durante los últimos tres segundos. Puede pausarse y mantiene la marcha al visitar Rutinas. Su configuración queda guardada en el dispositivo.
 
 ## Semanas e informes
 
