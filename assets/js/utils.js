@@ -4,7 +4,7 @@ import {
   dayNamesFull,
   physicalRoutineById,
   TZ
-} from "./data.js?v=12";
+} from "./data.js?v=14";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -145,6 +145,7 @@ export function normalizeRecord(record) {
     location: String(record?.location || "").slice(0, 300),
     surface: String(record?.surface || "").slice(0, 100),
     distanceKm: optionalNumber(record?.distanceKm ?? record?.kms, { min: 0 }),
+    elevationGainM: optionalNumber(record?.elevationGainM ?? record?.elevationMeters, { min: 0 }),
     durationMinutes,
     durationSeconds,
     durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
@@ -171,12 +172,14 @@ export function validateRecord(record) {
     if (!cardio) errors.push("Selecciona un tipo de cardio.");
     if (cardio?.id === "trekking" && !normalized.location.trim()) errors.push("Ingresa el cerro o lugar del trekking.");
     if (cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
+    if (cardio?.id === "trekking" && (normalized.elevationGainM === "" || normalized.elevationGainM === null)) errors.push("Ingresa el desnivel del trekking.");
   }
   if (normalized.category === "tennis") {
     if (!normalized.location.trim()) errors.push("Ingresa el lugar de la sesión de tenis.");
     if (!normalized.surface.trim()) errors.push("Selecciona la superficie.");
   }
   if (normalized.distanceKm === null) errors.push("La distancia debe ser un número igual o mayor que cero.");
+  if (normalized.elevationGainM === null) errors.push("El desnivel debe ser un número igual o mayor que cero.");
   return { valid: errors.length === 0, errors, record: normalized };
 }
 
@@ -191,9 +194,17 @@ export function recordTitle(record) {
 export function recordDetails(record) {
   const normalized = normalizeRecord(record);
   const details = [formatDuration(normalized), `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
-  if (normalized.distanceKm !== "") details.push(`${normalized.distanceKm} km`);
+  if (normalized.distanceKm !== "") details.push(formatDistance(normalized.distanceKm));
+  if (normalized.elevationGainM !== "") details.push(`${normalized.elevationGainM} m desnivel`);
   if (normalized.surface) details.push(normalized.surface);
   return details.join(" · ");
+}
+
+export function formatDistance(distanceKm) {
+  const totalMeters = Math.max(0, Math.round((Number(distanceKm) || 0) * 1000));
+  const kilometers = Math.floor(totalMeters / 1000);
+  const meters = totalMeters % 1000;
+  return `${String(kilometers).padStart(2, "0")}:${String(meters).padStart(3, "0")} (km:m)`;
 }
 
 export function formatDuration(record) {
@@ -228,6 +239,7 @@ export function weeklyReport(records, week) {
   const totalMinutes = normalized.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
   const totalCalories = normalized.reduce((sum, record) => sum + (Number(record.calories) || 0), 0);
   const totalDistance = normalized.reduce((sum, record) => sum + (Number(record.distanceKm) || 0), 0);
+  const totalElevation = normalized.reduce((sum, record) => sum + (Number(record.elevationGainM) || 0), 0);
   const categoryCounts = normalized.reduce((counts, record) => {
     counts[record.categoryName] = (counts[record.categoryName] || 0) + 1;
     return counts;
@@ -239,7 +251,8 @@ export function weeklyReport(records, week) {
   report += `- Entrenamientos: ${normalized.length}\n`;
   report += `- Tiempo total: ${Math.round(totalMinutes)} min\n`;
   report += `- Calorías registradas: ${totalCalories} kcal\n`;
-  report += `- Distancia registrada: ${totalDistance.toFixed(2)} km\n`;
+  report += `- Distancia registrada: ${formatDistance(totalDistance)}\n`;
+  report += `- Desnivel registrado: ${totalElevation} m\n`;
   for (const [category, count] of Object.entries(categoryCounts)) report += `- ${category}: ${count}\n`;
 
   report += "\nDETALLE DE LA SEMANA\n";
@@ -256,7 +269,8 @@ export function weeklyReport(records, week) {
       report += `   Tipo: ${record.categoryName}\n`;
       report += `   Duración: ${formatDuration(record)}\n`;
       report += `   Calorías: ${record.calories} kcal\n`;
-      if (record.distanceKm !== "") report += `   Distancia: ${record.distanceKm} km\n`;
+      if (record.distanceKm !== "") report += `   Distancia: ${formatDistance(record.distanceKm)}\n`;
+      if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;
       if (record.surface) report += `   Superficie: ${record.surface}\n`;
       if (record.sensations) report += `   Sensaciones: ${record.sensations}\n`;
@@ -275,7 +289,7 @@ export function recordsToCSV(records) {
   const columns = [
     ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
     ["cardio", "cardioTypeName"], ["lugar", "location"], ["superficie", "surface"],
-    ["distancia_km", "distanceKm"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
+    ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
     ["precisión_duración", "durationPrecision"], ["calorías", "calories"], ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];

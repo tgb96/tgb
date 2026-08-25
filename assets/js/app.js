@@ -11,8 +11,8 @@ import {
   tennisSurfaces,
   trekkingLocations,
   trainingCategories
-} from "./data.js?v=12";
-import { createRepository } from "./storage.js?v=12";
+} from "./data.js?v=14";
+import { createRepository } from "./storage.js?v=14";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -27,7 +27,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=12";
+} from "./utils.js?v=14";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -36,12 +36,22 @@ let currentCategory = null;
 let editingRecordId = null;
 let waitingServiceWorker = null;
 let toastTimer = null;
+let timerTicker = null;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
+const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
+const timerState = {
+  status: "idle",
+  phase: "work",
+  currentSet: 1,
+  remainingSeconds: 0,
+  phaseTotalSeconds: 0,
+  endAt: 0
+};
 
 function showView(name) {
-  for (const viewName of ["Home", "Register", "Routines", "History"]) {
+  for (const viewName of ["Home", "Register", "Routines", "Timer", "History"]) {
     const view = $(`view${viewName}`);
     const visible = viewName.toLowerCase() === name;
     view.hidden = !visible;
@@ -214,8 +224,21 @@ function renderPhysicalFields(record = {}) {
 function currentCardioExtraValues() {
   return {
     location: selectedLocation("cardioLocationSelect", "cardioLocationOther"),
-    distanceKm: $("distanceKm")?.value || ""
+    distanceKm: currentDistanceKm(),
+    elevationGainM: $("elevationGainM")?.value ?? ""
   };
+}
+
+function currentDistanceKm() {
+  if (!$("distanceKilometers") && !$("distanceMeters")) return "";
+  const kilometers = Number($("distanceKilometers")?.value || 0);
+  const meters = Number($("distanceMeters")?.value || 0);
+  return kilometers + (meters / 1000);
+}
+
+function distanceParts(distanceKm) {
+  const totalMeters = Math.max(0, Math.round((Number(distanceKm) || 0) * 1000));
+  return { kilometers: Math.floor(totalMeters / 1000), meters: totalMeters % 1000 };
 }
 
 function selectedLocation(selectId, otherId) {
@@ -288,18 +311,48 @@ function updateCardioExtraFields(values = {}) {
   }
   if (cardio.distance) {
     const label = document.createElement("label");
-    label.htmlFor = "distanceKm";
-    label.textContent = cardio.id === "trekking" ? "Distancia del trekking (km)" : "Distancia (km)";
-    const input = document.createElement("input");
-    input.id = "distanceKm";
-    input.type = "number";
-    input.inputMode = "decimal";
-    input.min = "0";
-    input.step = "0.01";
-    input.placeholder = "Ej: 8.5";
-    input.value = values.distanceKm ?? "";
-    input.required = cardio.id === "trekking";
-    box.append(label, input);
+    label.textContent = cardio.id === "trekking" ? "Distancia del trekking (KK:MMM)" : "Distancia (KK:MMM)";
+    const distance = distanceParts(values.distanceKm);
+    const fields = document.createElement("div");
+    fields.className = "distance-parts";
+    const createDistancePart = ({ id, value, max, caption }) => {
+      const wrapper = document.createElement("div");
+      const input = document.createElement("input");
+      input.id = id;
+      input.type = "number";
+      input.inputMode = "numeric";
+      input.min = "0";
+      input.max = String(max);
+      input.step = "1";
+      input.value = String(value);
+      input.required = cardio.id === "trekking";
+      input.setAttribute("aria-label", caption);
+      const unit = document.createElement("small");
+      unit.textContent = caption;
+      wrapper.append(input, unit);
+      return wrapper;
+    };
+    fields.append(
+      createDistancePart({ id: "distanceKilometers", value: distance.kilometers, max: 999, caption: "km" }),
+      createDistancePart({ id: "distanceMeters", value: distance.meters, max: 999, caption: "m" })
+    );
+    box.append(label, fields);
+  }
+  if (cardio.id === "trekking") {
+    const elevationLabel = document.createElement("label");
+    elevationLabel.htmlFor = "elevationGainM";
+    elevationLabel.textContent = "Desnivel positivo (metros)";
+    const elevation = document.createElement("input");
+    elevation.id = "elevationGainM";
+    elevation.type = "number";
+    elevation.inputMode = "numeric";
+    elevation.min = "0";
+    elevation.max = "10000";
+    elevation.step = "1";
+    elevation.value = values.elevationGainM === "" || values.elevationGainM === null || values.elevationGainM === undefined ? "0" : values.elevationGainM;
+    elevation.placeholder = "Ej: 650";
+    elevation.required = true;
+    box.append(elevationLabel, elevation);
   }
 }
 
@@ -318,9 +371,7 @@ function renderCardioFields(record = {}) {
       checked: record.cardioTypeId ? record.cardioTypeId === cardio.id : index === 0
     });
     choice.input.addEventListener("change", () => {
-      const duration = currentDurationValues();
       updateCardioExtraFields(currentCardioExtraValues());
-      renderDurationField(duration);
     });
     grid.append(choice.wrapper);
   });
@@ -359,23 +410,25 @@ function renderTennisFields(record = {}) {
     surfaceLabel,
     surface
   );
+  const defaultSurface = location => {
+    if (location === "Club Open Tenis") return "Arcilla";
+    if (location === "Sport Park de Huechuraba" || location === "Parque Araucano") return "Cemento";
+    return "";
+  };
+  const locationSelect = $("tennisLocationSelect");
+  const applySurfaceDefault = () => {
+    const suggested = defaultSurface(locationSelect?.value || "");
+    if (suggested) surface.value = suggested;
+  };
+  locationSelect?.addEventListener("change", applySurfaceDefault);
+  if (!record.surface) applySurfaceDefault();
 }
 
 function durationMode() {
-  if (currentCategory === "tennis") return "hms";
-  if (currentCategory === "cardio") {
-    const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value;
-    if (cardioTypeId === "running") return "hms";
-    if (cardioTypeId === "trekking") return "hm";
-  }
-  return "minutes";
+  return "hms";
 }
 
 function currentDurationValues() {
-  const simpleMinutes = $("durationMinutes")?.value;
-  if (simpleMinutes !== undefined && simpleMinutes !== "") {
-    return { durationMinutes: Number(simpleMinutes), durationSeconds: Math.round(Number(simpleMinutes) * 60) };
-  }
   const hours = Number($("durationHours")?.value || 0);
   const minutes = Number($("durationMinutesPart")?.value || 0);
   const seconds = Number($("durationSecondsPart")?.value || 0);
@@ -388,27 +441,27 @@ function durationParts(record = {}) {
     ? Number(record.durationSeconds)
     : Math.round((Number(record.durationMinutes) || 0) * 60);
   return {
-    hours: Math.floor(totalSeconds / 3600),
+    hours: Math.min(12, Math.floor(totalSeconds / 3600)),
     minutes: Math.floor((totalSeconds % 3600) / 60),
     seconds: Math.floor(totalSeconds % 60)
   };
 }
 
-function durationPart({ id, label, max, value, placeholder = "00" }) {
+function durationPart({ id, label, max, value = 0 }) {
   const wrapper = document.createElement("div");
-  const input = document.createElement("input");
-  input.id = id;
-  input.type = "number";
-  input.inputMode = "numeric";
-  input.min = "0";
-  input.max = String(max);
-  input.step = "1";
-  input.placeholder = placeholder;
-  input.value = value || "";
-  input.setAttribute("aria-label", label);
+  const select = document.createElement("select");
+  select.id = id;
+  select.setAttribute("aria-label", label);
+  for (let number = 0; number <= max; number += 1) {
+    const option = document.createElement("option");
+    option.value = String(number);
+    option.textContent = String(number).padStart(2, "0");
+    select.append(option);
+  }
+  select.value = String(Math.min(max, Math.max(0, Number(value) || 0)));
   const caption = document.createElement("small");
   caption.textContent = label;
-  wrapper.append(input, caption);
+  wrapper.append(select, caption);
   return wrapper;
 }
 
@@ -416,34 +469,212 @@ function renderDurationField(record = {}) {
   const box = $("durationField");
   box.replaceChildren();
   const label = document.createElement("label");
-  const mode = durationMode();
-  if (mode === "minutes") {
-    label.htmlFor = "durationMinutes";
-    label.textContent = "Duración (min)";
-    const input = document.createElement("input");
-    input.id = "durationMinutes";
-    input.name = "durationMinutes";
-    input.type = "number";
-    input.inputMode = "numeric";
-    input.min = "0";
-    input.step = "1";
-    input.placeholder = "Ej: 60";
-    input.required = true;
-    input.value = record.durationMinutes ?? "";
-    box.append(label, input);
-    return;
-  }
-
-  label.textContent = mode === "hms" ? "Duración exacta" : "Duración";
+  label.textContent = "Duración (HH:MM:SS)";
   const parts = durationParts(record);
   const fields = document.createElement("div");
-  fields.className = `duration-parts ${mode}`;
+  fields.className = "duration-parts hms";
   fields.append(
-    durationPart({ id: "durationHours", label: "Horas", max: 99, value: parts.hours }),
-    durationPart({ id: "durationMinutesPart", label: "Min", max: 59, value: parts.minutes })
+    durationPart({ id: "durationHours", label: "Horas", max: 12, value: parts.hours }),
+    durationPart({ id: "durationMinutesPart", label: "Min", max: 59, value: parts.minutes }),
+    durationPart({ id: "durationSecondsPart", label: "Seg", max: 59, value: parts.seconds })
   );
-  if (mode === "hms") fields.append(durationPart({ id: "durationSecondsPart", label: "Seg", max: 59, value: parts.seconds }));
   box.append(label, fields);
+}
+
+function loadTimerSettings() {
+  let saved = {};
+  try {
+    saved = JSON.parse(window.localStorage.getItem(TIMER_SETTINGS_KEY) || "{}");
+  } catch {
+    saved = {};
+  }
+  const safeSeconds = (value, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(43200, Math.max(0, Math.round(number))) : fallback;
+  };
+  const requestedSets = Number.parseInt(saved.totalSets, 10);
+  return {
+    workSeconds: safeSeconds(saved.workSeconds, 45),
+    restSeconds: safeSeconds(saved.restSeconds, 60),
+    totalSets: Number.isFinite(requestedSets) ? Math.min(50, Math.max(1, requestedSets)) : 3
+  };
+}
+
+function timerDurationValue(prefix) {
+  const hours = Number($(`${prefix}Hours`)?.value || 0);
+  const minutes = Number($(`${prefix}Minutes`)?.value || 0);
+  const seconds = Number($(`${prefix}Seconds`)?.value || 0);
+  return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+function timerSettingsFromFields() {
+  return {
+    workSeconds: timerDurationValue("timerWork"),
+    restSeconds: timerDurationValue("timerRest"),
+    totalSets: Number($("timerTotalSets")?.value || 3)
+  };
+}
+
+function saveTimerSettings() {
+  const settings = timerSettingsFromFields();
+  try {
+    window.localStorage.setItem(TIMER_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    showToast("No se pudo guardar la configuración del Timer.");
+  }
+  if (timerState.status === "idle" || timerState.status === "complete") resetTimer(false);
+}
+
+function renderTimerDuration(containerId, prefix, totalSeconds) {
+  const container = $(containerId);
+  const parts = durationParts({ durationSeconds: totalSeconds });
+  container.replaceChildren(
+    durationPart({ id: `${prefix}Hours`, label: "Horas", max: 12, value: parts.hours }),
+    durationPart({ id: `${prefix}Minutes`, label: "Min", max: 59, value: parts.minutes }),
+    durationPart({ id: `${prefix}Seconds`, label: "Seg", max: 59, value: parts.seconds })
+  );
+  container.querySelectorAll("select").forEach(select => select.addEventListener("change", saveTimerSettings));
+}
+
+function initializeTimer() {
+  const settings = loadTimerSettings();
+  renderTimerDuration("timerWorkDuration", "timerWork", settings.workSeconds);
+  renderTimerDuration("timerRestDuration", "timerRest", settings.restSeconds);
+  const totalSets = $("timerTotalSets");
+  totalSets.replaceChildren();
+  for (let number = 1; number <= 50; number += 1) {
+    const option = document.createElement("option");
+    option.value = String(number);
+    option.textContent = `${number} ${number === 1 ? "serie" : "series"}`;
+    totalSets.append(option);
+  }
+  totalSets.value = String(settings.totalSets);
+  totalSets.addEventListener("change", saveTimerSettings);
+  resetTimer(false);
+}
+
+function formatTimerClock(totalSeconds) {
+  const safe = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function updateTimerDisplay() {
+  const settings = timerSettingsFromFields();
+  const phaseLabels = {
+    idle: "Preparado",
+    work: "Intervalo",
+    rest: "Descanso",
+    complete: "Completado"
+  };
+  const phaseKey = timerState.status === "idle" || timerState.status === "complete" ? timerState.status : timerState.phase;
+  $("timerPhase").textContent = timerState.status === "paused" ? `Pausa · ${phaseLabels[timerState.phase]}` : phaseLabels[phaseKey];
+  $("timerPhase").className = `timer-phase ${phaseKey}`;
+  $("timerSetStatus").textContent = timerState.status === "complete"
+    ? `${settings.totalSets}/${settings.totalSets} series`
+    : `Serie ${Math.min(timerState.currentSet, settings.totalSets)} de ${settings.totalSets}`;
+  $("timerDisplay").textContent = formatTimerClock(timerState.remainingSeconds);
+  const progress = timerState.status === "complete"
+    ? 100
+    : timerState.phaseTotalSeconds > 0
+      ? ((timerState.phaseTotalSeconds - timerState.remainingSeconds) / timerState.phaseTotalSeconds) * 100
+      : 0;
+  $("timerProgressBar").style.width = `${Math.min(100, Math.max(0, progress))}%`;
+  $("timerStartButton").disabled = timerState.status === "running";
+  $("timerStartButton").textContent = timerState.status === "paused" ? "Continuar" : timerState.status === "complete" ? "Empezar otra vez" : "Iniciar";
+  $("timerPauseButton").disabled = timerState.status !== "running";
+  const lockSettings = timerState.status === "running" || timerState.status === "paused";
+  document.querySelectorAll("#viewTimer .timer-config-card select").forEach(select => { select.disabled = lockSettings; });
+}
+
+function resetTimer(showMessage = true) {
+  if (timerTicker) clearInterval(timerTicker);
+  timerTicker = null;
+  const settings = timerSettingsFromFields();
+  timerState.status = "idle";
+  timerState.phase = "work";
+  timerState.currentSet = 1;
+  timerState.remainingSeconds = settings.workSeconds;
+  timerState.phaseTotalSeconds = settings.workSeconds;
+  timerState.endAt = 0;
+  updateTimerDisplay();
+  if (showMessage) showToast("Timer reiniciado.");
+}
+
+function notifyTimerChange(message) {
+  globalThis.navigator?.vibrate?.([120, 60, 120]);
+  showToast(message);
+}
+
+function beginTimerPhase(phase, seconds) {
+  timerState.phase = phase;
+  timerState.remainingSeconds = seconds;
+  timerState.phaseTotalSeconds = seconds;
+  timerState.endAt = Date.now() + (seconds * 1000);
+}
+
+function completeTimer() {
+  if (timerTicker) clearInterval(timerTicker);
+  timerTicker = null;
+  timerState.status = "complete";
+  timerState.remainingSeconds = 0;
+  notifyTimerChange("Bloque de series completado.");
+  updateTimerDisplay();
+}
+
+function advanceTimerPhase() {
+  const settings = timerSettingsFromFields();
+  if (timerState.phase === "work") {
+    if (timerState.currentSet >= settings.totalSets) return completeTimer();
+    if (settings.restSeconds > 0) {
+      beginTimerPhase("rest", settings.restSeconds);
+      notifyTimerChange(`Descanso antes de la serie ${timerState.currentSet + 1}.`);
+    } else {
+      timerState.currentSet += 1;
+      beginTimerPhase("work", settings.workSeconds);
+      notifyTimerChange(`Comienza la serie ${timerState.currentSet}.`);
+    }
+  } else {
+    timerState.currentSet += 1;
+    beginTimerPhase("work", settings.workSeconds);
+    notifyTimerChange(`Comienza la serie ${timerState.currentSet}.`);
+  }
+  updateTimerDisplay();
+}
+
+function tickTimer() {
+  if (timerState.status !== "running") return;
+  timerState.remainingSeconds = Math.max(0, Math.ceil((timerState.endAt - Date.now()) / 1000));
+  if (timerState.remainingSeconds <= 0) return advanceTimerPhase();
+  updateTimerDisplay();
+}
+
+function startTimer() {
+  const settings = timerSettingsFromFields();
+  if (settings.workSeconds <= 0) return showToast("Selecciona un tiempo de intervalo mayor que cero.");
+  if (timerState.status === "idle" || timerState.status === "complete") {
+    timerState.phase = "work";
+    timerState.currentSet = 1;
+    timerState.remainingSeconds = settings.workSeconds;
+    timerState.phaseTotalSeconds = settings.workSeconds;
+  }
+  timerState.status = "running";
+  timerState.endAt = Date.now() + (timerState.remainingSeconds * 1000);
+  if (timerTicker) clearInterval(timerTicker);
+  timerTicker = setInterval(tickTimer, 250);
+  updateTimerDisplay();
+}
+
+function pauseTimer() {
+  if (timerState.status !== "running") return;
+  tickTimer();
+  if (timerState.status !== "running") return;
+  timerState.status = "paused";
+  if (timerTicker) clearInterval(timerTicker);
+  timerTicker = null;
+  updateTimerDisplay();
 }
 
 function renderSensationSuggestions() {
@@ -561,7 +792,8 @@ function formRecord() {
       ? selectedLocation("tennisLocationSelect", "tennisLocationOther")
       : selectedLocation("cardioLocationSelect", "cardioLocationOther"),
     surface: $("tennisSurface")?.value || "",
-    distanceKm: $("distanceKm")?.value ?? "",
+    distanceKm: currentDistanceKm(),
+    elevationGainM: $("elevationGainM")?.value ?? "",
     durationMinutes: duration.durationMinutes,
     durationSeconds: duration.durationSeconds,
     durationPrecision: durationMode(),
@@ -578,16 +810,23 @@ function showFormError(text) {
 }
 
 function durationPartsAreValid() {
-  if (durationMode() === "minutes") return true;
   const hours = Number($("durationHours")?.value || 0);
   const minutes = Number($("durationMinutesPart")?.value || 0);
   const seconds = Number($("durationSecondsPart")?.value || 0);
-  return hours >= 0 && hours <= 99 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59;
+  return hours >= 0 && hours <= 12 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59;
+}
+
+function distancePartsAreValid() {
+  if (!$("distanceKilometers") && !$("distanceMeters")) return true;
+  const kilometers = Number($("distanceKilometers")?.value || 0);
+  const meters = Number($("distanceMeters")?.value || 0);
+  return kilometers >= 0 && kilometers <= 999 && meters >= 0 && meters <= 999;
 }
 
 function saveTraining(event) {
   event.preventDefault();
   if (!durationPartsAreValid()) return showFormError("Revisa la duración: los minutos y segundos deben estar entre 0 y 59.");
+  if (!distancePartsAreValid()) return showFormError("Revisa la distancia: usa kilómetros entre 0 y 999 y metros entre 0 y 999.");
   const candidate = formRecord();
   const validation = validateRecord(candidate);
   if (!validation.valid) return showFormError(validation.errors.join(" "));
@@ -1069,11 +1308,15 @@ function bindEvents() {
   $("importJsonButton").addEventListener("click", () => $("backupFileInput").click());
   $("backupFileInput").addEventListener("change", importJSON);
   $("updateButton").addEventListener("click", () => waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" }));
+  $("timerStartButton").addEventListener("click", startTimer);
+  $("timerPauseButton").addEventListener("click", pauseTimer);
+  $("timerResetButton").addEventListener("click", () => resetTimer(true));
 }
 
 function initialize() {
   renderCategoryChooser();
   resetRegistration();
+  initializeTimer();
   bindEvents();
   renderHome();
   renderRoutines();

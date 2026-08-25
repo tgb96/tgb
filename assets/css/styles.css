@@ -117,8 +117,12 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .duration-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .duration-parts.hms { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .duration-parts div { position: relative; }
-.duration-parts input { padding-right: 38px; }
+.duration-parts select { padding-right: 32px; font-variant-numeric: tabular-nums; font-weight: 850; }
 .duration-parts small { position: absolute; right: 11px; top: 17px; color: var(--muted); font-size: 9px; font-weight: 850; text-transform: uppercase; pointer-events: none; }
+.distance-parts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.distance-parts div { position: relative; }
+.distance-parts input { padding-right: 35px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.distance-parts small { position: absolute; right: 12px; top: 17px; color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; pointer-events: none; }
 .choice-grid { display: grid; gap: 8px; }
 .choice-grid.two { grid-template-columns: 1fr 1fr; }
 .choice-input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; opacity: 0; overflow: hidden; pointer-events: none; }
@@ -140,6 +144,30 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .text-button { width: 100%; min-height: 46px; margin-top: 7px; border: 0; background: transparent; color: var(--muted); font-weight: 800; }
 .form-message { margin-top: 14px; padding: 12px; border-radius: 14px; background: #edf8df; color: #36510e; font-size: 13px; font-weight: 750; }
 .form-message.error { background: #ffebeb; color: #872c2c; }
+
+.timer-heading { min-height: 105px; }
+.timer-display-card { position: relative; overflow: hidden; padding: 20px; border-radius: 29px; background: var(--night); color: white; box-shadow: 0 22px 45px rgba(17, 21, 34, 0.22); }
+.timer-display-card::after { content: ""; position: absolute; width: 150px; height: 150px; right: -75px; top: -75px; border-radius: 50%; background: var(--blue); opacity: 0.55; }
+.timer-display-card > * { position: relative; z-index: 1; }
+.timer-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.timer-phase, .timer-set-status { padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 900; }
+.timer-phase { background: var(--lime); color: var(--night); }
+.timer-phase.rest { background: #ffcc68; }
+.timer-phase.complete { background: white; }
+.timer-set-status { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.78); }
+.timer-display { display: block; margin: 28px 0 22px; font-size: clamp(48px, 13vw, 70px); line-height: 1; letter-spacing: -3px; text-align: center; font-variant-numeric: tabular-nums; }
+.timer-progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
+.timer-progress-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--lime); transition: width 0.2s linear; }
+.timer-actions { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 7px; margin-top: 16px; }
+.timer-actions button { min-height: 48px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 14px; background: rgba(255, 255, 255, 0.08); color: white; font-size: 11px; font-weight: 900; }
+.timer-actions .timer-start { border: 0; background: var(--lime); color: var(--night); }
+.timer-actions button:disabled { opacity: 0.42; cursor: default; }
+.timer-config-card { margin-top: 13px; padding: 18px; border: 1px solid var(--line); border-radius: 25px; background: white; }
+.timer-config-card h2 { margin: 0 0 12px; font-size: 20px; letter-spacing: -0.6px; }
+.timer-duration-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.timer-duration-fields div { position: relative; }
+.timer-duration-fields select { padding-right: 32px; font-variant-numeric: tabular-nums; font-weight: 850; }
+.timer-duration-fields small { position: absolute; right: 10px; top: 17px; color: var(--muted); font-size: 9px; font-weight: 850; text-transform: uppercase; pointer-events: none; }
 
 .routines-heading { justify-content: space-between; }
 .provisional-badge { flex: 0 0 auto; padding: 8px 10px; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.7px; }
@@ -209,7 +237,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .data-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .data-actions button { min-height: 46px; border: 1px solid #d0d1cb; border-radius: 13px; background: white; color: var(--ink); font-size: 11px; font-weight: 850; }
 
-.bottom-nav { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); min-height: 70px; margin: auto; padding: 7px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 23px; background: rgba(17, 21, 34, 0.96); box-shadow: 0 15px 35px rgba(17, 21, 34, 0.32); backdrop-filter: blur(18px); }
+.bottom-nav { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); min-height: 70px; margin: auto; padding: 7px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 23px; background: rgba(17, 21, 34, 0.96); box-shadow: 0 15px 35px rgba(17, 21, 34, 0.32); backdrop-filter: blur(18px); }
 .nav-item { min-height: 54px; border: 0; border-radius: 17px; background: transparent; color: #949aa8; }
 .nav-item span { display: block; font-size: 21px; line-height: 1; }
 .nav-item small { display: block; margin-top: 5px; font-size: 10px; font-weight: 800; }

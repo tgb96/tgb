@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatDistance,
   formatDuration,
   groupRecordsByWeek,
   isoWeekInfo,
@@ -52,7 +53,8 @@ test("valida los tres tipos de entrenamiento y los campos especiales", () => {
     cardioTypeId: "trekking",
     cardioTypeName: "Trekking",
     location: "Cerro Manquehue",
-    distanceKm: 8.5
+    distanceKm: 8.5,
+    elevationGainM: 650
   }).valid, true);
   assert.equal(validateRecord({
     ...physicalRecord,
@@ -95,6 +97,11 @@ test("formatea duraciones exactas para trote, trekking y tenis", () => {
   assert.equal(formatDuration({ durationMinutes: 62.5, durationSeconds: 3750, durationPrecision: "hms" }), "1 h 02 min 30 s");
   assert.equal(formatDuration({ durationMinutes: 135, durationSeconds: 8100, durationPrecision: "hm" }), "2 h 15 min");
   assert.equal(formatDuration({ durationMinutes: 60, durationSeconds: 3600, durationPrecision: "minutes" }), "60 min");
+});
+
+test("formatea la distancia en kilómetros y metros", () => {
+  assert.equal(formatDistance(8.5), "08:500 (km:m)");
+  assert.equal(formatDistance(12.045), "12:045 (km:m)");
 });
 
 test("agrupa por semana y genera el informe completo de lunes a domingo", () => {

@@ -113,17 +113,43 @@ export const cardioTypes = [
   { id: "trekking", name: "Trekking", description: "Cerro, sendero o ruta", distance: true, location: true }
 ];
 
-export const trekkingLocations = ["Cerro La Región", "Cerro El Caracol", "Cerro Manquehue"];
+export const trekkingLocations = ["Cerro La Región", "Cerro El Carbón", "Cerro Manquehue"];
 
 export const tennisLocations = ["Club Open Tenis", "Sport Park de Huechuraba", "Parque Araucano"];
 
 export const tennisSurfaces = ["Arcilla", "Cemento"];
 
 export const sensationSuggestions = {
-  common: ["Me sentí bien", "Buena energía", "Cansancio controlado", "Terminé exigido"],
-  physical: ["No tuve molestias", "Tuve leves molestias", "Buena técnica", "Me costó la última serie"],
-  cardio: ["Ritmo cómodo", "Respiración controlada", "Piernas cansadas", "Mejoré al avanzar"],
-  tennis: ["Buen control", "Golpes consistentes", "Me sentí rápido", "Me costó el saque"]
+  common: [
+    "Me sentí excelente", "Me sentí bien", "Me sentí normal", "Me costó empezar",
+    "Buena energía", "Energía media", "Poca energía", "Cansancio controlado",
+    "Terminé exigido", "Terminé con energía", "Dormí bien", "Dormí poco",
+    "Buena concentración", "Me costó concentrarme", "No tuve molestias", "Tuve leves molestias"
+  ],
+  physical: [
+    "Buena técnica", "Técnica estable", "Perdí técnica al final", "Me costó la última serie",
+    "Carga liviana", "Carga adecuada", "Carga exigente", "Podía hacer más repeticiones",
+    "Buena activación muscular", "Buen equilibrio", "Me faltó estabilidad", "Recuperé bien entre series",
+    "Molestia en pulgar", "Molestia en codo", "Molestia en hombro", "Molestia en rodilla", "Molestia en Aquiles",
+    "Piernas fuertes", "Piernas pesadas", "Core estable"
+  ],
+  cardio: [
+    "Ritmo muy cómodo", "Ritmo cómodo", "Ritmo exigente", "Ritmo constante",
+    "Respiración controlada", "Me faltó aire", "Pulso controlado", "Mejoré al avanzar",
+    "Piernas livianas", "Piernas cansadas", "Piernas pesadas", "Buena recuperación",
+    "Ruta fácil", "Ruta exigente", "Subidas controladas", "Me costaron las subidas",
+    "Buena hidratación", "Me faltó hidratación", "Molestia en rodilla", "Molestia en Aquiles",
+    "Buen clima", "Mucho calor", "Mucho viento", "Frío durante la sesión"
+  ],
+  tennis: [
+    "Buen control", "Golpes consistentes", "Buen timing", "Me faltó timing",
+    "Derecha sólida", "Revés sólido", "Me costó la derecha", "Me costó el revés",
+    "Buen saque", "Me costó el saque", "Buena devolución", "Me costó devolver",
+    "Buen desplazamiento", "Me sentí rápido", "Llegué tarde a la pelota", "Recuperé bien al centro",
+    "Buena concentración", "Tomé buenas decisiones", "Jugué con confianza", "Jugué tenso",
+    "Me adapté bien a la superficie", "Me costó la superficie", "Brazo relajado", "Brazo cansado",
+    "Molestia en pulgar", "Molestia en codo", "Molestia en hombro"
+  ]
 };
 
 export function categoryById(id) {

@@ -8,8 +8,9 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Vista completa de lunes a domingo con las actividades realmente realizadas cada día.
 - Resumen semanal de sesiones, minutos y calorías.
 - Registro guiado por tres categorías: físico, cardio y tenis.
-- Sugerencias de sensaciones que pueden combinarse y editarse como texto.
+- Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis y series marcables.
+- Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 
 ## Tipos de entrenamiento
@@ -33,11 +34,15 @@ Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajust
 - Caminata.
 - Trekking.
 
-Trote registra horas, minutos y segundos. Trekking ofrece lugares frecuentes, opción personalizada y duración en horas y minutos. Las actividades al aire libre también permiten registrar distancia.
+Todo el cardio registra duración mediante selectores HH:MM:SS. Las actividades al aire libre separan kilómetros y metros en formato `KK:MMM`. Trekking ofrece lugares frecuentes, opción personalizada y desnivel positivo en metros.
 
 ### Tenis
 
-Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración exacta en horas, minutos y segundos.
+Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración mediante selectores HH:MM:SS. Club Open Tenis propone arcilla; Sport Park y Parque Araucano proponen cemento.
+
+## Timer
+
+Permite configurar hasta 12 horas, 59 minutos y 59 segundos para el intervalo y el descanso, además de 1 a 50 series. Alterna automáticamente las fases, puede pausarse y mantiene la marcha al visitar Rutinas. Su configuración queda guardada en el dispositivo.
 
 ## Semanas e informes
 
@@ -54,7 +59,7 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 
 ## Estructura
 
-- `index.html`: Inicio, registro, rutinas e historial.
+- `index.html`: Inicio, registro, rutinas, Timer e historial.
 - `assets/css/styles.css`: diseño adaptable.
 - `assets/js/data.js`: categorías, rutinas y opciones.
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=12">
+  <link rel="stylesheet" href="assets/css/styles.css?v=14">
   <title>TGB · Diario de entrenamiento</title>
 </head>
 
@@ -126,6 +126,41 @@
       <div id="routineLibrary" class="routine-library"></div>
     </section>
 
+    <section id="viewTimer" class="view hidden" hidden aria-labelledby="timerHeading">
+      <div class="page-heading timer-heading">
+        <div>
+          <p class="eyebrow dark">Temporizador de series</p>
+          <h1 id="timerHeading">Intervalos y descansos</h1>
+          <p class="page-subtitle">Configura el trabajo y el descanso. Puedes volver a Rutinas sin detener el temporizador ni perder las series marcadas.</p>
+        </div>
+      </div>
+
+      <section class="timer-display-card" aria-label="Estado del temporizador">
+        <div class="timer-status-row">
+          <span id="timerPhase" class="timer-phase">Preparado</span>
+          <span id="timerSetStatus" class="timer-set-status">Serie 1 de 3</span>
+        </div>
+        <strong id="timerDisplay" class="timer-display">00:00:00</strong>
+        <div class="timer-progress-track" aria-hidden="true"><span id="timerProgressBar"></span></div>
+        <div class="timer-actions">
+          <button id="timerStartButton" class="timer-start" type="button">Iniciar</button>
+          <button id="timerPauseButton" type="button" disabled>Pausar</button>
+          <button id="timerResetButton" type="button">Reiniciar</button>
+        </div>
+      </section>
+
+      <section class="timer-config-card" aria-labelledby="timerConfigHeading">
+        <p class="eyebrow dark">Configuración</p>
+        <h2 id="timerConfigHeading">Tu bloque de trabajo</h2>
+        <label>Tiempo del intervalo</label>
+        <div id="timerWorkDuration" class="timer-duration-fields"></div>
+        <label>Tiempo de descanso</label>
+        <div id="timerRestDuration" class="timer-duration-fields"></div>
+        <label for="timerTotalSets">Número de series</label>
+        <select id="timerTotalSets"></select>
+      </section>
+    </section>
+
     <section id="viewHistory" class="view hidden" hidden aria-labelledby="historyHeading">
       <div class="page-heading history-heading">
         <div>
@@ -164,6 +199,9 @@
     <button class="nav-item" type="button" data-view-target="routines">
       <span aria-hidden="true">▦</span><small>Rutinas</small>
     </button>
+    <button class="nav-item" type="button" data-view-target="timer">
+      <span aria-hidden="true">◷</span><small>Timer</small>
+    </button>
     <button class="nav-item" type="button" data-view-target="history">
       <span aria-hidden="true">≡</span><small>Historial</small>
     </button>
@@ -171,6 +209,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=12"></script>
+  <script type="module" src="assets/js/app.js?v=14"></script>
 </body>
 </html>

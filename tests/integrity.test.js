@@ -6,13 +6,15 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("la interfaz usa módulos, cuatro vistas y ningún evento inline", async () => {
+test("la interfaz usa módulos, cinco vistas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   assert.match(html, /assets\/css\/styles\.css/);
   assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
-  assert.equal([...html.matchAll(/class="nav-item/g)].length, 4);
+  assert.equal([...html.matchAll(/class="nav-item/g)].length, 5);
   assert.match(html, /id="viewRoutines"/);
+  assert.match(html, /id="viewTimer"/);
+  assert.match(html, /id="timerWorkDuration"/);
   assert.match(html, /id="sensationSuggestions"/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
@@ -25,9 +27,14 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking"]);
   assert.deepEqual(data.tennisSurfaces, ["Arcilla", "Cemento"]);
+  assert.ok(data.trekkingLocations.includes("Cerro El Carbón"));
+  assert.ok(data.sensationSuggestions.physical.length >= 20);
+  assert.ok(data.sensationSuggestions.cardio.length >= 20);
+  assert.ok(data.sensationSuggestions.tennis.length >= 20);
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   assert.match(app, /tgb-routine-settings-v1/);
   assert.match(app, /exercise-controls/);
+  assert.match(app, /tgb-series-timer-v1/);
 });
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
@@ -35,5 +42,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v12/);
+  assert.match(worker, /tgb-shell-v14/);
 });
