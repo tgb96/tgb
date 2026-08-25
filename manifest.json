@@ -2,12 +2,16 @@
   "name": "TGB",
   "short_name": "TGB",
   "description": "App personal de entrenamiento, tenis, sensaciones e informes físicos.",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#070b12",
   "theme_color": "#111827",
   "orientation": "portrait",
+  "lang": "es-CL",
+  "dir": "ltr",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     {
       "src": "icon-192.png",
