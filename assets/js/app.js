@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=17";
-import { createRepository } from "./storage.js?v=17";
+} from "./data.js?v=18";
+import { createRepository } from "./storage.js?v=18";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=17";
+} from "./utils.js?v=18";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -154,7 +154,7 @@ function renderHome() {
 function renderCategoryChooser() {
   const chooser = $("categoryChooser");
   chooser.replaceChildren();
-  for (const category of trainingCategories) {
+  for (const category of trainingCategories.filter(category => category.id !== "physical")) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `category-card ${category.accent}`;
@@ -873,7 +873,7 @@ function toggleSensationSuggestion(suggestion) {
 
 function syncSensationSuggestions() {
   const selected = new Set(sensationParts());
-  document.querySelectorAll(".suggestion-chip").forEach(button => {
+  document.querySelectorAll("#sensationSuggestions .suggestion-chip").forEach(button => {
     const active = selected.has(button.dataset.suggestion);
     button.classList.toggle("selected", active);
     button.setAttribute("aria-pressed", String(active));
@@ -930,7 +930,7 @@ function resetRegistration() {
   $("categoryChooser").classList.remove("hidden");
   $("registrationBackButton").classList.add("hidden");
   $("registerHeading").textContent = "¿Qué quieres registrar?";
-  $("registerIntro").textContent = "Elige entrenamiento o descanso.";
+  $("registerIntro").textContent = "Elige cardio, tenis o descanso.";
   $("formMessage").className = "form-message hidden";
   $("cancelEditButton").classList.add("hidden");
   $("categoryFields").replaceChildren();
@@ -1263,8 +1263,10 @@ function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
   const caloriesInput = $(`routineCalories-${routine.id}`);
+  const sensationsInput = $(`routineSensations-${routine.id}`);
   const message = $(`routineFinishMessage-${routine.id}`);
   const calories = caloriesInput?.value === "" ? null : Number(caloriesInput?.value);
+  const sensations = sensationsInput?.value.trim() || "";
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
   const summary = routineSessionSummary(routine, progress, settings, session.dateISO);
@@ -1278,6 +1280,12 @@ function finishRoutineSession(routine) {
     message.textContent = "Anota las calorías quemadas para registrar la sesión.";
     message.classList.remove("hidden");
     caloriesInput?.focus();
+    return;
+  }
+  if (!sensations) {
+    message.textContent = "Elige al menos una sensación o escribe cómo te sentiste.";
+    message.classList.remove("hidden");
+    sensationsInput?.focus();
     return;
   }
 
@@ -1300,7 +1308,7 @@ function finishRoutineSession(routine) {
     durationSeconds: elapsedSeconds,
     durationPrecision: "hms",
     calories,
-    sensations: "",
+    sensations,
     routineCompletedSets: summary.completedSets,
     routinePlannedSets: summary.plannedSets,
     routineCompletedExercises: summary.completedExercises,
@@ -1322,7 +1330,7 @@ function finishRoutineSession(routine) {
     return;
   }
 
-  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, recordId: record.id, summary });
+  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, sensations, recordId: record.id, summary });
   if (routineSessionTicker) clearInterval(routineSessionTicker);
   routineSessionTicker = null;
   openRoutineId = routine.id;
@@ -1424,6 +1432,58 @@ function createRoutineSessionHeader(routine, session) {
   return panel;
 }
 
+function createRoutineSensationPicker(routine) {
+  const box = document.createElement("div");
+  box.className = "routine-sensation-box";
+  const label = document.createElement("label");
+  label.htmlFor = `routineSensations-${routine.id}`;
+  label.textContent = "Sensaciones finales";
+  const heading = document.createElement("div");
+  heading.className = "suggestion-heading";
+  const headingText = document.createElement("span");
+  headingText.textContent = "Ideas rápidas";
+  const headingHelp = document.createElement("small");
+  headingHelp.textContent = "Puedes elegir más de una";
+  heading.append(headingText, headingHelp);
+  const chips = document.createElement("div");
+  chips.className = "suggestion-chips routine-suggestion-chips";
+  chips.setAttribute("aria-label", "Sugerencias de sensaciones para la rutina");
+  const textarea = document.createElement("textarea");
+  textarea.id = `routineSensations-${routine.id}`;
+  textarea.rows = 4;
+  textarea.maxLength = 5000;
+  textarea.placeholder = "Selecciona sensaciones o escribe cómo terminaste la rutina.";
+  const values = () => textarea.value.split(" · ").map(value => value.trim()).filter(Boolean);
+  const sync = () => {
+    const selected = new Set(values());
+    chips.querySelectorAll(".suggestion-chip").forEach(button => {
+      const active = selected.has(button.dataset.suggestion);
+      button.classList.toggle("selected", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  };
+  [...sensationSuggestions.common, ...sensationSuggestions.physical].forEach(suggestion => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "suggestion-chip";
+    button.textContent = suggestion;
+    button.dataset.suggestion = suggestion;
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => {
+      const selected = values();
+      const index = selected.indexOf(suggestion);
+      if (index >= 0) selected.splice(index, 1);
+      else selected.push(suggestion);
+      textarea.value = selected.join(" · ");
+      sync();
+    });
+    chips.append(button);
+  });
+  textarea.addEventListener("input", sync);
+  box.append(label, heading, chips, textarea);
+  return box;
+}
+
 function createRoutineFinishPanel(routine, session, progress, settings, dateISO) {
   if (!session || session.routineId !== routine.id) return null;
   const panel = document.createElement("section");
@@ -1463,6 +1523,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   calories.min = "0";
   calories.step = "1";
   calories.placeholder = "Ej: 420";
+  const sensations = createRoutineSensationPicker(routine);
   const message = document.createElement("div");
   message.id = `routineFinishMessage-${routine.id}`;
   message.className = "form-message error hidden";
@@ -1472,7 +1533,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   finish.className = "routine-finish-button";
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", true), caloriesLabel, calories, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", true), caloriesLabel, calories, sensations, message, finish);
   const note = document.createElement("small");
   note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
   panel.append(note);
@@ -1932,6 +1993,7 @@ function bindEvents() {
     if (target === "register") openRegistration();
     else showView(target);
   }));
+  $("homeRoutineButton").addEventListener("click", () => showView("routines"));
   $("homeRegisterButton").addEventListener("click", openRegistration);
   $("registrationBackButton").addEventListener("click", () => {
     if (editingRecordId && !window.confirm("¿Cancelar la edición del entrenamiento?")) return;
