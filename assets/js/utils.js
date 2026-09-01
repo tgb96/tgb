@@ -3,8 +3,10 @@ import {
   categoryById,
   dayNamesFull,
   physicalRoutineById,
+  restTypes,
+  trekkingRoutes,
   TZ
-} from "./data.js?v=16";
+} from "./data.js?v=17";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -142,10 +144,14 @@ export function normalizeRecord(record) {
     routineName: String(legacyRoutine(record)),
     cardioTypeId: String(record?.cardioTypeId || ""),
     cardioTypeName: String(legacyCardio(record)),
+    restTypeId: String(record?.restTypeId || ""),
+    restDetail: String(record?.restDetail || "").slice(0, 2000),
     location: String(record?.location || "").slice(0, 300),
     surface: String(record?.surface || "").slice(0, 100),
+    trekkingRoute: String(record?.trekkingRoute || "").slice(0, 200),
     distanceKm: optionalNumber(record?.distanceKm ?? record?.kms, { min: 0 }),
     elevationGainM: optionalNumber(record?.elevationGainM ?? record?.elevationMeters, { min: 0 }),
+    ascentDurationSeconds: optionalNumber(record?.ascentDurationSeconds, { min: 0 }),
     durationMinutes,
     durationSeconds,
     durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
@@ -170,8 +176,8 @@ export function validateRecord(record) {
   const errors = [];
   if (!isValidISODate(normalized.dateISO)) errors.push("Selecciona una fecha válida.");
   if (!categoryById(normalized.category)) errors.push("Selecciona un tipo de entrenamiento.");
-  if (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0) errors.push("Ingresa una duración mayor que cero.");
-  if (normalized.calories === "" || normalized.calories === null) errors.push("Ingresa las calorías quemadas.");
+  if (normalized.category !== "rest" && (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0)) errors.push("Ingresa una duración mayor que cero.");
+  if (normalized.category !== "rest" && (normalized.calories === "" || normalized.calories === null)) errors.push("Ingresa las calorías quemadas.");
 
   if (normalized.category === "physical") {
     if (!physicalRoutineById(normalized.routineId) && !normalized.routineName) errors.push("Selecciona una rutina física.");
@@ -182,18 +188,26 @@ export function validateRecord(record) {
     if (cardio?.id === "trekking" && !normalized.location.trim()) errors.push("Ingresa el cerro o lugar del trekking.");
     if (cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
     if (cardio?.id === "trekking" && (normalized.elevationGainM === "" || normalized.elevationGainM === null)) errors.push("Ingresa el desnivel del trekking.");
+    if (cardio?.id === "trekking" && (normalized.ascentDurationSeconds === "" || normalized.ascentDurationSeconds === null || normalized.ascentDurationSeconds <= 0)) errors.push("Ingresa el tiempo de subida.");
+    if (cardio?.id === "trekking" && (trekkingRoutes[normalized.location] || []).length && !(trekkingRoutes[normalized.location] || []).includes(normalized.trekkingRoute)) errors.push("Selecciona la ruta del trekking.");
   }
   if (normalized.category === "tennis") {
     if (!normalized.location.trim()) errors.push("Ingresa el lugar de la sesión de tenis.");
     if (!normalized.surface.trim()) errors.push("Selecciona la superficie.");
   }
+  if (normalized.category === "rest") {
+    if (!restTypes.some(type => type.id === normalized.restTypeId)) errors.push("Selecciona el tipo de descanso.");
+    if (normalized.restTypeId === "discomfort" && !normalized.restDetail.trim()) errors.push("Describe la molestia que te impidió entrenar.");
+  }
   if (normalized.distanceKm === null) errors.push("La distancia debe ser un número igual o mayor que cero.");
   if (normalized.elevationGainM === null) errors.push("El desnivel debe ser un número igual o mayor que cero.");
+  if (normalized.ascentDurationSeconds === null) errors.push("El tiempo de subida debe ser válido.");
   return { valid: errors.length === 0, errors, record: normalized };
 }
 
 export function recordTitle(record) {
   const normalized = normalizeRecord(record);
+  if (normalized.category === "rest") return normalized.restTypeId === "discomfort" ? "Descanso por molestia" : "Día de descanso";
   if (normalized.category === "physical") return normalized.routineName || "Entrenamiento físico";
   if (normalized.category === "cardio") return normalized.cardioTypeName || "Cardio";
   if (normalized.category === "tennis") return normalized.location ? `Tenis · ${normalized.location}` : "Tenis";
@@ -202,7 +216,12 @@ export function recordTitle(record) {
 
 export function recordDetails(record) {
   const normalized = normalizeRecord(record);
+  if (normalized.category === "rest") return normalized.restTypeId === "discomfort"
+    ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
+    : "Recuperación planificada";
   const details = [formatDuration(normalized), `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  if (normalized.trekkingRoute) details.push(normalized.trekkingRoute);
+  if (normalized.ascentDurationSeconds !== "") details.push(`Subida ${formatDuration({ durationSeconds: normalized.ascentDurationSeconds, durationMinutes: normalized.ascentDurationSeconds / 60, durationPrecision: "hms" })}`);
   if (normalized.distanceKm !== "") details.push(formatDistance(normalized.distanceKm));
   if (normalized.elevationGainM !== "") details.push(`${normalized.elevationGainM} m desnivel`);
   if (normalized.surface) details.push(normalized.surface);
@@ -247,8 +266,33 @@ export function groupRecordsByWeek(records) {
     .sort((a, b) => b.key.localeCompare(a.key));
 }
 
+export function trekkingBestTimes(records) {
+  const groups = new Map();
+  records.map(normalizeRecord)
+    .filter(record => record.category === "cardio" && record.cardioTypeId === "trekking" && record.location.trim())
+    .forEach(record => {
+      const ascentSeconds = Number(record.ascentDurationSeconds) || 0;
+      const totalSeconds = Number(record.durationSeconds) || Math.round((Number(record.durationMinutes) || 0) * 60);
+      const rankingSeconds = ascentSeconds > 0 ? ascentSeconds : totalSeconds;
+      if (rankingSeconds <= 0) return;
+      const needsRoute = (trekkingRoutes[record.location] || []).length > 0;
+      const route = record.trekkingRoute || (needsRoute ? "Sin ruta especificada" : "");
+      const key = `${record.location}::${route}`;
+      if (!groups.has(key)) groups.set(key, { key, location: record.location, route, attempts: [] });
+      groups.get(key).attempts.push({ ...record, rankingSeconds, usesTotalDuration: ascentSeconds <= 0 });
+    });
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      attempts: group.attempts.sort((a, b) => a.rankingSeconds - b.rankingSeconds || b.dateISO.localeCompare(a.dateISO))
+    }))
+    .sort((a, b) => a.location.localeCompare(b.location, "es") || a.route.localeCompare(b.route, "es"));
+}
+
 export function weeklyReport(records, week) {
   const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+  const trainings = normalized.filter(record => record.category !== "rest");
+  const restDays = normalized.filter(record => record.category === "rest");
   const totalMinutes = normalized.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
   const totalCalories = normalized.reduce((sum, record) => sum + (Number(record.calories) || 0), 0);
   const totalDistance = normalized.reduce((sum, record) => sum + (Number(record.distanceKm) || 0), 0);
@@ -261,7 +305,8 @@ export function weeklyReport(records, week) {
   let report = `REGISTRO TGB — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
   report += "RESUMEN\n";
-  report += `- Entrenamientos: ${normalized.length}\n`;
+  report += `- Entrenamientos: ${trainings.length}\n`;
+  report += `- Días de descanso registrados: ${restDays.length}\n`;
   report += `- Tiempo total: ${Math.round(totalMinutes)} min\n`;
   report += `- Calorías registradas: ${totalCalories} kcal\n`;
   report += `- Distancia registrada: ${formatDistance(totalDistance)}\n`;
@@ -280,11 +325,16 @@ export function weeklyReport(records, week) {
     dayRecords.forEach((record, index) => {
       report += `${index + 1}. ${recordTitle(record)}\n`;
       report += `   Tipo: ${record.categoryName}\n`;
-      report += `   Duración: ${formatDuration(record)}\n`;
-      report += `   Calorías: ${record.calories} kcal\n`;
+      if (record.category !== "rest") {
+        report += `   Duración: ${formatDuration(record)}\n`;
+        report += `   Calorías: ${record.calories} kcal\n`;
+      }
+      if (record.category === "rest" && record.restTypeId === "discomfort") report += `   Molestia: ${record.restDetail}\n`;
       if (record.distanceKm !== "") report += `   Distancia: ${formatDistance(record.distanceKm)}\n`;
       if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;
+      if (record.trekkingRoute) report += `   Ruta: ${record.trekkingRoute}\n`;
+      if (record.ascentDurationSeconds !== "") report += `   Tiempo de subida: ${formatDuration({ durationSeconds: record.ascentDurationSeconds, durationMinutes: record.ascentDurationSeconds / 60, durationPrecision: "hms" })}\n`;
       if (record.surface) report += `   Superficie: ${record.surface}\n`;
       if (record.category === "physical" && record.routinePlannedSets !== "") {
         report += `   Series: ${record.routineCompletedSets}/${record.routinePlannedSets}\n`;
@@ -308,8 +358,9 @@ function csvCell(value) {
 export function recordsToCSV(records) {
   const columns = [
     ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
-    ["cardio", "cardioTypeName"], ["lugar", "location"], ["superficie", "surface"],
-    ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
+    ["cardio", "cardioTypeName"], ["tipo_descanso", "restTypeId"], ["detalle_molestia", "restDetail"],
+    ["lugar", "location"], ["ruta_trekking", "trekkingRoute"], ["superficie", "surface"],
+    ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["tiempo_subida_seg", "ascentDurationSeconds"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
     ["precisión_duración", "durationPrecision"], ["calorías", "calories"],
     ["series_completadas", "routineCompletedSets"], ["series_planificadas", "routinePlannedSets"],
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],

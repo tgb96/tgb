@@ -6,13 +6,15 @@ import {
   dayNamesShort,
   physicalRoutines,
   physicalRoutineById,
+  restTypes,
   sensationSuggestions,
   tennisLocations,
   tennisSurfaces,
   trekkingLocations,
+  trekkingRoutes,
   trainingCategories
-} from "./data.js?v=16";
-import { createRepository } from "./storage.js?v=16";
+} from "./data.js?v=17";
+import { createRepository } from "./storage.js?v=17";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -24,10 +26,11 @@ import {
   recordDetails,
   recordTitle,
   recordsToCSV,
+  trekkingBestTimes,
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=16";
+} from "./utils.js?v=17";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -83,6 +86,7 @@ function renderHome() {
   const todayISO = getChileDateISO();
   const week = isoWeekInfo(todayISO);
   const records = repository.list().filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+  const trainingRecords = records.filter(record => record.category !== "rest");
   const todayRecords = records.filter(record => record.dateISO === todayISO);
   const activeDays = new Set(records.map(record => record.dateISO)).size;
 
@@ -90,9 +94,9 @@ function renderHome() {
   $("todayStatus").textContent = todayRecords.length ? `${todayRecords.length} ${todayRecords.length === 1 ? "actividad" : "actividades"} hoy` : "Sin registrar hoy";
   $("homeTitle").textContent = formatLongDate(todayISO);
   $("weekRange").textContent = `${formatShortDate(week.startISO)} — ${formatShortDate(week.endISO)}`;
-  $("weekSessionCount").textContent = String(records.length);
-  $("weekMinutes").textContent = String(Math.round(records.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
-  $("weekCalories").textContent = String(records.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
+  $("weekSessionCount").textContent = String(trainingRecords.length);
+  $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
+  $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
 
   const ledger = $("weekLedger");
@@ -175,7 +179,8 @@ function categoryIcon(categoryId) {
   const icons = {
     physical: `<svg viewBox="0 0 64 64" role="img"><path d="M8 25v14M15 20v24M49 20v24M56 25v14M15 32h34"/></svg>`,
     cardio: `<svg viewBox="0 0 64 64" role="img"><path d="M8 34h11l5-14 9 28 7-21 5 7h11"/><path d="M49 13c-7 0-11 5-11 5s-4-5-11-5c-8 0-14 6-14 14"/></svg>`,
-    tennis: `<svg viewBox="0 0 64 64" role="img"><ellipse cx="27" cy="23" rx="15" ry="20" transform="rotate(38 27 23)"/><path d="M36 38l14 14M44 46l-7 7M14 15l25 19M11 24l20 15"/><circle cx="52" cy="14" r="5"/></svg>`
+    tennis: `<svg viewBox="0 0 64 64" role="img"><ellipse cx="27" cy="23" rx="15" ry="20" transform="rotate(38 27 23)"/><path d="M36 38l14 14M44 46l-7 7M14 15l25 19M11 24l20 15"/><circle cx="52" cy="14" r="5"/></svg>`,
+    rest: `<svg viewBox="0 0 64 64" role="img"><path d="M47 43A23 23 0 0 1 23 17a22 22 0 1 0 24 26Z"/><path d="M43 13v8M39 17h8M51 25v6M48 28h6"/></svg>`
   };
   return icons[categoryId] || "";
 }
@@ -226,12 +231,65 @@ function renderPhysicalFields(record = {}) {
   $("categoryFields").append(fieldset);
 }
 
+function renderRestFields(record = {}) {
+  const fieldset = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  legend.textContent = "¿Qué tipo de descanso necesitas registrar?";
+  const grid = document.createElement("div");
+  grid.className = "choice-grid two";
+  const detailBox = document.createElement("div");
+  detailBox.className = "rest-detail-box hidden";
+  const detailLabel = document.createElement("label");
+  detailLabel.htmlFor = "restDetail";
+  detailLabel.textContent = "Detalle de la molestia";
+  const detail = document.createElement("textarea");
+  detail.id = "restDetail";
+  detail.rows = 4;
+  detail.maxLength = 2000;
+  detail.placeholder = "¿Dónde está la molestia, cómo se siente y desde cuándo?";
+  detail.value = record.restDetail || "";
+  const hint = document.createElement("small");
+  hint.textContent = "Este detalle aparecerá en el historial y en tu informe semanal.";
+  detailBox.append(detailLabel, detail, hint);
+
+  const updateDetail = () => {
+    const discomfort = document.querySelector('input[name="restTypeId"]:checked')?.value === "discomfort";
+    detailBox.classList.toggle("hidden", !discomfort);
+    detail.required = discomfort;
+    if (!discomfort) detail.value = "";
+  };
+
+  restTypes.forEach((type, index) => {
+    const choice = createChoice({
+      name: "restTypeId",
+      value: type.id,
+      title: type.name,
+      description: type.description,
+      checked: record.restTypeId ? record.restTypeId === type.id : index === 0
+    });
+    choice.input.addEventListener("change", updateDetail);
+    grid.append(choice.wrapper);
+  });
+  fieldset.append(legend, grid, detailBox);
+  $("categoryFields").append(fieldset);
+  updateDetail();
+}
+
 function currentCardioExtraValues() {
   return {
     location: selectedLocation("cardioLocationSelect", "cardioLocationOther"),
+    trekkingRoute: $("trekkingRoute")?.value || "",
     distanceKm: currentDistanceKm(),
-    elevationGainM: $("elevationGainM")?.value ?? ""
+    elevationGainM: $("elevationGainM")?.value ?? "",
+    ascentDurationSeconds: currentAscentDurationSeconds()
   };
+}
+
+function currentAscentDurationSeconds() {
+  if (!$("ascentHours") && !$("ascentMinutes") && !$("ascentSeconds")) return "";
+  return (Number($("ascentHours")?.value || 0) * 3600)
+    + (Number($("ascentMinutes")?.value || 0) * 60)
+    + Number($("ascentSeconds")?.value || 0);
 }
 
 function currentDistanceKm() {
@@ -313,6 +371,38 @@ function updateCardioExtraFields(values = {}) {
       currentValue: values.location || "",
       placeholder: "Escribe el cerro o lugar"
     }));
+    if (cardio.id === "trekking") {
+      const routeBox = document.createElement("div");
+      routeBox.id = "trekkingRouteFields";
+      const renderRoutePicker = () => {
+        routeBox.replaceChildren();
+        const location = selectedLocation("cardioLocationSelect", "cardioLocationOther");
+        const routes = trekkingRoutes[location] || [];
+        if (!routes.length) return;
+        const label = document.createElement("label");
+        label.htmlFor = "trekkingRoute";
+        label.textContent = `Ruta de ${location}`;
+        const select = document.createElement("select");
+        select.id = "trekkingRoute";
+        select.required = true;
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Selecciona la ruta";
+        select.append(placeholder);
+        routes.forEach(route => {
+          const option = document.createElement("option");
+          option.value = route;
+          option.textContent = route;
+          select.append(option);
+        });
+        select.value = routes.includes(values.trekkingRoute) ? values.trekkingRoute : "";
+        routeBox.append(label, select);
+      };
+      box.append(routeBox);
+      $("cardioLocationSelect")?.addEventListener("change", renderRoutePicker);
+      $("cardioLocationOther")?.addEventListener("input", renderRoutePicker);
+      renderRoutePicker();
+    }
   }
   if (cardio.distance) {
     const label = document.createElement("label");
@@ -358,6 +448,18 @@ function updateCardioExtraFields(values = {}) {
     elevation.placeholder = "Ej: 650";
     elevation.required = true;
     box.append(elevationLabel, elevation);
+
+    const ascentLabel = document.createElement("label");
+    ascentLabel.textContent = "Tiempo de subida (HH:MM:SS)";
+    const ascentParts = durationParts({ durationSeconds: values.ascentDurationSeconds || 0 });
+    const ascentFields = document.createElement("div");
+    ascentFields.className = "duration-parts hms";
+    ascentFields.append(
+      durationPart({ id: "ascentHours", label: "Horas", max: 12, value: ascentParts.hours }),
+      durationPart({ id: "ascentMinutes", label: "Min", max: 59, value: ascentParts.minutes }),
+      durationPart({ id: "ascentSeconds", label: "Seg", max: 59, value: ascentParts.seconds })
+    );
+    box.append(ascentLabel, ascentFields);
   }
 }
 
@@ -787,19 +889,32 @@ function selectCategory(categoryId, record = null) {
   $("trainingForm").hidden = false;
   $("registrationBackButton").classList.remove("hidden");
   $("registerHeading").textContent = editingRecordId ? `Editar ${category.shortName.toLowerCase()}` : category.name;
-  $("registerIntro").textContent = editingRecordId ? "Actualiza los datos y guarda los cambios." : "Completa los datos principales de la sesión.";
+  $("registerIntro").textContent = editingRecordId
+    ? "Actualiza los datos y guarda los cambios."
+    : categoryId === "rest" ? "Registra la recuperación de este día." : "Completa los datos principales de la sesión.";
   $("categoryFields").replaceChildren();
 
   if (categoryId === "physical") renderPhysicalFields(record || {});
   if (categoryId === "cardio") renderCardioFields(record || {});
   if (categoryId === "tennis") renderTennisFields(record || {});
+  if (categoryId === "rest") renderRestFields(record || {});
 
   $("recordDate").value = record?.dateISO || getChileDateISO();
-  renderDurationField(record || {});
-  $("calories").value = record?.calories ?? "";
-  $("sensations").value = record?.sensations || "";
-  renderSensationSuggestions();
-  $("saveTrainingButton").textContent = editingRecordId ? "Guardar cambios" : "Guardar entrenamiento";
+  const isRest = categoryId === "rest";
+  $("commonFields").classList.toggle("hidden", isRest);
+  $("calories").required = !isRest;
+  if (isRest) {
+    $("durationField").replaceChildren();
+    $("calories").value = "";
+    $("sensations").value = "";
+    $("sensationSuggestions").replaceChildren();
+  } else {
+    renderDurationField(record || {});
+    $("calories").value = record?.calories ?? "";
+    $("sensations").value = record?.sensations || "";
+    renderSensationSuggestions();
+  }
+  $("saveTrainingButton").textContent = editingRecordId ? "Guardar cambios" : isRest ? "Guardar descanso" : "Guardar entrenamiento";
   $("cancelEditButton").classList.toggle("hidden", !editingRecordId);
   updateFormWeekBadge();
   $("registerHeading").setAttribute("tabindex", "-1");
@@ -814,13 +929,15 @@ function resetRegistration() {
   $("trainingForm").hidden = true;
   $("categoryChooser").classList.remove("hidden");
   $("registrationBackButton").classList.add("hidden");
-  $("registerHeading").textContent = "¿Qué entrenamiento hiciste?";
-  $("registerIntro").textContent = "Elige uno de los tres grandes grupos.";
+  $("registerHeading").textContent = "¿Qué quieres registrar?";
+  $("registerIntro").textContent = "Elige entrenamiento o descanso.";
   $("formMessage").className = "form-message hidden";
   $("cancelEditButton").classList.add("hidden");
   $("categoryFields").replaceChildren();
   $("durationField").replaceChildren();
   $("sensationSuggestions").replaceChildren();
+  $("commonFields").classList.remove("hidden");
+  $("calories").required = true;
   $("recordDate").value = getChileDateISO();
 }
 
@@ -840,7 +957,8 @@ function formRecord() {
   const category = categoryById(currentCategory);
   const routineId = document.querySelector('input[name="routineId"]:checked')?.value || "";
   const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value || "";
-  const duration = currentDurationValues();
+  const isRest = currentCategory === "rest";
+  const duration = isRest ? { durationMinutes: "", durationSeconds: "" } : currentDurationValues();
   const preserveRoutineBalance = existing?.category === "physical" && existing.routineId === routineId;
   return {
     id: editingRecordId || createId(),
@@ -851,17 +969,21 @@ function formRecord() {
     routineName: physicalRoutineById(routineId)?.name || "",
     cardioTypeId,
     cardioTypeName: cardioTypeById(cardioTypeId)?.name || "",
+    restTypeId: document.querySelector('input[name="restTypeId"]:checked')?.value || "",
+    restDetail: $("restDetail")?.value.trim() || "",
     location: currentCategory === "tennis"
       ? selectedLocation("tennisLocationSelect", "tennisLocationOther")
       : selectedLocation("cardioLocationSelect", "cardioLocationOther"),
     surface: $("tennisSurface")?.value || "",
+    trekkingRoute: $("trekkingRoute")?.value || "",
     distanceKm: currentDistanceKm(),
     elevationGainM: $("elevationGainM")?.value ?? "",
+    ascentDurationSeconds: currentAscentDurationSeconds(),
     durationMinutes: duration.durationMinutes,
     durationSeconds: duration.durationSeconds,
     durationPrecision: durationMode(),
-    calories: $("calories").value,
-    sensations: $("sensations").value,
+    calories: isRest ? "" : $("calories").value,
+    sensations: isRest ? "" : $("sensations").value,
     routineCompletedSets: preserveRoutineBalance ? existing.routineCompletedSets : "",
     routinePlannedSets: preserveRoutineBalance ? existing.routinePlannedSets : "",
     routineCompletedExercises: preserveRoutineBalance ? existing.routineCompletedExercises : "",
@@ -907,7 +1029,9 @@ function saveTraining(event) {
   } catch (error) {
     return showFormError(error.message);
   }
-  const message = editingRecordId ? "Entrenamiento actualizado." : "Entrenamiento registrado.";
+  const message = editingRecordId
+    ? "Registro actualizado."
+    : candidate.category === "rest" ? "Descanso registrado." : "Entrenamiento registrado.";
   resetRegistration();
   renderHome();
   showView("home");
@@ -1535,9 +1659,71 @@ function renderRoutines() {
   ensureRoutineSessionTicker();
 }
 
+function renderTrekkingRankings(records) {
+  const container = $("trekkingRankings");
+  const groups = trekkingBestTimes(records);
+  container.replaceChildren();
+  if (!groups.length) {
+    const empty = document.createElement("div");
+    empty.className = "trekking-ranking-empty";
+    empty.textContent = "Cuando registres una subida, aquí aparecerán tus mejores tiempos por cerro y ruta.";
+    container.append(empty);
+    return;
+  }
+
+  groups.forEach((group, groupIndex) => {
+    const details = document.createElement("details");
+    details.className = "trekking-ranking-group";
+    details.open = groupIndex === 0;
+    const summary = document.createElement("summary");
+    const copy = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = group.location;
+    const route = document.createElement("p");
+    route.textContent = group.route || "Ruta general";
+    copy.append(title, route);
+    const best = document.createElement("div");
+    const bestLabel = document.createElement("span");
+    bestLabel.textContent = "Mejor tiempo";
+    const bestTime = document.createElement("strong");
+    bestTime.textContent = formatTimerClock(group.attempts[0].rankingSeconds);
+    best.append(bestLabel, bestTime);
+    summary.append(copy, best);
+
+    const list = document.createElement("ol");
+    list.className = "trekking-attempts";
+    group.attempts.forEach((attempt, index) => {
+      const item = document.createElement("li");
+      const position = document.createElement("span");
+      position.className = "trekking-position";
+      position.textContent = `#${index + 1}`;
+      const attemptCopy = document.createElement("div");
+      const time = document.createElement("strong");
+      time.textContent = formatTimerClock(attempt.rankingSeconds);
+      const meta = document.createElement("small");
+      const parts = [formatShortDate(attempt.dateISO)];
+      if (typeof attempt.distanceKm === "number") parts.push(`${attempt.distanceKm.toLocaleString("es-CL")} km`);
+      if (typeof attempt.elevationGainM === "number") parts.push(`${attempt.elevationGainM} m desnivel`);
+      meta.textContent = parts.join(" · ");
+      attemptCopy.append(time, meta);
+      if (attempt.usesTotalDuration) {
+        const legacy = document.createElement("span");
+        legacy.className = "trekking-legacy-time";
+        legacy.textContent = "Duración total";
+        attemptCopy.append(legacy);
+      }
+      item.append(position, attemptCopy);
+      list.append(item);
+    });
+    details.append(summary, list);
+    container.append(details);
+  });
+}
+
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderTrekkingRankings(records);
   $("historyTotal").textContent = `${records.length} ${records.length === 1 ? "registro" : "registros"}`;
   const container = $("historyWeeks");
   container.replaceChildren();

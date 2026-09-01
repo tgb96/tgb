@@ -7,7 +7,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Inicio con la fecha actual y el número de semana del año.
 - Vista completa de lunes a domingo con las actividades realmente realizadas cada día.
 - Resumen semanal de sesiones, minutos y calorías.
-- Registro guiado por tres categorías: físico, cardio y tenis.
+- Registro guiado por entrenamiento físico, cardio, tenis y días de descanso.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
@@ -36,6 +36,12 @@ Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajust
 
 Todo el cardio registra duración mediante selectores HH:MM:SS. Las actividades al aire libre separan kilómetros y metros en formato `KK:MMM`. Trekking ofrece lugares frecuentes, opción personalizada y desnivel positivo en metros.
 
+Trekking incluye Cerro La Región, El Carbón, Manquehue y San Cristóbal. Para Cerro La Región se distingue entre Los Fresnos y Ruta 7 Canchas. Además de la duración total, cada salida registra el tiempo específico de subida y el historial mantiene una clasificación del intento más rápido al más lento por cerro y ruta.
+
+### Descanso
+
+Permite registrar un día de descanso planificado o un descanso por molestia. Cuando existe una molestia, su descripción es obligatoria y queda incluida en el historial y en el informe semanal.
+
 ### Tenis
 
 Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración mediante selectores HH:MM:SS. Club Open Tenis propone arcilla; Sport Park y Parque Araucano proponen cemento.
@@ -50,7 +56,7 @@ TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo de
 
 ## Datos y migración
 
-Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 4 y migra automáticamente:
+Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 5 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.

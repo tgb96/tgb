@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=16">
+  <link rel="stylesheet" href="assets/css/styles.css?v=17">
   <title>TGB · Diario de entrenamiento</title>
 </head>
 
@@ -58,7 +58,7 @@
 
       <button id="homeRegisterButton" class="primary-cta" type="button">
         <span class="cta-plus" aria-hidden="true">+</span>
-        <span><strong>Registrar entrenamiento</strong><small>Físico, cardio o tenis</small></span>
+        <span><strong>Registrar actividad</strong><small>Entrenamiento o descanso</small></span>
         <span class="cta-arrow" aria-hidden="true">→</span>
       </button>
     </section>
@@ -68,8 +68,8 @@
         <button id="registrationBackButton" class="back-button hidden" type="button" aria-label="Volver a elegir tipo">←</button>
         <div>
           <p class="eyebrow dark">Nuevo registro</p>
-          <h1 id="registerHeading">¿Qué entrenamiento hiciste?</h1>
-          <p id="registerIntro" class="page-subtitle">Elige uno de los tres grandes grupos.</p>
+          <h1 id="registerHeading">¿Qué quieres registrar?</h1>
+          <p id="registerIntro" class="page-subtitle">Elige entrenamiento o descanso.</p>
         </div>
       </div>
 
@@ -86,7 +86,7 @@
 
         <div id="categoryFields"></div>
 
-        <div class="common-fields">
+        <div id="commonFields" class="common-fields">
           <div class="two-columns common-metrics">
             <div id="durationField"></div>
             <div>
@@ -95,8 +95,8 @@
             </div>
           </div>
 
-          <label for="sensations">Impresiones o sensaciones</label>
-          <div class="suggestion-heading">
+          <label id="sensationsLabel" for="sensations">Impresiones o sensaciones</label>
+          <div id="suggestionHeading" class="suggestion-heading">
             <span>Ideas rápidas</span>
             <small>Puedes elegir más de una</small>
           </div>
@@ -173,6 +173,13 @@
         <span id="historyTotal" class="history-total"></span>
       </div>
 
+      <section class="trekking-ranking-card" aria-labelledby="trekkingRankingTitle">
+        <p class="eyebrow dark">Progreso en cerros</p>
+        <h2 id="trekkingRankingTitle">Mejores tiempos de subida</h2>
+        <p>Los intentos se ordenan del más rápido al más lento para cada cerro y ruta.</p>
+        <div id="trekkingRankings" class="trekking-rankings"></div>
+      </section>
+
       <div id="historyWeeks" class="history-weeks"></div>
 
       <section class="data-card" aria-labelledby="dataTitle">
@@ -211,6 +218,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=16"></script>
+  <script type="module" src="assets/js/app.js?v=17"></script>
 </body>
 </html>

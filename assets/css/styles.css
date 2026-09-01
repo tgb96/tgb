@@ -79,6 +79,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-dot.physical { background: #7ba511; }
 .category-dot.cardio { background: var(--coral); }
 .category-dot.tennis { background: var(--blue); }
+.category-dot.rest { background: #8c63d9; }
 .activity-copy { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 
 .primary-cta { width: 100%; min-height: 84px; margin-top: 16px; padding: 16px; display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; border: 0; border-radius: 24px; background: var(--blue); color: white; text-align: left; box-shadow: 0 18px 30px rgba(49, 87, 255, 0.25); }
@@ -99,6 +100,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-card.lime::after { background: var(--lime); }
 .category-card.coral::after { background: #ffd4cb; }
 .category-card.blue::after { background: var(--soft-blue); }
+.category-card.violet::after { background: #eadcff; }
 .category-card h2 { margin: 0 0 5px; font-size: 22px; letter-spacing: -0.7px; }
 .category-card p { max-width: 330px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
 .category-icon { position: relative; z-index: 1; width: 60px; height: 60px; display: grid; place-items: center; border-radius: 20px; background: var(--night); color: white; transform: rotate(4deg); box-shadow: 0 10px 22px rgba(17, 21, 34, 0.18); }
@@ -106,6 +108,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-icon.physical { color: var(--lime); }
 .category-icon.cardio { color: #ff9b85; }
 .category-icon.tennis { color: #aabaff; }
+.category-icon.rest { color: #d8bfff; }
 
 .training-form { padding: 18px; border: 1px solid var(--line); border-radius: 28px; background: white; box-shadow: 0 20px 45px rgba(30, 35, 50, 0.08); }
 .form-date-row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
@@ -131,6 +134,9 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .choice-label small { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.3; }
 .choice-input:checked + .choice-label { border-color: var(--blue); box-shadow: inset 0 0 0 2px var(--blue); background: #f0f3ff; }
 .choice-input:focus-visible + .choice-label { outline: 3px solid var(--blue); outline-offset: 3px; }
+.rest-detail-box { margin-top: 13px; padding: 13px; border-radius: 17px; background: #f4effd; }
+.rest-detail-box label { margin-top: 0; color: #5f3f91; }
+.rest-detail-box small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .common-fields { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
 .suggestion-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 1px 8px; }
 .suggestion-heading span { color: var(--ink); font-size: 11px; font-weight: 850; }
@@ -234,6 +240,28 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .series-checks label { min-height: 39px; margin: 0; display: grid; place-items: center; border: 1px solid #d5d7dc; border-radius: 12px; background: white; color: var(--muted); font-size: 10px; cursor: pointer; }
 .series-checks input:checked + label { border-color: var(--blue); background: var(--blue); color: white; }
 .series-checks input:focus-visible + label { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.trekking-ranking-card { margin: -5px 0 16px; padding: 18px; border-radius: 25px; background: var(--night); color: white; box-shadow: 0 18px 35px rgba(17, 21, 34, 0.16); }
+.trekking-ranking-card .eyebrow { color: var(--lime); }
+.trekking-ranking-card > h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -0.6px; }
+.trekking-ranking-card > p:not(.eyebrow) { margin: 6px 0 14px; color: rgba(255, 255, 255, 0.65); font-size: 11px; line-height: 1.45; }
+.trekking-rankings { display: grid; gap: 7px; }
+.trekking-ranking-empty { padding: 15px; border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 15px; color: rgba(255, 255, 255, 0.62); font-size: 11px; line-height: 1.45; }
+.trekking-ranking-group { overflow: hidden; border-radius: 16px; background: rgba(255, 255, 255, 0.08); }
+.trekking-ranking-group summary { list-style: none; padding: 12px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; cursor: pointer; }
+.trekking-ranking-group summary::-webkit-details-marker { display: none; }
+.trekking-ranking-group summary h3 { margin: 0; font-size: 13px; }
+.trekking-ranking-group summary p { margin: 3px 0 0; color: rgba(255, 255, 255, 0.55); font-size: 9px; }
+.trekking-ranking-group summary > div:last-child { text-align: right; }
+.trekking-ranking-group summary span { display: block; color: var(--lime); font-size: 8px; font-weight: 850; text-transform: uppercase; }
+.trekking-ranking-group summary strong { display: block; margin-top: 3px; font-size: 17px; font-variant-numeric: tabular-nums; }
+.trekking-attempts { margin: 0; padding: 0 12px 12px; list-style: none; }
+.trekking-attempts li { padding: 9px; display: grid; grid-template-columns: 35px 1fr; align-items: center; gap: 8px; border-radius: 12px; background: white; color: var(--ink); }
+.trekking-attempts li + li { margin-top: 5px; }
+.trekking-position { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 11px; background: var(--lime); font-size: 10px; font-weight: 950; }
+.trekking-attempts strong { display: block; font-size: 14px; font-variant-numeric: tabular-nums; }
+.trekking-attempts small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+.trekking-legacy-time { display: inline-block; margin-top: 5px; padding: 4px 6px; border-radius: 7px; background: #fff0dd; color: #7a4a10; font-size: 7px; font-weight: 900; text-transform: uppercase; }
 
 .history-heading { justify-content: space-between; }
 .history-weeks { display: grid; gap: 14px; }

@@ -1,9 +1,9 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=16";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=17";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 function parseJSON(value, fallback) {
   try {

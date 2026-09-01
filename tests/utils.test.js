@@ -8,6 +8,7 @@ import {
   normalizeRecord,
   recordDetails,
   recordsToCSV,
+  trekkingBestTimes,
   validateRecord,
   weekDays,
   weeklyReport
@@ -42,7 +43,7 @@ test("las semanas respetan el año ISO en cambios de año", () => {
   assert.equal(isoWeekInfo("2027-01-01").key, "2026-W53");
 });
 
-test("valida los tres tipos de entrenamiento y los campos especiales", () => {
+test("valida entrenamientos, descansos y campos especiales", () => {
   assert.equal(validateRecord(physicalRecord).valid, true);
   assert.equal(validateRecord({
     ...physicalRecord,
@@ -55,7 +56,8 @@ test("valida los tres tipos de entrenamiento y los campos especiales", () => {
     cardioTypeName: "Trekking",
     location: "Cerro Manquehue",
     distanceKm: 8.5,
-    elevationGainM: 650
+    elevationGainM: 650,
+    ascentDurationSeconds: 4100
   }).valid, true);
   assert.equal(validateRecord({
     ...physicalRecord,
@@ -74,6 +76,55 @@ test("valida los tres tipos de entrenamiento y los campos especiales", () => {
     location: "Club",
     surface: "Arcilla"
   }).valid, true);
+});
+
+test("registra descanso planificado o por molestia con detalle obligatorio", () => {
+  assert.equal(validateRecord({
+    id: "rest-1",
+    dateISO: "2026-08-25",
+    category: "rest",
+    categoryName: "Descanso",
+    restTypeId: "planned"
+  }).valid, true);
+  assert.equal(validateRecord({
+    id: "rest-2",
+    dateISO: "2026-08-26",
+    category: "rest",
+    categoryName: "Descanso",
+    restTypeId: "discomfort",
+    restDetail: "Molestia leve en la rodilla derecha"
+  }).valid, true);
+  assert.equal(validateRecord({
+    id: "rest-3",
+    dateISO: "2026-08-27",
+    category: "rest",
+    categoryName: "Descanso",
+    restTypeId: "discomfort",
+    restDetail: ""
+  }).valid, false);
+});
+
+test("ordena las mejores subidas por cerro y ruta", () => {
+  const base = {
+    ...physicalRecord,
+    category: "cardio",
+    categoryName: "Cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "trekking",
+    cardioTypeName: "Trekking",
+    location: "Cerro La Región",
+    trekkingRoute: "Los Fresnos",
+    distanceKm: 5,
+    elevationGainM: 500
+  };
+  const groups = trekkingBestTimes([
+    { ...base, id: "slow", dateISO: "2026-08-20", ascentDurationSeconds: 4200 },
+    { ...base, id: "fast", dateISO: "2026-08-27", ascentDurationSeconds: 3600 }
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].route, "Los Fresnos");
+  assert.deepEqual(groups[0].attempts.map(record => record.id), ["fast", "slow"]);
 });
 
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {

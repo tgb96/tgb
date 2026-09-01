@@ -24,7 +24,19 @@ export const trainingCategories = [
     shortName: "Tenis",
     description: "Sesiones de cancha, superficie y sensaciones.",
     accent: "blue"
+  },
+  {
+    id: "rest",
+    name: "Descanso",
+    shortName: "Descanso",
+    description: "Recuperación planificada o descanso por molestia.",
+    accent: "violet"
   }
+];
+
+export const restTypes = [
+  { id: "planned", name: "Día de descanso", description: "Recuperación planificada, sin molestias." },
+  { id: "discomfort", name: "Descanso por molestia", description: "No entrenaste debido a dolor o molestia física." }
 ];
 
 // Rutinas base personales. Los ajustes de progresión se guardan en el dispositivo.
@@ -113,7 +125,11 @@ export const cardioTypes = [
   { id: "trekking", name: "Trekking", description: "Cerro, sendero o ruta", distance: true, location: true }
 ];
 
-export const trekkingLocations = ["Cerro La Región", "Cerro El Carbón", "Cerro Manquehue"];
+export const trekkingLocations = ["Cerro La Región", "Cerro El Carbón", "Cerro Manquehue", "Cerro San Cristóbal"];
+
+export const trekkingRoutes = {
+  "Cerro La Región": ["Los Fresnos", "Ruta 7 Canchas"]
+};
 
 export const tennisLocations = ["Club Open Tenis", "Sport Park de Huechuraba", "Parque Araucano"];
 

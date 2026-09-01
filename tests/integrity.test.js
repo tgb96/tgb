@@ -29,6 +29,10 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking"]);
   assert.deepEqual(data.tennisSurfaces, ["Arcilla", "Cemento"]);
   assert.ok(data.trekkingLocations.includes("Cerro El Carbón"));
+  assert.ok(data.trekkingLocations.includes("Cerro Manquehue"));
+  assert.ok(data.trekkingLocations.includes("Cerro San Cristóbal"));
+  assert.deepEqual(data.trekkingRoutes["Cerro La Región"], ["Los Fresnos", "Ruta 7 Canchas"]);
+  assert.ok(data.trainingCategories.some(category => category.id === "rest"));
   assert.ok(data.sensationSuggestions.physical.length >= 20);
   assert.ok(data.sensationSuggestions.cardio.length >= 20);
   assert.ok(data.sensationSuggestions.tennis.length >= 20);
@@ -48,5 +52,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v16/);
+  assert.match(worker, /tgb-shell-v17/);
 });
