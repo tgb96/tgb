@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=20";
-import { createRepository } from "./storage.js?v=20";
+} from "./data.js?v=21";
+import { createRepository } from "./storage.js?v=21";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=20";
+} from "./utils.js?v=21";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -81,6 +81,18 @@ function showView(name) {
 function openRegistration() {
   resetRegistration();
   showView("register");
+}
+
+function openRegistrationOrActiveRoutine() {
+  const session = loadRoutineSession();
+  if (session?.status === "active") {
+    openRoutineId = session.routineId;
+    showView("routines");
+    scrollToRoutine(session.routineId);
+    ensureRoutineSessionTicker();
+    return;
+  }
+  openRegistration();
 }
 
 function renderHome() {
@@ -735,7 +747,7 @@ function playTimerSound(kind) {
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(frequency, noteStart);
     gain.gain.setValueAtTime(0.0001, noteStart);
-    gain.gain.exponentialRampToValueAtTime(0.2, noteStart + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.34, noteStart + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
     oscillator.connect(gain);
     gain.connect(context.destination);
@@ -2057,10 +2069,10 @@ async function registerServiceWorker() {
 function bindEvents() {
   document.querySelectorAll("[data-view-target]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.viewTarget;
-    if (target === "register") openRegistration();
+    if (target === "register") openRegistrationOrActiveRoutine();
     else showView(target);
   }));
-  $("homeRegisterButton").addEventListener("click", openRegistration);
+  $("homeRegisterButton").addEventListener("click", openRegistrationOrActiveRoutine);
   $("registrationBackButton").addEventListener("click", () => {
     if (editingRecordId && !window.confirm("¿Cancelar la edición del entrenamiento?")) return;
     resetRegistration();
@@ -2087,6 +2099,12 @@ function initialize() {
   renderHome();
   renderRoutines();
   renderHistory();
+  const activeSession = loadRoutineSession();
+  if (activeSession?.status === "active") {
+    openRoutineId = activeSession.routineId;
+    showView("routines");
+    scrollToRoutine(activeSession.routineId);
+  }
   registerServiceWorker();
 }
 

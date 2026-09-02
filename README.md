@@ -9,6 +9,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Resumen semanal de sesiones, minutos y calorías.
 - Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
 - Al elegir entrenamiento físico y una rutina, la sesión comienza automáticamente en su vista de seguimiento; esa vista solo se abre desde Registrar.
+- Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
@@ -49,7 +50,7 @@ Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o c
 
 ## Timer
 
-Permite configurar hasta 12 horas, 59 minutos y 59 segundos para el intervalo y el descanso, además de 1 a 50 series. Alterna automáticamente las fases, muestra en grande la serie o el descanso actual, emite alertas sonoras y vibración en los cambios y avisa durante los últimos tres segundos. Puede pausarse y mantiene la marcha al volver al entrenamiento desde Registrar. Su configuración queda guardada en el dispositivo.
+Permite configurar hasta 12 horas, 59 minutos y 59 segundos para el intervalo y el descanso, además de 1 a 50 series. Alterna automáticamente las fases, muestra en grande la serie o el descanso actual, emite alertas sonoras reforzadas y vibración en los cambios y avisa durante los últimos tres segundos. Puede pausarse y mantiene la marcha al volver al entrenamiento desde Registrar. Su configuración queda guardada en el dispositivo.
 
 ## Semanas e informes
 
