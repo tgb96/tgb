@@ -6,7 +6,7 @@ import {
   restTypes,
   trekkingRoutes,
   TZ
-} from "./data.js?v=24";
+} from "./data.js?v=25";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {

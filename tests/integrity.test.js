@@ -59,6 +59,9 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /closestAllowed/);
   assert.match(app, /Math\.min\(10, Math\.max\(1, requestedSets\)\)/);
   assert.match(app, /number <= 10/);
+  assert.match(app, /TIMER_PREP_SECONDS = 3/);
+  assert.match(app, /timerState\.phase === "prepare"/);
+  assert.match(app, /Prepárate/);
   assert.match(app, /data-routine-id/);
   assert.match(app, /routineSensations-/);
   assert.match(app, /Elige al menos una sensación/);
@@ -69,5 +72,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v24/);
+  assert.match(worker, /tgb-shell-v25/);
 });

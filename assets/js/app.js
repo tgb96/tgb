@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=24";
-import { createRepository } from "./storage.js?v=24";
+} from "./data.js?v=25";
+import { createRepository } from "./storage.js?v=25";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=24";
+} from "./utils.js?v=25";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -51,6 +51,7 @@ const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
 const TIMER_REST_OPTIONS = [20, 30, 40, 50];
+const TIMER_PREP_SECONDS = 3;
 const timerState = {
   status: "idle",
   phase: "work",
@@ -768,6 +769,7 @@ function updateTimerDisplay() {
   const settings = timerSettingsFromFields();
   const phaseLabels = {
     idle: "Preparado",
+    prepare: "Preparación",
     work: "Intervalo",
     rest: "Descanso",
     complete: "Completado"
@@ -777,14 +779,18 @@ function updateTimerDisplay() {
   $("timerPhase").className = `timer-phase ${phaseKey}`;
   const stageLabel = timerState.status === "complete"
     ? "Completado"
-    : timerState.phase === "rest"
-      ? "Descanso"
-      : `Serie ${Math.min(timerState.currentSet, settings.totalSets)}`;
+    : timerState.phase === "prepare"
+      ? "Prepárate"
+      : timerState.phase === "rest"
+        ? "Descanso"
+        : `Serie ${Math.min(timerState.currentSet, settings.totalSets)}`;
   $("timerStageLabel").textContent = timerState.status === "paused" ? `${stageLabel} · Pausa` : stageLabel;
   $("timerStageLabel").className = `timer-stage-label ${phaseKey}`;
   $("timerSetStatus").textContent = timerState.status === "complete"
     ? `${settings.totalSets}/${settings.totalSets} series`
-    : `Serie ${Math.min(timerState.currentSet, settings.totalSets)} de ${settings.totalSets}`;
+    : timerState.phase === "prepare"
+      ? "La Serie 1 comienza enseguida"
+      : `Serie ${Math.min(timerState.currentSet, settings.totalSets)} de ${settings.totalSets}`;
   $("timerDisplay").textContent = formatTimerClock(timerState.remainingSeconds);
   const progress = timerState.status === "complete"
     ? 100
@@ -839,7 +845,10 @@ function completeTimer() {
 
 function advanceTimerPhase() {
   const settings = timerSettingsFromFields();
-  if (timerState.phase === "work") {
+  if (timerState.phase === "prepare") {
+    beginTimerPhase("work", settings.workSeconds);
+    notifyTimerChange("Comienza la serie 1.", "work");
+  } else if (timerState.phase === "work") {
     if (timerState.currentSet >= settings.totalSets) return completeTimer();
     if (settings.restSeconds > 0) {
       beginTimerPhase("rest", settings.restSeconds);
@@ -874,16 +883,19 @@ function startTimer() {
   ensureTimerAudio();
   const wasPaused = timerState.status === "paused";
   if (timerState.status === "idle" || timerState.status === "complete") {
-    timerState.phase = "work";
+    timerState.phase = "prepare";
     timerState.currentSet = 1;
-    timerState.remainingSeconds = settings.workSeconds;
-    timerState.phaseTotalSeconds = settings.workSeconds;
+    timerState.remainingSeconds = TIMER_PREP_SECONDS;
+    timerState.phaseTotalSeconds = TIMER_PREP_SECONDS;
   }
   timerState.status = "running";
   timerState.endAt = Date.now() + (timerState.remainingSeconds * 1000);
   if (timerTicker) clearInterval(timerTicker);
   timerTicker = setInterval(tickTimer, 250);
-  if (!wasPaused) playTimerSound("work");
+  if (!wasPaused) {
+    timerLastCountdownSecond = TIMER_PREP_SECONDS;
+    playTimerSound("countdown");
+  }
   updateTimerDisplay();
 }
 

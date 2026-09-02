@@ -169,10 +169,12 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .timer-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .timer-phase, .timer-set-status { padding: 7px 10px; border-radius: 999px; font-size: 10px; font-weight: 900; }
 .timer-phase { background: var(--lime); color: var(--night); }
+.timer-phase.prepare { background: var(--soft-blue); color: var(--blue-dark); }
 .timer-phase.rest { background: #ffcc68; }
 .timer-phase.complete { background: white; }
 .timer-set-status { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.78); }
 .timer-stage-label { display: block; margin-top: 24px; color: white; font-size: clamp(40px, 12vw, 68px); line-height: 0.95; letter-spacing: -2.5px; text-align: center; }
+.timer-stage-label.prepare { color: var(--lime); }
 .timer-stage-label.rest { color: #ffcc68; }
 .timer-stage-label.complete { color: var(--lime); }
 .timer-stage-label.idle { color: rgba(255, 255, 255, 0.92); }
