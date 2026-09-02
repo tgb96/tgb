@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=23";
-import { createRepository } from "./storage.js?v=23";
+} from "./data.js?v=24";
+import { createRepository } from "./storage.js?v=24";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=23";
+} from "./utils.js?v=24";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -655,7 +655,7 @@ function loadTimerSettings() {
   return {
     workSeconds: closestAllowed(saved.workSeconds, TIMER_WORK_OPTIONS, 30),
     restSeconds: closestAllowed(saved.restSeconds, TIMER_REST_OPTIONS, 30),
-    totalSets: Number.isFinite(requestedSets) ? Math.min(50, Math.max(1, requestedSets)) : 3
+    totalSets: Number.isFinite(requestedSets) ? Math.min(10, Math.max(1, requestedSets)) : 3
   };
 }
 
@@ -705,7 +705,7 @@ function initializeTimer() {
   renderTimerDuration("timerRestDuration", "timerRest", settings.restSeconds, TIMER_REST_OPTIONS);
   const totalSets = $("timerTotalSets");
   totalSets.replaceChildren();
-  for (let number = 1; number <= 50; number += 1) {
+  for (let number = 1; number <= 10; number += 1) {
     const option = document.createElement("option");
     option.value = String(number);
     option.textContent = `${number} ${number === 1 ? "serie" : "series"}`;

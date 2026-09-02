@@ -51,7 +51,7 @@ Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o c
 
 ## Timer
 
-Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20, 30, 40 o 50 segundos, además de configurar entre 1 y 50 series. Alterna automáticamente las fases, muestra en grande la serie o el descanso actual, emite alertas sonoras reforzadas y vibración en los cambios y avisa durante los últimos tres segundos. Puede pausarse y mantiene la marcha al volver al entrenamiento desde Registrar. Su configuración queda guardada en el dispositivo; los valores antiguos se ajustan automáticamente a la opción permitida más cercana.
+Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20, 30, 40 o 50 segundos, además de configurar entre 1 y 10 series. Alterna automáticamente las fases, muestra en grande la serie o el descanso actual, emite alertas sonoras reforzadas y vibración en los cambios y avisa durante los últimos tres segundos. Puede pausarse y mantiene la marcha al volver al entrenamiento desde Registrar. Su configuración queda guardada en el dispositivo; los valores antiguos se ajustan automáticamente a la opción permitida más cercana y cualquier cantidad anterior superior a 10 queda limitada a 10 series.
 
 ## Semanas e informes
 
