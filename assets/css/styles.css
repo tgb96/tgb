@@ -84,8 +84,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .primary-cta { width: 100%; min-height: 84px; margin-top: 16px; padding: 16px; display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; border: 0; border-radius: 24px; background: var(--blue); color: white; text-align: left; box-shadow: 0 18px 30px rgba(49, 87, 255, 0.25); }
 .primary-cta:hover { background: var(--blue-dark); }
-.primary-cta.routine-cta { background: var(--night); box-shadow: 0 18px 30px rgba(17, 21, 34, 0.2); }
-.primary-cta.routine-cta:hover { background: #20283a; }
 .cta-plus { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 17px; background: var(--lime); color: var(--night); font-size: 28px; font-weight: 500; }
 .primary-cta strong { display: block; font-size: 16px; }
 .primary-cta small { display: block; margin-top: 3px; color: rgba(255, 255, 255, 0.7); font-size: 11px; }
@@ -110,6 +108,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-icon.physical { color: var(--lime); }
 .category-icon.cardio { color: #ff9b85; }
 .category-icon.tennis { color: #aabaff; }
+.routine-launch-heading { margin: 2px 2px 14px; }
+.routine-launch-heading h2 { margin: 0; font-size: 22px; letter-spacing: -0.7px; }
+.routine-launch-heading p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.routine-launch-grid { display: grid; gap: 10px; }
+.routine-launch-card { width: 100%; min-height: 92px; padding: 14px; display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 20px; background: white; color: var(--ink); text-align: left; }
+.routine-launch-card:hover { border-color: var(--blue); background: #f8f9ff; }
+.routine-launch-number { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--night); color: var(--lime); font-size: 12px; font-weight: 950; transform: rotate(-3deg); }
+.routine-launch-card strong, .routine-launch-card small { display: block; }
+.routine-launch-card strong { font-size: 14px; line-height: 1.25; }
+.routine-launch-card small { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.routine-launch-action { color: var(--blue); font-size: 10px; font-weight: 900; white-space: nowrap; }
 .category-icon.rest { color: #d8bfff; }
 
 .training-form { padding: 18px; border: 1px solid var(--line); border-radius: 28px; background: white; box-shadow: 0 20px 45px rgba(30, 35, 50, 0.08); }

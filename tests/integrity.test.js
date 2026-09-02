@@ -17,7 +17,7 @@ test("la interfaz usa módulos, cinco vistas y ningún evento inline", async () 
   assert.match(html, /id="timerWorkDuration"/);
   assert.match(html, /id="timerStageLabel"/);
   assert.match(html, /id="sensationSuggestions"/);
-  assert.match(html, /id="homeRoutineButton"/);
+  assert.match(html, /id="registrationDateRow"/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
 });
@@ -46,7 +46,8 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineVolumeKg/);
   assert.match(app, /AudioContext/);
   assert.match(app, /playTimerSound\("countdown"\)/);
-  assert.match(app, /category\.id !== "physical"/);
+  assert.match(app, /launchRoutineFromRegistration/);
+  assert.match(app, /data-routine-id/);
   assert.match(app, /routineSensations-/);
   assert.match(app, /Elige al menos una sensación/);
 });
@@ -56,5 +57,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v18/);
+  assert.match(worker, /tgb-shell-v19/);
 });

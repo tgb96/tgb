@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=18";
-import { createRepository } from "./storage.js?v=18";
+} from "./data.js?v=19";
+import { createRepository } from "./storage.js?v=19";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=18";
+} from "./utils.js?v=19";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -154,7 +154,7 @@ function renderHome() {
 function renderCategoryChooser() {
   const chooser = $("categoryChooser");
   chooser.replaceChildren();
-  for (const category of trainingCategories.filter(category => category.id !== "physical")) {
+  for (const category of trainingCategories) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `category-card ${category.accent}`;
@@ -212,6 +212,41 @@ function createChoice({ name, value, title, description, checked }) {
 }
 
 function renderPhysicalFields(record = {}) {
+  if (!editingRecordId) {
+    const heading = document.createElement("div");
+    heading.className = "routine-launch-heading";
+    const title = document.createElement("h2");
+    title.textContent = "Elige la rutina de hoy";
+    const description = document.createElement("p");
+    description.textContent = "Al elegirla comenzará el cronómetro y podrás avanzar ejercicio por ejercicio y serie por serie.";
+    heading.append(title, description);
+    const grid = document.createElement("div");
+    grid.className = "routine-launch-grid";
+    physicalRoutines.forEach((routine, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "routine-launch-card";
+      button.setAttribute("aria-label", `Comenzar ${routine.name}`);
+      const number = document.createElement("span");
+      number.className = "routine-launch-number";
+      number.textContent = String(index + 1).padStart(2, "0");
+      const copy = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = routine.name;
+      const focus = document.createElement("small");
+      focus.textContent = routine.focus;
+      copy.append(name, focus);
+      const action = document.createElement("span");
+      action.className = "routine-launch-action";
+      action.textContent = "Comenzar →";
+      button.append(number, copy, action);
+      button.addEventListener("click", () => launchRoutineFromRegistration(routine));
+      grid.append(button);
+    });
+    $("categoryFields").append(heading, grid);
+    return;
+  }
+
   const fieldset = document.createElement("fieldset");
   const legend = document.createElement("legend");
   legend.textContent = "Elige una de las cuatro rutinas";
@@ -891,7 +926,9 @@ function selectCategory(categoryId, record = null) {
   $("registerHeading").textContent = editingRecordId ? `Editar ${category.shortName.toLowerCase()}` : category.name;
   $("registerIntro").textContent = editingRecordId
     ? "Actualiza los datos y guarda los cambios."
-    : categoryId === "rest" ? "Registra la recuperación de este día." : "Completa los datos principales de la sesión.";
+    : categoryId === "physical"
+      ? "Elige una rutina para comenzar el entrenamiento de hoy."
+      : categoryId === "rest" ? "Registra la recuperación de este día." : "Completa los datos principales de la sesión.";
   $("categoryFields").replaceChildren();
 
   if (categoryId === "physical") renderPhysicalFields(record || {});
@@ -901,9 +938,12 @@ function selectCategory(categoryId, record = null) {
 
   $("recordDate").value = record?.dateISO || getChileDateISO();
   const isRest = categoryId === "rest";
-  $("commonFields").classList.toggle("hidden", isRest);
-  $("calories").required = !isRest;
-  if (isRest) {
+  const isRoutineLauncher = categoryId === "physical" && !editingRecordId;
+  $("registrationDateRow").classList.toggle("hidden", isRoutineLauncher);
+  $("commonFields").classList.toggle("hidden", isRest || isRoutineLauncher);
+  $("saveTrainingButton").classList.toggle("hidden", isRoutineLauncher);
+  $("calories").required = !isRest && !isRoutineLauncher;
+  if (isRest || isRoutineLauncher) {
     $("durationField").replaceChildren();
     $("calories").value = "";
     $("sensations").value = "";
@@ -930,13 +970,15 @@ function resetRegistration() {
   $("categoryChooser").classList.remove("hidden");
   $("registrationBackButton").classList.add("hidden");
   $("registerHeading").textContent = "¿Qué quieres registrar?";
-  $("registerIntro").textContent = "Elige cardio, tenis o descanso.";
+  $("registerIntro").textContent = "Elige qué actividad quieres registrar.";
   $("formMessage").className = "form-message hidden";
   $("cancelEditButton").classList.add("hidden");
   $("categoryFields").replaceChildren();
   $("durationField").replaceChildren();
   $("sensationSuggestions").replaceChildren();
   $("commonFields").classList.remove("hidden");
+  $("registrationDateRow").classList.remove("hidden");
+  $("saveTrainingButton").classList.remove("hidden");
   $("calories").required = true;
   $("recordDate").value = getChileDateISO();
 }
@@ -1259,6 +1301,29 @@ function startRoutineSession(routine) {
   showToast("Rutina iniciada. El tiempo ya está corriendo.");
 }
 
+function scrollToRoutine(routineId) {
+  requestAnimationFrame(() => {
+    document.querySelector(`[data-routine-id="${routineId}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function launchRoutineFromRegistration(routine) {
+  const existing = loadRoutineSession();
+  if (existing?.status === "active") {
+    const activeRoutine = physicalRoutineById(existing.routineId);
+    openRoutineId = existing.routineId;
+    showView("routines");
+    scrollToRoutine(existing.routineId);
+    showToast(existing.routineId === routine.id
+      ? "Tu rutina ya estaba en curso. Continúa desde aquí."
+      : `Ya tienes ${activeRoutine?.name || "otra rutina"} en curso. Continúa o finalízala primero.`);
+    return;
+  }
+  startRoutineSession(routine);
+  showView("routines");
+  scrollToRoutine(routine.id);
+}
+
 function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
@@ -1551,6 +1616,7 @@ function renderRoutines() {
   physicalRoutines.forEach((routine, routineIndex) => {
     const card = document.createElement("details");
     card.className = "routine-card";
+    card.dataset.routineId = routine.id;
     card.open = openRoutineId === routine.id || session?.routineId === routine.id;
     card.addEventListener("toggle", () => {
       if (card.open) openRoutineId = routine.id;
@@ -1993,7 +2059,6 @@ function bindEvents() {
     if (target === "register") openRegistration();
     else showView(target);
   }));
-  $("homeRoutineButton").addEventListener("click", () => showView("routines"));
   $("homeRegisterButton").addEventListener("click", openRegistration);
   $("registrationBackButton").addEventListener("click", () => {
     if (editingRecordId && !window.confirm("¿Cancelar la edición del entrenamiento?")) return;

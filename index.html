@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=18">
+  <link rel="stylesheet" href="assets/css/styles.css?v=19">
   <title>TGB · Diario de entrenamiento</title>
 </head>
 
@@ -56,15 +56,9 @@
 
       <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
 
-      <button id="homeRoutineButton" class="primary-cta routine-cta" type="button">
-        <span class="cta-plus" aria-hidden="true">▦</span>
-        <span><strong>Realizar rutina física</strong><small>Cronómetro, series y balance</small></span>
-        <span class="cta-arrow" aria-hidden="true">→</span>
-      </button>
-
       <button id="homeRegisterButton" class="primary-cta" type="button">
         <span class="cta-plus" aria-hidden="true">+</span>
-        <span><strong>Registrar actividad</strong><small>Cardio, tenis o descanso</small></span>
+        <span><strong>Registrar actividad</strong><small>Físico, cardio, tenis o descanso</small></span>
         <span class="cta-arrow" aria-hidden="true">→</span>
       </button>
     </section>
@@ -75,14 +69,14 @@
         <div>
           <p class="eyebrow dark">Nuevo registro</p>
           <h1 id="registerHeading">¿Qué quieres registrar?</h1>
-          <p id="registerIntro" class="page-subtitle">Elige cardio, tenis o descanso.</p>
+          <p id="registerIntro" class="page-subtitle">Elige qué actividad quieres registrar.</p>
         </div>
       </div>
 
       <div id="categoryChooser" class="category-grid"></div>
 
       <form id="trainingForm" class="training-form hidden" hidden novalidate>
-        <div class="form-date-row">
+        <div id="registrationDateRow" class="form-date-row">
           <div>
             <label for="recordDate">Fecha</label>
             <input id="recordDate" name="recordDate" type="date" required>
@@ -224,6 +218,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=18"></script>
+  <script type="module" src="assets/js/app.js?v=19"></script>
 </body>
 </html>
