@@ -10,6 +10,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
 - Al elegir entrenamiento físico y una rutina, la sesión comienza automáticamente en su vista de seguimiento; esa vista solo se abre desde Registrar.
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
+- Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.

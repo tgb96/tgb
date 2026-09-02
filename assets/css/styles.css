@@ -217,7 +217,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-session-action button { min-height: 41px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
 .routine-session-action button:disabled { opacity: 0.42; cursor: default; }
 .routine-elapsed { margin: 0 !important; color: white; font-size: 20px !important; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
-.routine-finish-card { margin-top: 12px; padding: 17px; border: 1px solid #d9dcd2; border-radius: 21px; background: #f6f7f2; }
+.routine-finish-card { scroll-margin-top: 16px; margin-top: 12px; padding: 17px; border: 1px solid #d9dcd2; border-radius: 21px; background: #f6f7f2; }
 .routine-finish-card.complete { border-color: #b5dc4a; background: #f1f9dd; }
 .routine-finish-card h3 { margin: 5px 0 0; font-size: 18px; letter-spacing: -0.4px; }
 .routine-finish-card > p { margin: 6px 0 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
@@ -234,7 +234,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-balance-grid span { display: block; margin-top: 5px; color: var(--muted); font-size: 8px; font-weight: 850; line-height: 1.25; text-transform: uppercase; }
 .routine-finish-button, .routine-history-button { width: 100%; min-height: 50px; margin-top: 12px; border: 0; border-radius: 15px; background: var(--blue); color: white; font-size: 12px; font-weight: 900; }
 .routine-history-button { background: var(--night); }
-.exercise-card { padding: 14px; border: 1px solid #e2e3df; border-radius: 19px; background: #f8f8f5; }
+.exercise-card { scroll-margin-top: 16px; padding: 14px; border: 1px solid #e2e3df; border-radius: 19px; background: #f8f8f5; }
 .exercise-card + .exercise-card { margin-top: 9px; }
 .exercise-card.complete { border-color: #a8d62f; background: #f3fae4; }
 .exercise-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }

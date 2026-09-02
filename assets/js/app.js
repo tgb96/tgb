@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=21";
-import { createRepository } from "./storage.js?v=21";
+} from "./data.js?v=22";
+import { createRepository } from "./storage.js?v=22";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=21";
+} from "./utils.js?v=22";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -88,7 +88,7 @@ function openRegistrationOrActiveRoutine() {
   if (session?.status === "active") {
     openRoutineId = session.routineId;
     showView("routines");
-    scrollToRoutine(session.routineId);
+    scrollToRoutineProgress(session.routineId);
     ensureRoutineSessionTicker();
     return;
   }
@@ -1320,13 +1320,39 @@ function scrollToRoutine(routineId) {
   });
 }
 
+function scrollToRoutineProgress(routineId) {
+  const routine = physicalRoutineById(routineId);
+  const session = loadRoutineSession();
+  if (!routine || session?.status !== "active" || session.routineId !== routineId) return scrollToRoutine(routineId);
+  const progress = loadRoutineProgress();
+  const settings = loadRoutineSettings();
+  const exerciseStates = routine.exercises.map(exercise => {
+    const setCount = currentExerciseSettings(routine, exercise, settings).sets;
+    const completedSets = Array.from({ length: setCount }, (_, index) => index)
+      .filter(setIndex => progress[routineProgressKey(session.dateISO, routine.id, exercise.id, setIndex)]).length;
+    return { exercise, setCount, completedSets };
+  });
+  const targetState = exerciseStates.find(state => state.completedSets > 0 && state.completedSets < state.setCount)
+    || exerciseStates.find(state => state.completedSets < state.setCount);
+
+  requestAnimationFrame(() => {
+    const routineCard = [...document.querySelectorAll("[data-routine-id]")]
+      .find(card => card.dataset.routineId === routineId);
+    const target = targetState
+      ? [...(routineCard?.querySelectorAll("[data-exercise-id]") || [])]
+        .find(card => card.dataset.exerciseId === targetState.exercise.id)
+      : routineCard?.querySelector(".routine-finish-card");
+    (target || routineCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function launchRoutineFromRegistration(routine) {
   const existing = loadRoutineSession();
   if (existing?.status === "active") {
     const activeRoutine = physicalRoutineById(existing.routineId);
     openRoutineId = existing.routineId;
     showView("routines");
-    scrollToRoutine(existing.routineId);
+    scrollToRoutineProgress(existing.routineId);
     showToast(existing.routineId === routine.id
       ? "Tu rutina ya estaba en curso. Continúa desde aquí."
       : `Ya tienes ${activeRoutine?.name || "otra rutina"} en curso. Continúa o finalízala primero.`);
@@ -1669,6 +1695,7 @@ function renderRoutines() {
     routine.exercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
       exerciseCard.className = "exercise-card";
+      exerciseCard.dataset.exerciseId = exercise.id;
       const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
       const exerciseTop = document.createElement("div");
       exerciseTop.className = "exercise-top";
@@ -2103,7 +2130,7 @@ function initialize() {
   if (activeSession?.status === "active") {
     openRoutineId = activeSession.routineId;
     showView("routines");
-    scrollToRoutine(activeSession.routineId);
+    scrollToRoutineProgress(activeSession.routineId);
   }
   registerServiceWorker();
 }

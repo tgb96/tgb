@@ -50,6 +50,9 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /launchRoutineFromRegistration/);
   assert.match(app, /openRegistrationOrActiveRoutine/);
   assert.match(app, /activeSession\?\.status === "active"/);
+  assert.match(app, /scrollToRoutineProgress/);
+  assert.match(app, /data-exercise-id/);
+  assert.match(app, /completedSets > 0 && state\.completedSets < state\.setCount/);
   assert.match(app, /exponentialRampToValueAtTime\(0\.34/);
   assert.match(app, /data-routine-id/);
   assert.match(app, /routineSensations-/);
@@ -61,5 +64,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v21/);
+  assert.match(worker, /tgb-shell-v22/);
 });
