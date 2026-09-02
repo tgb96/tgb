@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=22";
-import { createRepository } from "./storage.js?v=22";
+} from "./data.js?v=23";
+import { createRepository } from "./storage.js?v=23";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=22";
+} from "./utils.js?v=23";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -49,6 +49,8 @@ const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
+const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
+const TIMER_REST_OPTIONS = [20, 30, 40, 50];
 const timerState = {
   status: "idle",
   phase: "work",
@@ -643,23 +645,22 @@ function loadTimerSettings() {
   } catch {
     saved = {};
   }
-  const safeSeconds = (value, fallback) => {
+  const closestAllowed = (value, allowed, fallback) => {
     const number = Number(value);
-    return Number.isFinite(number) ? Math.min(43200, Math.max(0, Math.round(number))) : fallback;
+    if (!Number.isFinite(number)) return fallback;
+    return allowed.reduce((closest, option) =>
+      Math.abs(option - number) < Math.abs(closest - number) ? option : closest, allowed[0]);
   };
   const requestedSets = Number.parseInt(saved.totalSets, 10);
   return {
-    workSeconds: safeSeconds(saved.workSeconds, 45),
-    restSeconds: safeSeconds(saved.restSeconds, 60),
+    workSeconds: closestAllowed(saved.workSeconds, TIMER_WORK_OPTIONS, 30),
+    restSeconds: closestAllowed(saved.restSeconds, TIMER_REST_OPTIONS, 30),
     totalSets: Number.isFinite(requestedSets) ? Math.min(50, Math.max(1, requestedSets)) : 3
   };
 }
 
 function timerDurationValue(prefix) {
-  const hours = Number($(`${prefix}Hours`)?.value || 0);
-  const minutes = Number($(`${prefix}Minutes`)?.value || 0);
-  const seconds = Number($(`${prefix}Seconds`)?.value || 0);
-  return (hours * 3600) + (minutes * 60) + seconds;
+  return Number($(`${prefix}Seconds`)?.value || 0);
 }
 
 function timerSettingsFromFields() {
@@ -680,21 +681,28 @@ function saveTimerSettings() {
   if (timerState.status === "idle" || timerState.status === "complete") resetTimer(false);
 }
 
-function renderTimerDuration(containerId, prefix, totalSeconds) {
+function renderTimerDuration(containerId, prefix, totalSeconds, options) {
   const container = $(containerId);
-  const parts = durationParts({ durationSeconds: totalSeconds });
-  container.replaceChildren(
-    durationPart({ id: `${prefix}Hours`, label: "Horas", max: 12, value: parts.hours }),
-    durationPart({ id: `${prefix}Minutes`, label: "Min", max: 59, value: parts.minutes }),
-    durationPart({ id: `${prefix}Seconds`, label: "Seg", max: 59, value: parts.seconds })
-  );
-  container.querySelectorAll("select").forEach(select => select.addEventListener("change", saveTimerSettings));
+  const wrapper = document.createElement("div");
+  const select = document.createElement("select");
+  select.id = `${prefix}Seconds`;
+  select.setAttribute("aria-label", prefix === "timerWork" ? "Segundos del intervalo" : "Segundos de descanso");
+  options.forEach(seconds => {
+    const option = document.createElement("option");
+    option.value = String(seconds);
+    option.textContent = `${seconds} segundos`;
+    select.append(option);
+  });
+  select.value = String(totalSeconds);
+  wrapper.append(select);
+  container.replaceChildren(wrapper);
+  select.addEventListener("change", saveTimerSettings);
 }
 
 function initializeTimer() {
   const settings = loadTimerSettings();
-  renderTimerDuration("timerWorkDuration", "timerWork", settings.workSeconds);
-  renderTimerDuration("timerRestDuration", "timerRest", settings.restSeconds);
+  renderTimerDuration("timerWorkDuration", "timerWork", settings.workSeconds, TIMER_WORK_OPTIONS);
+  renderTimerDuration("timerRestDuration", "timerRest", settings.restSeconds, TIMER_REST_OPTIONS);
   const totalSets = $("timerTotalSets");
   totalSets.replaceChildren();
   for (let number = 1; number <= 50; number += 1) {
