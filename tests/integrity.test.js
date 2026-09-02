@@ -6,12 +6,13 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("la interfaz usa módulos, cinco vistas y ningún evento inline", async () => {
+test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   assert.match(html, /assets\/css\/styles\.css/);
   assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
-  assert.equal([...html.matchAll(/class="nav-item/g)].length, 5);
+  assert.equal([...html.matchAll(/class="nav-item/g)].length, 4);
+  assert.doesNotMatch(html, /class="nav-item"[^>]+data-view-target="routines"/);
   assert.match(html, /id="viewRoutines"/);
   assert.match(html, /id="viewTimer"/);
   assert.match(html, /id="timerWorkDuration"/);
@@ -57,5 +58,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v19/);
+  assert.match(worker, /tgb-shell-v20/);
 });

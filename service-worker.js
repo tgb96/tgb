@@ -1,14 +1,14 @@
-const CACHE_NAME = "tgb-shell-v19";
+const CACHE_NAME = "tgb-shell-v20";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./assets/css/styles.css?v=19",
-  "./assets/js/app.js?v=19",
-  "./assets/js/data.js?v=19",
-  "./assets/js/storage.js?v=19",
-  "./assets/js/utils.js?v=19",
+  "./assets/css/styles.css?v=20",
+  "./assets/js/app.js?v=20",
+  "./assets/js/data.js?v=20",
+  "./assets/js/storage.js?v=20",
+  "./assets/js/utils.js?v=20",
   "./icon-192.png",
   "./icon-512.png",
   "./icon.svg"

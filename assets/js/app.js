@@ -13,8 +13,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=19";
-import { createRepository } from "./storage.js?v=19";
+} from "./data.js?v=20";
+import { createRepository } from "./storage.js?v=20";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +30,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=19";
+} from "./utils.js?v=20";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -65,8 +65,9 @@ function showView(name) {
     view.hidden = !visible;
     view.classList.toggle("hidden", !visible);
   }
+  const activeNavTarget = name === "routines" ? "register" : name;
   document.querySelectorAll(".nav-item").forEach(button => {
-    const active = button.dataset.viewTarget === name;
+    const active = button.dataset.viewTarget === activeNavTarget;
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
