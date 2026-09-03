@@ -4,9 +4,10 @@ import {
   dayNamesFull,
   physicalRoutineById,
   restTypes,
+  tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=25";
+} from "./data.js?v=26";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -144,6 +145,8 @@ export function normalizeRecord(record) {
     routineName: String(legacyRoutine(record)),
     cardioTypeId: String(record?.cardioTypeId || ""),
     cardioTypeName: String(legacyCardio(record)),
+    tennisTypeId: String(record?.tennisTypeId || ""),
+    tennisTypeName: String(record?.tennisTypeName || tennisTypeById(record?.tennisTypeId)?.name || ""),
     restTypeId: String(record?.restTypeId || ""),
     restDetail: String(record?.restDetail || "").slice(0, 2000),
     location: String(record?.location || "").slice(0, 300),
@@ -192,6 +195,7 @@ export function validateRecord(record) {
     if (cardio?.id === "trekking" && (trekkingRoutes[normalized.location] || []).length && !(trekkingRoutes[normalized.location] || []).includes(normalized.trekkingRoute)) errors.push("Selecciona la ruta del trekking.");
   }
   if (normalized.category === "tennis") {
+    if (!tennisTypeById(normalized.tennisTypeId)) errors.push("Selecciona el tipo de sesión de tenis.");
     if (!normalized.location.trim()) errors.push("Ingresa el lugar de la sesión de tenis.");
     if (!normalized.surface.trim()) errors.push("Selecciona la superficie.");
   }
@@ -210,7 +214,10 @@ export function recordTitle(record) {
   if (normalized.category === "rest") return normalized.restTypeId === "discomfort" ? "Descanso por molestia" : "Día de descanso";
   if (normalized.category === "physical") return normalized.routineName || "Entrenamiento físico";
   if (normalized.category === "cardio") return normalized.cardioTypeName || "Cardio";
-  if (normalized.category === "tennis") return normalized.location ? `Tenis · ${normalized.location}` : "Tenis";
+  if (normalized.category === "tennis") {
+    if (normalized.tennisTypeName) return `Tenis · ${normalized.tennisTypeName}`;
+    return normalized.location ? `Tenis · ${normalized.location}` : "Tenis";
+  }
   return normalized.categoryName || "Entrenamiento";
 }
 
@@ -220,6 +227,7 @@ export function recordDetails(record) {
     ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
     : "Recuperación planificada";
   const details = [formatDuration(normalized), `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  if (normalized.category === "tennis" && normalized.location) details.push(normalized.location);
   if (normalized.trekkingRoute) details.push(normalized.trekkingRoute);
   if (normalized.ascentDurationSeconds !== "") details.push(`Subida ${formatDuration({ durationSeconds: normalized.ascentDurationSeconds, durationMinutes: normalized.ascentDurationSeconds / 60, durationPrecision: "hms" })}`);
   if (normalized.distanceKm !== "") details.push(formatDistance(normalized.distanceKm));
@@ -329,6 +337,7 @@ export function weeklyReport(records, week) {
         report += `   Duración: ${formatDuration(record)}\n`;
         report += `   Calorías: ${record.calories} kcal\n`;
       }
+      if (record.category === "tennis" && record.tennisTypeName) report += `   Tipo de tenis: ${record.tennisTypeName}\n`;
       if (record.category === "rest" && record.restTypeId === "discomfort") report += `   Molestia: ${record.restDetail}\n`;
       if (record.distanceKm !== "") report += `   Distancia: ${formatDistance(record.distanceKm)}\n`;
       if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
@@ -358,7 +367,7 @@ function csvCell(value) {
 export function recordsToCSV(records) {
   const columns = [
     ["fecha", "dateISO"], ["día", "day"], ["categoría", "categoryName"], ["rutina", "routineName"],
-    ["cardio", "cardioTypeName"], ["tipo_descanso", "restTypeId"], ["detalle_molestia", "restDetail"],
+    ["cardio", "cardioTypeName"], ["tipo_tenis", "tennisTypeName"], ["tipo_descanso", "restTypeId"], ["detalle_molestia", "restDetail"],
     ["lugar", "location"], ["ruta_trekking", "trekkingRoute"], ["superficie", "surface"],
     ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["tiempo_subida_seg", "ascentDurationSeconds"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
     ["precisión_duración", "durationPrecision"], ["calorías", "calories"],

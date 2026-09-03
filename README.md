@@ -47,7 +47,7 @@ Permite registrar un día de descanso planificado o un descanso por molestia. Cu
 
 ### Tenis
 
-Ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración mediante selectores HH:MM:SS. Club Open Tenis propone arcilla; Sport Park y Parque Araucano proponen cemento.
+Antes del lugar permite elegir el tipo de sesión: entrenamiento grupal, partido, frontón o peloteo amistoso. También ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración mediante selectores HH:MM:SS. Club Open Tenis propone arcilla; Sport Park y Parque Araucano proponen cemento.
 
 ## Timer
 
@@ -59,7 +59,7 @@ TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo de
 
 ## Datos y migración
 
-Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 5 y migra automáticamente:
+Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 6 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.

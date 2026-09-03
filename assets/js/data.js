@@ -133,6 +133,13 @@ export const trekkingRoutes = {
 
 export const tennisLocations = ["Club Open Tenis", "Sport Park de Huechuraba", "Parque Araucano"];
 
+export const tennisTypes = [
+  { id: "group-training", name: "Entrenamiento grupal" },
+  { id: "match", name: "Partido" },
+  { id: "wall", name: "Frontón" },
+  { id: "friendly-hitting", name: "Peloteo amistoso" }
+];
+
 export const tennisSurfaces = ["Arcilla", "Cemento"];
 
 export const sensationSuggestions = {
@@ -178,4 +185,8 @@ export function physicalRoutineById(id) {
 
 export function cardioTypeById(id) {
   return cardioTypes.find(type => type.id === id) || null;
+}
+
+export function tennisTypeById(id) {
+  return tennisTypes.find(type => type.id === id) || null;
 }

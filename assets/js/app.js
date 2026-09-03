@@ -10,11 +10,13 @@ import {
   sensationSuggestions,
   tennisLocations,
   tennisSurfaces,
+  tennisTypes,
+  tennisTypeById,
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=25";
-import { createRepository } from "./storage.js?v=25";
+} from "./data.js?v=26";
+import { createRepository } from "./storage.js?v=26";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -30,7 +32,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=25";
+} from "./utils.js?v=26";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -541,6 +543,24 @@ function renderCardioFields(record = {}) {
 }
 
 function renderTennisFields(record = {}) {
+  const typeLabel = document.createElement("label");
+  typeLabel.htmlFor = "tennisType";
+  typeLabel.textContent = "Tipo";
+  const type = document.createElement("select");
+  type.id = "tennisType";
+  type.required = true;
+  const typePlaceholder = document.createElement("option");
+  typePlaceholder.value = "";
+  typePlaceholder.textContent = "Selecciona el tipo de sesión";
+  type.append(typePlaceholder);
+  tennisTypes.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.name;
+    type.append(option);
+  });
+  type.value = record.tennisTypeId || "";
+
   const surfaceLabel = document.createElement("label");
   surfaceLabel.htmlFor = "tennisSurface";
   surfaceLabel.textContent = "Superficie";
@@ -558,6 +578,8 @@ function renderTennisFields(record = {}) {
   });
   surface.value = record.surface || "";
   $("categoryFields").append(
+    typeLabel,
+    type,
     createLocationPicker({
       idPrefix: "tennisLocation",
       labelText: "Lugar",
@@ -1044,6 +1066,8 @@ function formRecord() {
     routineName: physicalRoutineById(routineId)?.name || "",
     cardioTypeId,
     cardioTypeName: cardioTypeById(cardioTypeId)?.name || "",
+    tennisTypeId: $("tennisType")?.value || "",
+    tennisTypeName: tennisTypeById($("tennisType")?.value || "")?.name || "",
     restTypeId: document.querySelector('input[name="restTypeId"]:checked')?.value || "",
     restDetail: $("restDetail")?.value.trim() || "",
     location: currentCategory === "tennis"

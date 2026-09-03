@@ -73,6 +73,8 @@ test("valida entrenamientos, descansos y campos especiales", () => {
     category: "tennis",
     routineId: "",
     routineName: "",
+    tennisTypeId: "match",
+    tennisTypeName: "Partido",
     location: "Club",
     surface: "Arcilla"
   }).valid, true);
@@ -187,6 +189,8 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
     categoryName: "Tenis",
     routineId: "",
     routineName: "",
+    tennisTypeId: "friendly-hitting",
+    tennisTypeName: "Peloteo amistoso",
     location: "Club Open",
     surface: "Arcilla",
     durationMinutes: 90,
@@ -200,6 +204,7 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
   assert.match(report, /Tiempo total: 150 min/);
   assert.match(report, /LUNES 2026-08-24/);
   assert.match(report, /DOMINGO 2026-08-30/);
+  assert.match(report, /Tipo de tenis: Peloteo amistoso/);
   assert.match(report, /Sin entrenamiento registrado/);
 });
 
@@ -207,5 +212,6 @@ test("CSV conserva los campos nuevos y neutraliza fórmulas", () => {
   const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)" }]);
   assert.ok(csv.startsWith("\uFEFF"));
   assert.match(csv, /Fuerza de piernas/);
+  assert.match(csv, /tipo_tenis/);
   assert.match(csv, /'=SUM/);
 });
