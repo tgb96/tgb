@@ -8,6 +8,7 @@ import {
   normalizeRecord,
   recordDetails,
   recordsToCSV,
+  routineExerciseLine,
   trekkingBestTimes,
   validateRecord,
   weekDays,
@@ -159,14 +160,33 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
     routineTotalExercises: 9,
     routineTotalReps: 210,
     routineVolumeKg: 1680,
+    routineExercises: [{
+      id: "unilateral-loaded-squat",
+      name: "Sentadilla con carga unilateral",
+      phase: "Fuerza principal",
+      target: "10",
+      weightKg: 8,
+      plannedSets: 4,
+      completedSets: 3,
+      completedSetNumbers: [1, 2, 4],
+      totalReps: 30,
+      volumeKg: 240
+    }],
     routineStartedAt: "2026-08-24T20:00:00.000Z",
     routineEndedAt: "2026-08-24T21:01:15.000Z"
   });
   assert.equal(record.routineCompletedSets, 24);
   assert.equal(record.routineVolumeKg, 1680);
   assert.equal(record.routineStartedExercises, 9);
+  assert.equal(record.routineExercises[0].completedSetNumbers.join(","), "1,2,4");
+  assert.match(routineExerciseLine(record.routineExercises[0]), /3\/4 series realizadas/);
+  assert.match(routineExerciseLine(record.routineExercises[0]), /240 kg de volumen/);
   assert.match(recordDetails(record), /24\/28 series/);
   assert.match(recordDetails(record), /1\.680 kg volumen/);
+  const report = weeklyReport([record], isoWeekInfo(record.dateISO));
+  assert.match(report, /Ejercicios, cargas y repeticiones realizadas/);
+  assert.match(report, /Sentadilla con carga unilateral/);
+  assert.match(report, /series marcadas: 1, 2, 4/);
 });
 
 test("formatea duraciones exactas para trote, trekking y tenis", () => {
@@ -208,10 +228,15 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
   assert.match(report, /Sin entrenamiento registrado/);
 });
 
-test("CSV conserva los campos nuevos y neutraliza fórmulas", () => {
-  const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)" }]);
+test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fórmulas", () => {
+  const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)", routineExercises: [{
+    name: "Remo a una mano", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3,
+    completedSetNumbers: [1, 2, 3], totalReps: 30, volumeKg: 240
+  }] }]);
   assert.ok(csv.startsWith("\uFEFF"));
   assert.match(csv, /Fuerza de piernas/);
   assert.match(csv, /tipo_tenis/);
+  assert.match(csv, /detalle_ejercicios/);
+  assert.match(csv, /Remo a una mano/);
   assert.match(csv, /'=SUM/);
 });

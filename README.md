@@ -8,7 +8,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Vista completa de lunes a domingo con las actividades realmente realizadas cada día.
 - Resumen semanal de sesiones, minutos y calorías.
 - Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
-- Al elegir entrenamiento físico y una rutina, la sesión comienza automáticamente en su vista de seguimiento; esa vista solo se abre desde Registrar.
+- Al elegir entrenamiento físico y una rutina, se abre primero una vista previa completa; la sesión y su cronómetro solo comienzan al pulsar Iniciar entrenamiento.
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
 - Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
@@ -27,7 +27,7 @@ Incluye cuatro rutinas configuradas en `assets/js/data.js`:
 3. Día 3: potencia y desplazamientos.
 4. Día 4 extra: antebrazo, core y técnica.
 
-Cada ejercicio permite modificar series, repeticiones o tiempo y peso. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Desde Registrar se elige Entrenamiento físico y luego una de las cuatro rutinas; esa elección abre la rutina e inicia automáticamente su cronómetro. Al finalizar se ingresan las calorías y se seleccionan una o varias sensaciones. El cierre registra el entrenamiento y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
+Cada ejercicio permite elegir entre 1 y 10 series desde un desplegable, además de modificar repeticiones o tiempo y peso. El editor distingue si el objetivo corresponde a repeticiones, segundos o minutos y permite borrar y sobrescribir el valor con normalidad. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Desde Registrar se elige Entrenamiento físico y luego una de las cuatro rutinas; esa elección abre una vista previa para revisar ejercicios y preparar implementos, sin iniciar el cronómetro. Al pulsar Iniciar entrenamiento comienza el seguimiento. Al finalizar se ingresan las calorías y se seleccionan una o varias sensaciones. El cierre registra el entrenamiento y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
 
 ### Cardio
 
@@ -55,11 +55,11 @@ Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20,
 
 ## Semanas e informes
 
-TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe con resumen y detalle diario, incluidos los días sin actividad.
+TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe con resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
 
 ## Datos y migración
 
-Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 6 y migra automáticamente:
+Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 7 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.

@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=26";
+} from "./data.js?v=27";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -106,6 +106,31 @@ function optionalNumber(value, { min = 0 } = {}) {
   return Number.isFinite(parsed) && parsed >= min ? parsed : null;
 }
 
+function normalizeRoutineExercises(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).map((exercise, index) => {
+    const plannedSets = optionalNumber(exercise?.plannedSets, { min: 0 });
+    const completedSets = optionalNumber(exercise?.completedSets, { min: 0 });
+    const completedSetNumbers = Array.isArray(exercise?.completedSetNumbers)
+      ? [...new Set(exercise.completedSetNumbers
+        .map(number => Number.parseInt(number, 10))
+        .filter(number => number >= 1 && number <= 10))]
+      : [];
+    return {
+      id: String(exercise?.id || `exercise-${index + 1}`).slice(0, 100),
+      name: String(exercise?.name || `Ejercicio ${index + 1}`).slice(0, 300),
+      phase: String(exercise?.phase || "").slice(0, 200),
+      target: String(exercise?.target || "").slice(0, 100),
+      weightKg: optionalNumber(exercise?.weightKg, { min: 0 }),
+      plannedSets: plannedSets === null || plannedSets === "" ? 0 : Math.min(10, Math.floor(plannedSets)),
+      completedSets: completedSets === null || completedSets === "" ? completedSetNumbers.length : Math.min(10, Math.floor(completedSets)),
+      completedSetNumbers,
+      totalReps: optionalNumber(exercise?.totalReps, { min: 0 }) || 0,
+      volumeKg: optionalNumber(exercise?.volumeKg, { min: 0 }) || 0
+    };
+  });
+}
+
 function legacyCategory(record) {
   if (record?.category) return record.category;
   if (record?.activity === "Físico") return "physical";
@@ -167,6 +192,7 @@ export function normalizeRecord(record) {
     routineTotalExercises: optionalNumber(record?.routineTotalExercises, { min: 0 }),
     routineTotalReps: optionalNumber(record?.routineTotalReps, { min: 0 }),
     routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
+    routineExercises: normalizeRoutineExercises(record?.routineExercises),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
     createdAt: String(record?.createdAt || ""),
@@ -238,6 +264,21 @@ export function recordDetails(record) {
     details.push(`${Number(normalized.routineVolumeKg || 0).toLocaleString("es-CL")} kg volumen`);
   }
   return details.join(" · ");
+}
+
+export function routineExerciseLine(exercise) {
+  const plannedSets = Number(exercise?.plannedSets) || 0;
+  const completedSets = Number(exercise?.completedSets) || 0;
+  const completedSetNumbers = Array.isArray(exercise?.completedSetNumbers) ? exercise.completedSetNumbers : [];
+  const parts = [
+    `${completedSets}/${plannedSets} series realizadas`,
+    `objetivo por serie: ${exercise?.target || "sin objetivo anotado"}`,
+    `carga: ${exercise?.weightKg === "" || exercise?.weightKg === null || exercise?.weightKg === undefined ? "sin carga" : `${exercise.weightKg} kg`}`
+  ];
+  if (completedSetNumbers.length) parts.push(`series marcadas: ${completedSetNumbers.join(", ")}`);
+  if (Number(exercise?.totalReps) > 0) parts.push(`${exercise.totalReps} repeticiones contabilizadas`);
+  if (Number(exercise?.volumeKg) > 0) parts.push(`${Number(exercise.volumeKg).toLocaleString("es-CL")} kg de volumen`);
+  return parts.join(" · ");
 }
 
 export function formatDistance(distanceKm) {
@@ -352,6 +393,15 @@ export function weeklyReport(records, week) {
         report += `   Repeticiones contabilizadas: ${record.routineTotalReps}\n`;
         report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
       }
+      if (record.category === "physical" && record.routineExercises.length) {
+        report += "   Ejercicios, cargas y repeticiones realizadas:\n";
+        record.routineExercises.forEach((exercise, exerciseIndex) => {
+          const phase = exercise.phase ? ` [${exercise.phase}]` : "";
+          report += `     ${exerciseIndex + 1}. ${exercise.name}${phase}: ${routineExerciseLine(exercise)}\n`;
+        });
+      } else if (record.category === "physical" && record.routinePlannedSets !== "") {
+        report += "   Detalle por ejercicio: no disponible en este registro anterior.\n";
+      }
       if (record.sensations) report += `   Sensaciones: ${record.sensations}\n`;
     });
   }
@@ -375,9 +425,18 @@ export function recordsToCSV(records) {
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
+    ["detalle_ejercicios", "routineExercisesExport"],
     ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];
-  for (const record of records.map(normalizeRecord)) rows.push(columns.map(([, key]) => csvCell(record[key])).join(","));
+  for (const record of records.map(normalizeRecord)) {
+    const csvRecord = {
+      ...record,
+      routineExercisesExport: record.routineExercises
+        .map((exercise, index) => `${index + 1}. ${exercise.name}: ${routineExerciseLine(exercise)}`)
+        .join(" | ")
+    };
+    rows.push(columns.map(([, key]) => csvCell(csvRecord[key])).join(","));
+  }
   return `\uFEFF${rows.join("\r\n")}`;
 }

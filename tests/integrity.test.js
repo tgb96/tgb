@@ -49,6 +49,13 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /AudioContext/);
   assert.match(app, /playTimerSound\("countdown"\)/);
   assert.match(app, /launchRoutineFromRegistration/);
+  assert.match(app, /Iniciar entrenamiento/);
+  assert.match(app, /Ver rutina/);
+  assert.match(app, /document\.createElement\("select"\)/);
+  assert.match(app, /Array\.from\(\{ length: 10 \}/);
+  assert.match(app, /routineExercises: summary\.exercises/);
+  const routineLauncher = app.match(/function launchRoutineFromRegistration\(routine\) \{([\s\S]*?)\n\}\n\nfunction finishRoutineSession/)?.[1] || "";
+  assert.doesNotMatch(routineLauncher, /startRoutineSession\(routine\)/);
   assert.match(app, /openRegistrationOrActiveRoutine/);
   assert.match(app, /activeSession\?\.status === "active"/);
   assert.match(app, /scrollToRoutineProgress/);
@@ -73,5 +80,5 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v26/);
+  assert.match(worker, /tgb-shell-v27/);
 });

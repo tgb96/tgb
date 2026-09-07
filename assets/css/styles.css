@@ -251,12 +251,13 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-controls { display: grid; grid-template-columns: 0.72fr 1.35fr 1fr; gap: 7px; margin-top: 13px; padding-top: 12px; border-top: 1px solid #dedfd9; }
 .exercise-controls label { min-width: 0; margin: 0; }
 .exercise-controls label > span { display: block; margin: 0 0 5px; color: var(--muted); font-size: 9px; font-weight: 850; }
-.exercise-controls input { min-height: 43px; padding: 9px; border-radius: 12px; font-size: 13px; }
+.exercise-controls input, .exercise-controls select { min-height: 43px; padding: 9px; border-radius: 12px; font-size: 13px; }
 .series-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px; margin-top: 12px; }
 .series-checks input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; opacity: 0; overflow: hidden; pointer-events: none; }
 .series-checks label { min-height: 39px; margin: 0; display: grid; place-items: center; border: 1px solid #d5d7dc; border-radius: 12px; background: white; color: var(--muted); font-size: 10px; cursor: pointer; }
 .series-checks input:checked + label { border-color: var(--blue); background: var(--blue); color: white; }
 .series-checks input:focus-visible + label { outline: 3px solid var(--blue); outline-offset: 2px; }
+.series-checks.locked label { opacity: 0.48; cursor: default; }
 
 .trekking-ranking-card { margin: -5px 0 16px; padding: 18px; border-radius: 25px; background: var(--night); color: white; box-shadow: 0 18px 35px rgba(17, 21, 34, 0.16); }
 .trekking-ranking-card .eyebrow { color: var(--lime); }
@@ -298,12 +299,20 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .history-entry { padding: 12px; border-radius: 17px; background: #f6f6f2; }
 .history-entry + .history-entry { margin-top: 7px; }
 .history-entry-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.history-entry-top > div:first-child { min-width: 0; flex: 1; }
 .history-entry h3 { margin: 0; font-size: 14px; }
 .history-entry p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .history-routine-balance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
 .history-routine-balance > div { min-width: 0; padding: 7px; border-radius: 10px; background: white; }
 .history-routine-balance strong { display: block; overflow-wrap: anywhere; font-size: 11px; font-variant-numeric: tabular-nums; }
 .history-routine-balance span { display: block; margin-top: 3px; color: var(--muted); font-size: 7px; font-weight: 850; text-transform: uppercase; }
+.history-exercise-details { margin-top: 9px; border-radius: 12px; background: white; overflow: hidden; }
+.history-exercise-details summary { padding: 10px; color: var(--blue-dark); font-size: 10px; font-weight: 900; cursor: pointer; }
+.history-exercise-details ol { margin: 0; padding: 0 10px 10px 29px; }
+.history-exercise-details li { padding: 8px 0; color: var(--ink); font-size: 10px; line-height: 1.4; }
+.history-exercise-details li + li { border-top: 1px solid var(--line); }
+.history-exercise-details li strong, .history-exercise-details li span { display: block; }
+.history-exercise-details li span { margin-top: 3px; color: var(--muted); }
 .entry-actions { display: flex; gap: 5px; }
 .entry-actions button { min-width: 40px; min-height: 40px; border: 0; border-radius: 12px; background: white; color: var(--muted); font-size: 11px; font-weight: 850; }
 .entry-actions .delete { color: var(--danger); }

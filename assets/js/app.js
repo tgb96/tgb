@@ -15,8 +15,8 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=26";
-import { createRepository } from "./storage.js?v=26";
+} from "./data.js?v=27";
+import { createRepository } from "./storage.js?v=27";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -28,11 +28,12 @@ import {
   recordDetails,
   recordTitle,
   recordsToCSV,
+  routineExerciseLine,
   trekkingBestTimes,
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=26";
+} from "./utils.js?v=27";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -234,9 +235,9 @@ function renderPhysicalFields(record = {}) {
     const heading = document.createElement("div");
     heading.className = "routine-launch-heading";
     const title = document.createElement("h2");
-    title.textContent = "Elige la rutina de hoy";
+    title.textContent = "Elige una rutina";
     const description = document.createElement("p");
-    description.textContent = "Al elegirla comenzará el cronómetro y podrás avanzar ejercicio por ejercicio y serie por serie.";
+    description.textContent = "Puedes revisar sus ejercicios y preparar tus implementos. El tiempo solo comenzará cuando pulses Iniciar entrenamiento.";
     heading.append(title, description);
     const grid = document.createElement("div");
     grid.className = "routine-launch-grid";
@@ -244,7 +245,7 @@ function renderPhysicalFields(record = {}) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "routine-launch-card";
-      button.setAttribute("aria-label", `Comenzar ${routine.name}`);
+      button.setAttribute("aria-label", `Ver ${routine.name}`);
       const number = document.createElement("span");
       number.className = "routine-launch-number";
       number.textContent = String(index + 1).padStart(2, "0");
@@ -256,7 +257,7 @@ function renderPhysicalFields(record = {}) {
       copy.append(name, focus);
       const action = document.createElement("span");
       action.className = "routine-launch-action";
-      action.textContent = "Comenzar →";
+      action.textContent = "Ver rutina →";
       button.append(number, copy, action);
       button.addEventListener("click", () => launchRoutineFromRegistration(routine));
       grid.append(button);
@@ -1090,6 +1091,7 @@ function formRecord() {
     routineTotalExercises: preserveRoutineBalance ? existing.routineTotalExercises : "",
     routineTotalReps: preserveRoutineBalance ? existing.routineTotalReps : "",
     routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
+    routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
     createdAt: existing?.createdAt || new Date().toISOString(),
@@ -1233,27 +1235,60 @@ function targetRepetitions(target) {
   return Number.isFinite(repetitions) ? repetitions * sideFactor : 0;
 }
 
-function routineSessionSummary(routine, progress, settings, dateISO) {
-  let completedSets = 0;
-  let plannedSets = 0;
-  let completedExercises = 0;
-  let startedExercises = 0;
-  let totalReps = 0;
-  let volumeKg = 0;
+function exerciseTargetMeta(exercise) {
+  const target = String(exercise.target || "").toLowerCase();
+  const qualifier = target.match(/por (lado|pierna|brazo)/)?.[0] || (target.includes("total") ? "total" : "");
+  if (/\b(seg|segundos?)\b/.test(target)) {
+    return { label: qualifier ? `Tiempo en segundos (${qualifier})` : "Tiempo en segundos", unit: "seg", qualifier };
+  }
+  if (/\b(min|minutos?)\b/.test(target)) {
+    return { label: qualifier ? `Tiempo en minutos (${qualifier})` : "Tiempo en minutos", unit: "min", qualifier };
+  }
+  return { label: qualifier ? `Repeticiones (${qualifier})` : "Repeticiones", unit: "", qualifier };
+}
 
-  routine.exercises.forEach(exercise => {
-    const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
-    const checkedSets = Array.from({ length: exerciseSettings.sets }, (_, setIndex) => setIndex)
-      .filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length;
-    const repsPerSet = targetRepetitions(exerciseSettings.target);
-    const weight = Number(exerciseSettings.weightKg) || 0;
-    plannedSets += exerciseSettings.sets;
-    completedSets += checkedSets;
-    if (checkedSets > 0) startedExercises += 1;
-    if (checkedSets === exerciseSettings.sets) completedExercises += 1;
-    totalReps += repsPerSet * checkedSets;
-    volumeKg += weight * repsPerSet * checkedSets;
-  });
+function editableTargetValue(target) {
+  const text = String(target || "");
+  const match = text.match(/\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?/);
+  return match?.[0]?.replaceAll(" ", "") || text;
+}
+
+function normalizedExerciseTarget(value, exercise) {
+  const raw = String(value || "").trim().slice(0, 20);
+  if (!raw) return "";
+  if (/[a-záéíóúñ]/i.test(raw)) return raw;
+  const meta = exerciseTargetMeta(exercise);
+  return [raw, meta.unit, meta.qualifier].filter(Boolean).join(" ");
+}
+
+function routineExerciseSnapshot(routine, exercise, progress, settings, dateISO) {
+  const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
+  const completedSetNumbers = Array.from({ length: exerciseSettings.sets }, (_, setIndex) => setIndex + 1)
+    .filter(setNumber => progress[routineProgressKey(dateISO, routine.id, exercise.id, setNumber - 1)]);
+  const repsPerSet = targetRepetitions(exerciseSettings.target);
+  const weight = Number(exerciseSettings.weightKg) || 0;
+  return {
+    id: exercise.id,
+    name: exercise.name,
+    phase: exercise.phase,
+    target: exerciseSettings.target,
+    weightKg: exerciseSettings.weightKg,
+    plannedSets: exerciseSettings.sets,
+    completedSets: completedSetNumbers.length,
+    completedSetNumbers,
+    totalReps: Math.round(repsPerSet * completedSetNumbers.length),
+    volumeKg: Math.round(weight * repsPerSet * completedSetNumbers.length * 100) / 100
+  };
+}
+
+function routineSessionSummary(routine, progress, settings, dateISO) {
+  const exercises = routine.exercises.map(exercise => routineExerciseSnapshot(routine, exercise, progress, settings, dateISO));
+  const completedSets = exercises.reduce((total, exercise) => total + exercise.completedSets, 0);
+  const plannedSets = exercises.reduce((total, exercise) => total + exercise.plannedSets, 0);
+  const completedExercises = exercises.filter(exercise => exercise.completedSets === exercise.plannedSets).length;
+  const startedExercises = exercises.filter(exercise => exercise.completedSets > 0).length;
+  const totalReps = exercises.reduce((total, exercise) => total + exercise.totalReps, 0);
+  const volumeKg = exercises.reduce((total, exercise) => total + exercise.volumeKg, 0);
 
   return {
     completedSets,
@@ -1262,7 +1297,8 @@ function routineSessionSummary(routine, progress, settings, dateISO) {
     startedExercises,
     totalExercises: routine.exercises.length,
     totalReps: Math.round(totalReps),
-    volumeKg: Math.round(volumeKg * 100) / 100
+    volumeKg: Math.round(volumeKg * 100) / 100,
+    exercises
   };
 }
 
@@ -1302,7 +1338,7 @@ function routineSettingsKey(routineId, exerciseId) {
 function currentExerciseSettings(routine, exercise, settings) {
   const saved = settings[routineSettingsKey(routine.id, exercise.id)] || {};
   const requestedSets = Number.parseInt(saved.sets ?? exercise.sets, 10);
-  const sets = Number.isFinite(requestedSets) ? Math.min(12, Math.max(1, requestedSets)) : exercise.sets;
+  const sets = Number.isFinite(requestedSets) ? Math.min(10, Math.max(1, requestedSets)) : Math.min(10, exercise.sets);
   const target = String(saved.target ?? exercise.target).slice(0, 40);
   const rawWeight = saved.weightKg ?? exercise.weightKg;
   const numericWeight = rawWeight === "" ? "" : Number(rawWeight);
@@ -1402,7 +1438,7 @@ function launchRoutineFromRegistration(routine) {
       : `Ya tienes ${activeRoutine?.name || "otra rutina"} en curso. Continúa o finalízala primero.`);
     return;
   }
-  startRoutineSession(routine);
+  openRoutineId = routine.id;
   showView("routines");
   scrollToRoutine(routine.id);
 }
@@ -1464,6 +1500,7 @@ function finishRoutineSession(routine) {
     routineTotalExercises: summary.totalExercises,
     routineTotalReps: summary.totalReps,
     routineVolumeKg: summary.volumeKg,
+    routineExercises: summary.exercises,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
     createdAt: session.startedAt,
@@ -1554,8 +1591,10 @@ function createRoutineSessionHeader(routine, session) {
     description.textContent = "El balance quedó guardado en tu historial.";
   } else {
     eyebrow.textContent = anotherActive ? "Otra rutina en curso" : "Lista para comenzar";
-    title.textContent = "Registra esta rutina completa";
-    description.textContent = "El cronómetro seguirá corriendo aunque cambies de pestaña.";
+    title.textContent = "Revisa y prepara tu entrenamiento";
+    description.textContent = anotherActive
+      ? "Puedes revisarla, pero primero debes finalizar la rutina que está en curso."
+      : "El cronómetro todavía no está corriendo. Puedes revisar los ejercicios y ajustar sus valores.";
   }
   copy.append(eyebrow, title, description);
 
@@ -1571,7 +1610,7 @@ function createRoutineSessionHeader(routine, session) {
   if (!isActive) {
     const start = document.createElement("button");
     start.type = "button";
-    start.textContent = isComplete ? "Iniciar otra" : "Iniciar";
+    start.textContent = isComplete ? "Iniciar otra" : "Iniciar entrenamiento";
     start.disabled = anotherActive;
     start.addEventListener("click", () => startRoutineSession(routine));
     action.append(start);
@@ -1735,6 +1774,7 @@ function renderRoutines() {
     objective.className = "routine-objective";
     objective.textContent = routine.objective;
     body.append(note, objective, createRoutineSessionHeader(routine, session));
+    const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
     routine.exercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
@@ -1781,18 +1821,21 @@ function renderRoutines() {
         wrapper.append(caption, input);
         return wrapper;
       };
-      const setsInput = document.createElement("input");
-      setsInput.type = "number";
-      setsInput.inputMode = "numeric";
-      setsInput.min = "1";
-      setsInput.max = "12";
-      setsInput.step = "1";
+      const setsInput = document.createElement("select");
+      Array.from({ length: 10 }, (_, index) => index + 1).forEach(value => {
+        const option = document.createElement("option");
+        option.value = String(value);
+        option.textContent = String(value);
+        setsInput.append(option);
+      });
       setsInput.value = String(exerciseSettings.sets);
       setsInput.setAttribute("aria-label", `Series de ${exercise.name}`);
       const targetInput = document.createElement("input");
       targetInput.type = "text";
-      targetInput.maxLength = 40;
-      targetInput.value = exerciseSettings.target;
+      targetInput.inputMode = "numeric";
+      targetInput.maxLength = 20;
+      targetInput.value = editableTargetValue(exerciseSettings.target);
+      targetInput.placeholder = editableTargetValue(exercise.target);
       targetInput.setAttribute("aria-label", `Repeticiones o tiempo de ${exercise.name}`);
       const weightInput = document.createElement("input");
       weightInput.type = "number";
@@ -1805,12 +1848,13 @@ function renderRoutines() {
       weightInput.setAttribute("aria-label", `Peso en kilos de ${exercise.name}`);
       controls.append(
         createControl({ labelText: "Series", input: setsInput }),
-        createControl({ labelText: "Reps / tiempo", input: targetInput }),
+        createControl({ labelText: exerciseTargetMeta(exercise).label, input: targetInput }),
         createControl({ labelText: "Peso (kg)", input: weightInput })
       );
 
       const series = document.createElement("div");
       series.className = "series-checks";
+      series.classList.toggle("locked", !isRoutineActive);
 
       const updateExerciseComplete = () => {
         const checkboxes = [...series.querySelectorAll('input[type="checkbox"]')];
@@ -1826,6 +1870,7 @@ function renderRoutines() {
           input.type = "checkbox";
           input.id = id;
           input.checked = Boolean(progress[key]);
+          input.disabled = !isRoutineActive;
           const label = document.createElement("label");
           label.htmlFor = id;
           label.textContent = `Serie ${setIndex + 1}`;
@@ -1842,22 +1887,22 @@ function renderRoutines() {
         updateExerciseComplete();
       };
       const persistExerciseSettings = () => {
-        const setCount = Math.min(12, Math.max(1, Number.parseInt(setsInput.value, 10) || exercise.sets));
-        const target = targetInput.value.trim().slice(0, 40) || exercise.target;
+        const setCount = Math.min(10, Math.max(1, Number.parseInt(setsInput.value, 10) || exercise.sets));
+        const target = normalizedExerciseTarget(targetInput.value, exercise);
         const enteredWeight = weightInput.value === "" ? "" : Number(weightInput.value);
         const weightKg = enteredWeight === "" || (Number.isFinite(enteredWeight) && enteredWeight >= 0) ? enteredWeight : exercise.weightKg;
         settings[routineSettingsKey(routine.id, exercise.id)] = { sets: setCount, target, weightKg };
         setsInput.value = String(setCount);
-        targetInput.value = target;
-        weightInput.value = weightKg;
         saveRoutineSettings(settings);
         renderSeries();
         updateCounter();
         updateRoutineSessionPreview(routine, progress, settings, dateISO);
       };
-      setsInput.addEventListener("input", persistExerciseSettings);
+      setsInput.addEventListener("change", persistExerciseSettings);
       targetInput.addEventListener("input", persistExerciseSettings);
+      targetInput.addEventListener("focus", () => targetInput.select());
       weightInput.addEventListener("input", persistExerciseSettings);
+      weightInput.addEventListener("focus", () => weightInput.select());
       renderSeries();
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
@@ -2025,6 +2070,24 @@ function createHistoryEntry(sourceRecord) {
       ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
     copy.append(balance);
+  }
+  if (record.category === "physical" && record.routineExercises.length) {
+    const exerciseDisclosure = document.createElement("details");
+    exerciseDisclosure.className = "history-exercise-details";
+    const exerciseSummary = document.createElement("summary");
+    exerciseSummary.textContent = "Ver ejercicios, cargas y repeticiones";
+    const exerciseList = document.createElement("ol");
+    record.routineExercises.forEach(exercise => {
+      const item = document.createElement("li");
+      const name = document.createElement("strong");
+      name.textContent = exercise.name;
+      const performed = document.createElement("span");
+      performed.textContent = routineExerciseLine(exercise);
+      item.append(name, performed);
+      exerciseList.append(item);
+    });
+    exerciseDisclosure.append(exerciseSummary, exerciseList);
+    copy.append(exerciseDisclosure);
   }
   const actions = document.createElement("div");
   actions.className = "entry-actions";
