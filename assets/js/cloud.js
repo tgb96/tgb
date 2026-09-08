@@ -1,4 +1,4 @@
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=28";
+import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=29";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -23,7 +23,14 @@ function publicUser(user) {
   } : null;
 }
 
-export function createCloudSync({ repository, storage, onStatus = () => {}, onDataChanged = () => {} }) {
+export function createCloudSync({
+  repository,
+  storage,
+  onStatus = () => {},
+  onDataChanged = () => {},
+  configuration = firebaseConfig,
+  isConfigured = firebaseConfigured
+}) {
   let modules = null;
   let app = null;
   let auth = null;
@@ -148,10 +155,10 @@ export function createCloudSync({ repository, storage, onStatus = () => {}, onDa
   }
 
   return {
-    get configured() { return firebaseConfigured; },
+    get configured() { return isConfigured; },
     get currentUser() { return publicUser(user); },
     async initialize() {
-      if (!firebaseConfigured) {
+      if (!isConfigured) {
         emit("unconfigured", "La conexión con Google está pendiente de activación.");
         return;
       }
@@ -159,7 +166,7 @@ export function createCloudSync({ repository, storage, onStatus = () => {}, onDa
         await loadFirebase();
         app = modules.appModule.getApps().length
           ? modules.appModule.getApp()
-          : modules.appModule.initializeApp(firebaseConfig);
+          : modules.appModule.initializeApp(configuration);
         auth = modules.authModule.getAuth(app);
         database = modules.firestoreModule.getFirestore(app);
         await modules.authModule.setPersistence(auth, modules.authModule.browserLocalPersistence);
@@ -169,7 +176,7 @@ export function createCloudSync({ repository, storage, onStatus = () => {}, onDa
       }
     },
     async signIn() {
-      if (!firebaseConfigured) throw new Error("La conexión con Google todavía no está activada.");
+      if (!isConfigured) throw new Error("La conexión con Google todavía no está activada.");
       if (!auth) await this.initialize();
       if (!auth) throw new Error("No fue posible iniciar la conexión con Google.");
       const provider = new modules.authModule.GoogleAuthProvider();

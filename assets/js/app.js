@@ -15,9 +15,9 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=28";
-import { createRepository } from "./storage.js?v=28";
-import { createCloudSync } from "./cloud.js?v=28";
+} from "./data.js?v=29";
+import { createRepository } from "./storage.js?v=29";
+import { createCloudSync } from "./cloud.js?v=29";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -34,7 +34,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=28";
+} from "./utils.js?v=29";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);

@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=28";
+} from "./data.js?v=29";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
