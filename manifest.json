@@ -1,6 +1,6 @@
 {
-  "name": "TGB",
-  "short_name": "TGB",
+  "name": "TGTrain",
+  "short_name": "TGTrain",
   "description": "Diario semanal personal para registrar entrenamiento físico, cardio y tenis.",
   "id": "./",
   "start_url": "./index.html",

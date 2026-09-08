@@ -1,14 +1,16 @@
-const CACHE_NAME = "tgb-shell-v27";
+const CACHE_NAME = "tgtrain-shell-v28";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./assets/css/styles.css?v=27",
-  "./assets/js/app.js?v=27",
-  "./assets/js/data.js?v=27",
-  "./assets/js/storage.js?v=27",
-  "./assets/js/utils.js?v=27",
+  "./assets/css/styles.css?v=28",
+  "./assets/js/app.js?v=28",
+  "./assets/js/data.js?v=28",
+  "./assets/js/storage.js?v=28",
+  "./assets/js/utils.js?v=28",
+  "./assets/js/cloud.js?v=28",
+  "./assets/js/firebase-config.js?v=28",
   "./icon-192.png",
   "./icon-512.png",
   "./icon.svg"

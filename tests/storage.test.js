@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 7/);
+  assert.match(repository.backup(), /"schemaVersion": 8/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -69,4 +69,19 @@ test("combina respaldos anteriores con el historial actual", () => {
   }] }));
   assert.equal(count, 1);
   assert.equal(repository.list().length, 2);
+});
+
+test("notifica cambios locales y aplica cambios de la nube sin duplicarlos", () => {
+  const repository = createRepository(new FakeStorage());
+  const changes = [];
+  const unsubscribe = repository.subscribe(change => changes.push(change));
+  repository.upsert(record(1));
+  repository.upsert({ ...record(1), durationMinutes: 75, updatedAt: "2026-09-08T12:00:00.000Z" });
+  assert.equal(changes.filter(change => change.type === "upsert").length, 2);
+  assert.equal(repository.applyCloudRecord({ ...record(1), durationMinutes: 90, updatedAt: "2026-09-08T13:00:00.000Z" }), true);
+  assert.equal(repository.get("record-1").durationMinutes, 90);
+  assert.equal(changes.length, 2);
+  assert.equal(repository.applyCloudDeletion("record-1", "2026-09-08T14:00:00.000Z"), true);
+  assert.equal(repository.get("record-1"), null);
+  unsubscribe();
 });

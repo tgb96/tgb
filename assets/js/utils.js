@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=27";
+} from "./data.js?v=28";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -351,7 +351,7 @@ export function weeklyReport(records, week) {
     return counts;
   }, {});
 
-  let report = `REGISTRO TGB — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
+  let report = `REGISTRO TGTRAIN — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
   report += "RESUMEN\n";
   report += `- Entrenamientos: ${trainings.length}\n`;

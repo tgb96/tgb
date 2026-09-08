@@ -5,29 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#111522">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="TGB">
+  <meta name="apple-mobile-web-app-title" content="TGTrain">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="Diario semanal personal de entrenamiento.">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=27">
-  <title>TGB · Diario de entrenamiento</title>
+  <link rel="stylesheet" href="assets/css/styles.css?v=28">
+  <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
 <body>
   <div id="updateBanner" class="update-banner hidden" role="status">
-    <span>Hay una versión nueva de TGB.</span>
+    <span>Hay una versión nueva de TGTrain.</span>
     <button id="updateButton" type="button">Actualizar</button>
   </div>
 
   <main class="app-shell">
     <header class="app-header">
       <button class="brand" type="button" data-view-target="home" aria-label="Ir al inicio">
-        <span class="brand-mark">T</span>
-        <span><strong>TGB</strong><small>Entrenamiento semanal</small></span>
+        <img class="brand-mark" src="icon.svg" alt="">
+        <span><strong>TGTrain</strong><small>Entrenamiento semanal</small></span>
       </button>
-      <span class="local-badge">Datos locales</span>
+      <button id="cloudStatusButton" class="cloud-status-button" type="button" aria-haspopup="dialog">
+        <span class="cloud-status-dot" aria-hidden="true"></span>
+        <span id="cloudStatusLabel">Datos locales</span>
+      </button>
     </header>
 
     <section id="viewHome" class="view" aria-labelledby="homeTitle">
@@ -186,7 +189,7 @@
         <div>
           <p class="eyebrow dark">Seguridad</p>
           <h2 id="dataTitle">Respalda tu historial</h2>
-          <p>Tus datos permanecen en este dispositivo. Guarda una copia periódicamente.</p>
+          <p>TGTrain conserva una copia local y, si inicias sesión, la sincroniza con tu cuenta. También puedes descargar un respaldo manual.</p>
         </div>
         <div class="data-actions">
           <button id="exportJsonButton" type="button">Respaldar JSON</button>
@@ -197,6 +200,27 @@
       </section>
     </section>
   </main>
+
+  <dialog id="cloudDialog" class="cloud-dialog" aria-labelledby="cloudDialogTitle">
+    <div class="cloud-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Cuenta y respaldo</p>
+        <h2 id="cloudDialogTitle">Tus datos en la nube</h2>
+      </div>
+      <button id="cloudDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div id="cloudIdentity" class="cloud-identity hidden">
+      <img id="cloudUserPhoto" alt="" referrerpolicy="no-referrer">
+      <div><strong id="cloudUserName"></strong><span id="cloudUserEmail"></span></div>
+    </div>
+    <p id="cloudMessage" class="cloud-message">Comprobando la conexión…</p>
+    <div class="cloud-actions">
+      <button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button>
+      <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
+      <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
+    </div>
+    <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
+  </dialog>
 
   <nav class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
@@ -215,6 +239,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=27"></script>
+  <script type="module" src="assets/js/app.js?v=28"></script>
 </body>
 </html>

@@ -19,6 +19,9 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /id="timerStageLabel"/);
   assert.match(html, /id="sensationSuggestions"/);
   assert.match(html, /id="registrationDateRow"/);
+  assert.match(html, /TGTrain/);
+  assert.match(html, /id="cloudStatusButton"/);
+  assert.match(html, /id="cloudDialog"/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
 });
@@ -77,8 +80,17 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgb-shell-v27/);
+  assert.match(worker, /tgtrain-shell-v28/);
+});
+
+test("el nombre y el logo corresponden a TGTrain", async () => {
+  const manifest = JSON.parse(await readFile(resolve(root, "manifest.json"), "utf8"));
+  const icon = await readFile(resolve(root, "icon.svg"), "utf8");
+  assert.equal(manifest.name, "TGTrain");
+  assert.equal(manifest.short_name, "TGTrain");
+  assert.match(icon, /TGTRAIN/);
+  assert.doesNotMatch(icon, />TGB</);
 });

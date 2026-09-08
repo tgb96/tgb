@@ -15,8 +15,9 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=27";
-import { createRepository } from "./storage.js?v=27";
+} from "./data.js?v=28";
+import { createRepository } from "./storage.js?v=28";
+import { createCloudSync } from "./cloud.js?v=28";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -33,10 +34,19 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=27";
+} from "./utils.js?v=28";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
+const cloudSync = createCloudSync({
+  repository,
+  storage: window.localStorage,
+  onStatus: updateCloudStatus,
+  onDataChanged: () => {
+    renderHome();
+    renderHistory();
+  }
+});
 
 let currentCategory = null;
 let editingRecordId = null;
@@ -47,6 +57,7 @@ let timerAudioContext = null;
 let timerLastCountdownSecond = null;
 let routineSessionTicker = null;
 let openRoutineId = "";
+let currentCloudStatus = { state: "unconfigured", user: null };
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -87,6 +98,62 @@ function showView(name) {
 function openRegistration() {
   resetRegistration();
   showView("register");
+}
+
+function updateCloudStatus(status) {
+  currentCloudStatus = status;
+  const button = $("cloudStatusButton");
+  const label = $("cloudStatusLabel");
+  if (!button || !label) return;
+  const stateLabels = {
+    unconfigured: "Activación pendiente",
+    "signed-out": "Datos locales",
+    syncing: "Sincronizando…",
+    synced: "En la nube",
+    offline: "Solo local",
+    error: "Error de nube",
+    "account-mismatch": "Revisa la cuenta"
+  };
+  button.className = `cloud-status-button ${status.state}`;
+  label.textContent = stateLabels[status.state] || "Datos locales";
+  $("cloudMessage").textContent = status.message || "";
+
+  const identity = $("cloudIdentity");
+  const hasUser = Boolean(status.user);
+  identity.classList.toggle("hidden", !hasUser);
+  if (hasUser) {
+    $("cloudUserName").textContent = status.user.displayName || "Cuenta de Google";
+    $("cloudUserEmail").textContent = status.user.email || "";
+    $("cloudUserPhoto").src = status.user.photoURL || "icon.svg";
+  }
+  $("cloudSignInButton").classList.toggle("hidden", hasUser);
+  $("cloudSignInButton").disabled = !cloudSync.configured || status.state === "syncing";
+  $("cloudSyncButton").classList.toggle("hidden", !hasUser || status.state === "account-mismatch");
+  $("cloudSignOutButton").classList.toggle("hidden", !hasUser);
+  $("cloudSyncButton").disabled = status.state === "syncing";
+}
+
+function openCloudDialog() {
+  updateCloudStatus(currentCloudStatus);
+  if (!$("cloudDialog").open) $("cloudDialog").showModal();
+}
+
+async function signInToCloud() {
+  try {
+    await cloudSync.signIn();
+  } catch (error) {
+    const cancelled = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code);
+    if (!cancelled) showToast(error?.message || "No fue posible iniciar sesión con Google.");
+  }
+}
+
+async function syncCloudNow() {
+  try {
+    await cloudSync.syncNow();
+    showToast("Datos sincronizados con Google.");
+  } catch (error) {
+    showToast(error?.message || "No fue posible sincronizar ahora.");
+  }
 }
 
 function openRegistrationOrActiveRoutine() {
@@ -2139,17 +2206,17 @@ function downloadText(filename, content, type = "text/plain;charset=utf-8") {
 }
 
 function downloadWeeklyReport(group) {
-  downloadText(`tgb-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group));
+  downloadText(`tgtrain-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group));
   showToast("Informe semanal descargado.");
 }
 
 function exportJSON() {
-  downloadText(`tgb-respaldo-${getChileDateISO()}.json`, repository.backup(), "application/json;charset=utf-8");
+  downloadText(`tgtrain-respaldo-${getChileDateISO()}.json`, repository.backup(), "application/json;charset=utf-8");
   showToast("Respaldo JSON descargado.");
 }
 
 function exportCSV() {
-  downloadText(`tgb-entrenamientos-${getChileDateISO()}.csv`, recordsToCSV(repository.list()), "text/csv;charset=utf-8");
+  downloadText(`tgtrain-entrenamientos-${getChileDateISO()}.csv`, recordsToCSV(repository.list()), "text/csv;charset=utf-8");
   showToast("Historial CSV descargado.");
 }
 
@@ -2220,6 +2287,13 @@ function bindEvents() {
   $("importJsonButton").addEventListener("click", () => $("backupFileInput").click());
   $("backupFileInput").addEventListener("change", importJSON);
   $("updateButton").addEventListener("click", () => waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" }));
+  $("cloudStatusButton").addEventListener("click", openCloudDialog);
+  $("cloudDialogClose").addEventListener("click", () => $("cloudDialog").close());
+  $("cloudSignInButton").addEventListener("click", signInToCloud);
+  $("cloudSyncButton").addEventListener("click", syncCloudNow);
+  $("cloudSignOutButton").addEventListener("click", async () => {
+    try { await cloudSync.signOut(); } catch { showToast("No fue posible cerrar la sesión."); }
+  });
   $("timerStartButton").addEventListener("click", startTimer);
   $("timerPauseButton").addEventListener("click", pauseTimer);
   $("timerResetButton").addEventListener("click", () => resetTimer(true));
@@ -2239,6 +2313,7 @@ function initialize() {
     showView("routines");
     scrollToRoutineProgress(activeSession.routineId);
   }
+  cloudSync.initialize();
   registerServiceWorker();
 }
 

@@ -1,6 +1,6 @@
-# TGB · Diario de entrenamiento
+# TGTrain · Entrenamiento semanal
 
-PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, organizada por semanas ISO de lunes a domingo.
+PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, organizada por semanas ISO de lunes a domingo y preparada para sincronizar el historial mediante una cuenta de Google.
 
 ## Experiencia principal
 
@@ -15,6 +15,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
+- Copia local para funcionamiento sin conexión y sincronización privada en Firestore al iniciar sesión con Google.
 
 ## Tipos de entrenamiento
 
@@ -55,11 +56,17 @@ Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20,
 
 ## Semanas e informes
 
-TGB utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe con resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
+TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe con resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
+
+## Cuenta de Google y nube
+
+TGTrain mantiene primero una copia local para continuar funcionando sin conexión. Una vez configurado Firebase, el botón de estado ubicado en el encabezado permite iniciar sesión con Google. En la primera conexión combina los registros del dispositivo con los de la cuenta; después, las altas, ediciones y eliminaciones se sincronizan automáticamente. Cada registro se guarda como un documento independiente para evitar que el historial completo dependa del límite de tamaño de un único documento.
+
+Las reglas incluidas en `firestore.rules` limitan cada historial al identificador privado del usuario autenticado. Un dispositivo ya vinculado no mezcla automáticamente su copia local con una cuenta diferente. La activación está documentada en `FIREBASE_SETUP.md`.
 
 ## Datos y migración
 
-Los registros permanecen en el navegador y no se envían a servidores. La versión actual usa el esquema 7 y migra automáticamente:
+Los registros permanecen disponibles en el navegador y, al iniciar sesión, se sincronizan con la nube de TGTrain bajo la cuenta de Google correspondiente. La versión actual usa el esquema 8 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.
@@ -72,7 +79,9 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 - `assets/css/styles.css`: diseño adaptable.
 - `assets/js/data.js`: categorías, rutinas y opciones.
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.
-- `assets/js/storage.js`: migración, validación y persistencia.
+- `assets/js/storage.js`: migración, validación, persistencia local y eventos de sincronización.
+- `assets/js/cloud.js`: autenticación con Google y sincronización con Firestore.
+- `assets/js/firebase-config.js`: configuración pública del proyecto Firebase.
 - `assets/js/app.js`: interacción de la aplicación.
 - `service-worker.js`: funcionamiento offline y actualizaciones.
 - `tests/`: pruebas de semanas, datos, migración e integridad.
