@@ -15,10 +15,11 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=32";
-import { createRepository } from "./storage.js?v=32";
-import { createCloudSync } from "./cloud.js?v=32";
+} from "./data.js?v=33";
+import { createRepository } from "./storage.js?v=33";
+import { createCloudSync } from "./cloud.js?v=33";
 import {
+  coachUpdateReport,
   dayIndexFromISO,
   formatLongDate,
   formatShortDate,
@@ -36,7 +37,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=32";
+} from "./utils.js?v=33";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -65,6 +66,8 @@ const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
+const COACH_CONVERSATION_URL_KEY = "tgb-coach-conversation-url-v1";
+const COACH_PENDING_BATCH_KEY = "tgb-coach-pending-batch-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
 const TIMER_REST_OPTIONS = [20, 30, 40, 50];
 const TIMER_PREP_SECONDS = 3;
@@ -1211,6 +1214,7 @@ function formRecord() {
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
+    coachSentAt: "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -1630,6 +1634,7 @@ function finishRoutineSession(routine) {
     routineExercises: summary.exercises,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
+    coachSentAt: "",
     createdAt: session.startedAt,
     updatedAt: endedAt
   };
@@ -2286,6 +2291,7 @@ function renderTrekkingRankings(records) {
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderCoachShare(records);
   renderPhysicalRankings(records);
   renderRunningRankings(records);
   renderTrekkingRankings(records);
@@ -2350,6 +2356,126 @@ function renderHistory() {
     details.append(summary, body);
     container.append(details);
   });
+}
+
+function loadCoachConversationUrl() {
+  return window.localStorage.getItem(COACH_CONVERSATION_URL_KEY) || "";
+}
+
+function loadCoachPendingBatch() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(COACH_PENDING_BATCH_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(item => item?.id && typeof item.updatedAt === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCoachPendingBatch(batch) {
+  if (batch.length) window.localStorage.setItem(COACH_PENDING_BATCH_KEY, JSON.stringify(batch));
+  else window.localStorage.removeItem(COACH_PENDING_BATCH_KEY);
+}
+
+function pendingCoachRecords(records = repository.list()) {
+  return records.map(normalizeRecord).filter(record => !record.coachSentAt);
+}
+
+function normalizeCoachConversationUrl(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "https://chatgpt.com/";
+  try {
+    const url = new URL(trimmed);
+    const allowedHosts = ["chatgpt.com", "www.chatgpt.com", "chat.openai.com"];
+    if (url.protocol !== "https:" || !allowedHosts.includes(url.hostname)) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function setCoachConversationPanel(open) {
+  $("coachConversationPanel").classList.toggle("hidden", !open);
+  $("coachConversationToggle").setAttribute("aria-expanded", String(open));
+  if (open) {
+    $("coachConversationUrl").value = loadCoachConversationUrl();
+    $("coachConversationUrl").focus();
+  }
+}
+
+function renderCoachShare(records = repository.list()) {
+  const pending = pendingCoachRecords(records);
+  const sentCount = records.length - pending.length;
+  const batch = loadCoachPendingBatch();
+  $("coachPendingCount").textContent = String(pending.length);
+  $("coachSendButton").disabled = pending.length === 0;
+  $("coachSendButton").textContent = pending.length
+    ? `Enviar ${pending.length} ${pending.length === 1 ? "registro nuevo" : "registros nuevos"}`
+    : "Todo está actualizado";
+  $("coachShareDescription").textContent = pending.length
+    ? "Se copiarán únicamente las actividades nuevas o modificadas desde tu última confirmación."
+    : "Tu entrenador ya tiene todo lo que registraste hasta ahora.";
+  $("coachConfirmPanel").classList.toggle("hidden", batch.length === 0);
+  $("coachBaselineButton").classList.toggle("hidden", !(records.length > 0 && sentCount === 0 && batch.length === 0));
+  $("coachConversationToggle").textContent = loadCoachConversationUrl() ? "Cambiar conversación" : "Configurar conversación";
+}
+
+function saveCoachConversation() {
+  const typed = $("coachConversationUrl").value;
+  const normalized = normalizeCoachConversationUrl(typed);
+  if (!normalized) {
+    showToast("Pega un enlace válido de chatgpt.com.");
+    $("coachConversationUrl").focus();
+    return;
+  }
+  if (typed.trim()) window.localStorage.setItem(COACH_CONVERSATION_URL_KEY, normalized);
+  else window.localStorage.removeItem(COACH_CONVERSATION_URL_KEY);
+  setCoachConversationPanel(false);
+  renderCoachShare();
+  showToast(typed.trim() ? "Conversación guardada." : "Se abrirá la página principal de ChatGPT.");
+}
+
+async function prepareCoachUpdate({ openConversation = true } = {}) {
+  const pending = pendingCoachRecords();
+  if (!pending.length) return showToast("No tienes registros nuevos para enviar.");
+  const report = coachUpdateReport(pending);
+  const batch = pending.map(record => ({ id: record.id, updatedAt: record.updatedAt }));
+  saveCoachPendingBatch(batch);
+  if (openConversation) {
+    const destination = normalizeCoachConversationUrl(loadCoachConversationUrl()) || "https://chatgpt.com/";
+    window.open(destination, "_blank", "noopener,noreferrer");
+  }
+  await copyText(report);
+  renderCoachShare();
+  showToast(`${pending.length} ${pending.length === 1 ? "registro copiado" : "registros copiados"}. Pégalos en tu conversación.`);
+}
+
+function confirmCoachUpdateSent() {
+  const batch = loadCoachPendingBatch();
+  if (!batch.length) return showToast("No hay una actualización pendiente de confirmar.");
+  const sentAt = new Date().toISOString();
+  let marked = 0;
+  batch.forEach(item => {
+    const current = repository.get(item.id);
+    if (!current || current.coachSentAt || current.updatedAt !== item.updatedAt) return;
+    repository.upsert({ ...current, coachSentAt: sentAt, updatedAt: sentAt });
+    marked += 1;
+  });
+  saveCoachPendingBatch([]);
+  renderHistory();
+  showToast(marked
+    ? `${marked} ${marked === 1 ? "registro marcado" : "registros marcados"} como enviados.`
+    : "Los registros cambiaron y seguirán pendientes para no perder información.");
+}
+
+function markCurrentHistoryAsKnown() {
+  const pending = pendingCoachRecords();
+  if (!pending.length) return;
+  if (!window.confirm(`Se marcarán ${pending.length} registros actuales como ya conocidos por tu entrenador. No se borrará ningún dato. ¿Continuar?`)) return;
+  const sentAt = new Date().toISOString();
+  pending.forEach(record => repository.upsert({ ...record, coachSentAt: sentAt, updatedAt: sentAt }));
+  saveCoachPendingBatch([]);
+  renderHistory();
+  showToast("Historial anterior marcado como ya compartido.");
 }
 
 function createHistoryEntry(sourceRecord) {
@@ -2529,6 +2655,12 @@ function bindEvents() {
   $("exportCsvButton").addEventListener("click", exportCSV);
   $("importJsonButton").addEventListener("click", () => $("backupFileInput").click());
   $("backupFileInput").addEventListener("change", importJSON);
+  $("coachSendButton").addEventListener("click", () => prepareCoachUpdate());
+  $("coachConversationToggle").addEventListener("click", () => setCoachConversationPanel($("coachConversationPanel").classList.contains("hidden")));
+  $("coachSaveConversationButton").addEventListener("click", saveCoachConversation);
+  $("coachConfirmSentButton").addEventListener("click", confirmCoachUpdateSent);
+  $("coachCopyAgainButton").addEventListener("click", () => prepareCoachUpdate({ openConversation: false }));
+  $("coachBaselineButton").addEventListener("click", markCurrentHistoryAsKnown);
   $("updateButton").addEventListener("click", () => waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" }));
   $("cloudStatusButton").addEventListener("click", openCloudDialog);
   $("cloudDialogClose").addEventListener("click", () => $("cloudDialog").close());
