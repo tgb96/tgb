@@ -272,6 +272,12 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-guidance:empty { display: none; }
 .exercise-guidance p { padding: 8px 9px; border-radius: 10px; background: white; color: #58606d; font-size: 10px; }
 .exercise-guidance .exercise-caution { background: #fff0dd; color: #7a4a10; }
+.abdominal-finisher { margin-top: 12px !important; border-color: #a8d62f; background: linear-gradient(145deg, #f5fbe7, #eef8d5); }
+.abdominal-finisher .exercise-phase { background: var(--lime); color: var(--night); }
+.abdominal-count-control { display: block; margin-top: 14px; padding-top: 12px; border-top: 1px solid #d4dfa8; }
+.abdominal-count-control > span { display: block; margin-bottom: 6px; color: var(--ink); font-size: 10px; font-weight: 900; }
+.abdominal-count-control input { min-height: 52px; background: white; font-size: 18px; font-weight: 900; }
+.abdominal-count-control input:disabled { opacity: 0.62; }
 .exercise-controls { display: grid; grid-template-columns: 0.72fr 1.35fr 1fr; gap: 7px; margin-top: 13px; padding-top: 12px; border-top: 1px solid #dedfd9; }
 .exercise-controls label { min-width: 0; margin: 0; }
 .exercise-controls label > span { display: block; margin: 0 0 5px; color: var(--muted); font-size: 9px; font-weight: 850; }
@@ -284,7 +290,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .series-checks.locked label { opacity: 0.48; cursor: default; }
 
 .trekking-ranking-card { margin: -5px 0 16px; padding: 18px; border-radius: 25px; background: var(--night); color: white; box-shadow: 0 18px 35px rgba(17, 21, 34, 0.16); }
-.running-ranking-card + .trekking-ranking-card { margin-top: 0; }
+.trekking-ranking-card + .trekking-ranking-card { margin-top: 0; }
 .trekking-ranking-card .eyebrow { color: var(--lime); }
 .trekking-ranking-card > h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -0.6px; }
 .trekking-ranking-card > p:not(.eyebrow) { margin: 6px 0 14px; color: rgba(255, 255, 255, 0.65); font-size: 11px; line-height: 1.45; }

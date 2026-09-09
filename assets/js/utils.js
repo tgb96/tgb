@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=31";
+} from "./data.js?v=32";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -192,6 +192,7 @@ export function normalizeRecord(record) {
     routineTotalExercises: optionalNumber(record?.routineTotalExercises, { min: 0 }),
     routineTotalReps: optionalNumber(record?.routineTotalReps, { min: 0 }),
     routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
+    routineAbsCount: optionalNumber(record?.routineAbsCount, { min: 0 }),
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
@@ -233,6 +234,7 @@ export function validateRecord(record) {
   if (normalized.distanceKm === null) errors.push("La distancia debe ser un número igual o mayor que cero.");
   if (normalized.elevationGainM === null) errors.push("El desnivel debe ser un número igual o mayor que cero.");
   if (normalized.ascentDurationSeconds === null) errors.push("El tiempo de subida debe ser válido.");
+  if (normalized.routineAbsCount === null) errors.push("La cantidad de abdominales debe ser un número igual o mayor que cero.");
   return { valid: errors.length === 0, errors, record: normalized };
 }
 
@@ -263,6 +265,7 @@ export function recordDetails(record) {
   if (normalized.category === "physical" && normalized.routinePlannedSets !== "") {
     details.push(`${normalized.routineCompletedSets}/${normalized.routinePlannedSets} series`);
     details.push(`${Number(normalized.routineVolumeKg || 0).toLocaleString("es-CL")} kg volumen`);
+    if (normalized.routineAbsCount !== "") details.push(`${normalized.routineAbsCount} abdominales`);
   }
   return details.join(" · ");
 }
@@ -364,6 +367,17 @@ export function runningBestTimes(records) {
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
+export function physicalBestRecords(records) {
+  const physical = records.map(normalizeRecord).filter(record => record.category === "physical");
+  const byHighestValue = key => physical
+    .filter(record => Number(record[key]) > 0)
+    .sort((a, b) => Number(b[key]) - Number(a[key]) || b.dateISO.localeCompare(a.dateISO));
+  return {
+    abdominals: byHighestValue("routineAbsCount"),
+    volume: byHighestValue("routineVolumeKg")
+  };
+}
+
 export function weeklyReport(records, week) {
   const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const trainings = normalized.filter(record => record.category !== "rest");
@@ -418,6 +432,7 @@ export function weeklyReport(records, week) {
         report += `   Ejercicios completados: ${record.routineCompletedExercises}/${record.routineTotalExercises}\n`;
         report += `   Repeticiones contabilizadas: ${record.routineTotalReps}\n`;
         report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
+        if (record.routineAbsCount !== "") report += `   Abdominales finales: ${record.routineAbsCount}\n`;
       }
       if (record.category === "physical" && record.routineExercises.length) {
         report += "   Ejercicios, cargas y repeticiones realizadas:\n";
@@ -450,7 +465,7 @@ export function recordsToCSV(records) {
     ["series_completadas", "routineCompletedSets"], ["series_planificadas", "routinePlannedSets"],
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
-    ["volumen_kg", "routineVolumeKg"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
+    ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
     ["detalle_ejercicios", "routineExercisesExport"],
     ["sensaciones", "sensations"]
   ];

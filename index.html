@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=31">
+  <link rel="stylesheet" href="assets/css/styles.css?v=32">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -176,6 +176,13 @@
         <span id="historyTotal" class="history-total"></span>
       </div>
 
+      <section class="trekking-ranking-card physical-ranking-card" aria-labelledby="physicalRankingTitle">
+        <p class="eyebrow dark">Progreso de fuerza</p>
+        <h2 id="physicalRankingTitle">Récords de tus rutinas</h2>
+        <p>Compara tus abdominales finales y el volumen total levantado en cada entrenamiento.</p>
+        <div id="physicalRankings" class="trekking-rankings"></div>
+      </section>
+
       <section class="trekking-ranking-card running-ranking-card" aria-labelledby="runningRankingTitle">
         <p class="eyebrow dark">Progreso en trote</p>
         <h2 id="runningRankingTitle">Mejores tiempos por distancia</h2>
@@ -246,6 +253,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=31"></script>
+  <script type="module" src="assets/js/app.js?v=32"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /id="cloudStatusButton"/);
   assert.match(html, /id="cloudDialog"/);
   assert.match(html, /id="runningRankings"/);
+  assert.match(html, /id="physicalRankings"/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
 });
@@ -79,6 +80,9 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /Elige al menos una sensación/);
   assert.match(app, /runningDistanceSelect/);
   assert.match(app, /renderRunningRankings/);
+  assert.match(app, /createRoutineAbsFinisher/);
+  assert.match(app, /routineAbsCount/);
+  assert.match(app, /renderPhysicalRankings/);
 });
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
@@ -86,7 +90,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v31/);
+  assert.match(worker, /tgtrain-shell-v32/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {

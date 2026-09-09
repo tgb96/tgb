@@ -15,9 +15,9 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=31";
-import { createRepository } from "./storage.js?v=31";
-import { createCloudSync } from "./cloud.js?v=31";
+} from "./data.js?v=32";
+import { createRepository } from "./storage.js?v=32";
+import { createCloudSync } from "./cloud.js?v=32";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -26,6 +26,7 @@ import {
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
+  physicalBestRecords,
   recordDetails,
   recordTitle,
   recordsToCSV,
@@ -35,7 +36,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=31";
+} from "./utils.js?v=32";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1206,6 +1207,7 @@ function formRecord() {
     routineTotalExercises: preserveRoutineBalance ? existing.routineTotalExercises : "",
     routineTotalReps: preserveRoutineBalance ? existing.routineTotalReps : "",
     routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
+    routineAbsCount: preserveRoutineBalance ? existing.routineAbsCount : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
@@ -1501,7 +1503,8 @@ function startRoutineSession(routine) {
     dateISO,
     startedAt: now,
     endedAt: "",
-    elapsedSeconds: 0
+    elapsedSeconds: 0,
+    absCount: ""
   });
   openRoutineId = routine.id;
   renderRoutines();
@@ -1536,7 +1539,7 @@ function scrollToRoutineProgress(routineId) {
     const target = targetState
       ? [...(routineCard?.querySelectorAll("[data-exercise-id]") || [])]
         .find(card => card.dataset.exerciseId === targetState.exercise.id)
-      : routineCard?.querySelector(".routine-finish-card");
+      : routineCard?.querySelector(".abdominal-finisher") || routineCard?.querySelector(".routine-finish-card");
     (target || routineCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
@@ -1562,9 +1565,11 @@ function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
   const caloriesInput = $(`routineCalories-${routine.id}`);
+  const absInput = $(`routineAbsCount-${routine.id}`);
   const sensationsInput = $(`routineSensations-${routine.id}`);
   const message = $(`routineFinishMessage-${routine.id}`);
   const calories = caloriesInput?.value === "" ? null : Number(caloriesInput?.value);
+  const absCount = absInput?.value === "" ? null : Number(absInput?.value);
   const sensations = sensationsInput?.value.trim() || "";
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
@@ -1573,6 +1578,12 @@ function finishRoutineSession(routine) {
   if (summary.completedSets === 0) {
     message.textContent = "Marca al menos una serie antes de finalizar.";
     message.classList.remove("hidden");
+    return;
+  }
+  if (absCount === null || !Number.isFinite(absCount) || absCount < 0) {
+    message.textContent = "Anota cuántos abdominales realizaste al terminar.";
+    message.classList.remove("hidden");
+    absInput?.focus();
     return;
   }
   if (calories === null || !Number.isFinite(calories) || calories < 0) {
@@ -1615,6 +1626,7 @@ function finishRoutineSession(routine) {
     routineTotalExercises: summary.totalExercises,
     routineTotalReps: summary.totalReps,
     routineVolumeKg: summary.volumeKg,
+    routineAbsCount: absCount,
     routineExercises: summary.exercises,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
@@ -1630,7 +1642,7 @@ function finishRoutineSession(routine) {
     return;
   }
 
-  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, sensations, recordId: record.id, summary });
+  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, sensations, absCount, recordId: record.id, summary });
   if (routineSessionTicker) clearInterval(routineSessionTicker);
   routineSessionTicker = null;
   openRoutineId = routine.id;
@@ -1649,7 +1661,7 @@ function balanceMetric(label, value) {
   return metric;
 }
 
-function routineBalanceGrid(summary, elapsedSeconds, calories, preview = false) {
+function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", preview = false) {
   const grid = document.createElement("div");
   grid.className = "routine-balance-grid";
   const metrics = [
@@ -1658,7 +1670,8 @@ function routineBalanceGrid(summary, elapsedSeconds, calories, preview = false) 
     ["Series", `${summary.completedSets}/${summary.plannedSets}`, "sets"],
     ["Ejercicios trabajados", `${summary.startedExercises}/${summary.totalExercises}`, "exercises"],
     ["Repeticiones", String(summary.totalReps), "reps"],
-    ["Volumen estimado", `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`, "volume"]
+    ["Volumen estimado", `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`, "volume"],
+    ["Abdominales", absCount === "" || absCount === null || absCount === undefined ? "—" : String(absCount), "abdominals"]
   ];
   metrics.forEach(([label, value, key]) => {
     const metric = balanceMetric(label, value);
@@ -1676,7 +1689,8 @@ function updateRoutineSessionPreview(routine, progress, settings, dateISO) {
     sets: `${summary.completedSets}/${summary.plannedSets}`,
     exercises: `${summary.startedExercises}/${summary.totalExercises}`,
     reps: String(summary.totalReps),
-    volume: `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`
+    volume: `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`,
+    abdominals: session.absCount === "" || session.absCount === undefined ? "—" : String(session.absCount)
   };
   Object.entries(values).forEach(([key, value]) => {
     const target = $(`routinePreview-${key}`)?.querySelector("strong");
@@ -1786,6 +1800,58 @@ function createRoutineSensationPicker(routine) {
   return box;
 }
 
+function createRoutineAbsFinisher(routine, session) {
+  const isCurrentRoutine = session?.routineId === routine.id;
+  const isActive = isCurrentRoutine && session.status === "active";
+  const card = document.createElement("article");
+  card.className = "exercise-card abdominal-finisher";
+  card.dataset.exerciseId = "abdominals-finisher";
+  const top = document.createElement("div");
+  top.className = "exercise-top";
+  const titleBox = document.createElement("div");
+  const phase = document.createElement("span");
+  phase.className = "exercise-phase";
+  phase.textContent = "Cierre · Récord personal";
+  const title = document.createElement("h3");
+  title.textContent = `${routine.exercises.length + 1}. Abdominales`;
+  titleBox.append(phase, title);
+  top.append(titleBox);
+  const description = document.createElement("p");
+  description.textContent = "Termina la rutina con abdominales y anota el total realizado para seguir superando tu mejor marca.";
+  const benefit = document.createElement("p");
+  benefit.className = "tennis-benefit";
+  const benefitLabel = document.createElement("strong");
+  benefitLabel.textContent = "Para el tenis: ";
+  benefit.append(benefitLabel, "refuerza el core para estabilizar golpes, frenadas y cambios de dirección.");
+  const control = document.createElement("label");
+  control.className = "abdominal-count-control";
+  control.htmlFor = `routineAbsCount-${routine.id}`;
+  const caption = document.createElement("span");
+  caption.textContent = "Total de abdominales realizados";
+  const input = document.createElement("input");
+  input.id = `routineAbsCount-${routine.id}`;
+  input.type = "number";
+  input.inputMode = "numeric";
+  input.min = "0";
+  input.max = "10000";
+  input.step = "1";
+  input.placeholder = isActive ? "Ej: 50" : "Disponible al iniciar";
+  input.value = isCurrentRoutine && session.absCount !== undefined ? session.absCount : "";
+  input.disabled = !isActive;
+  input.addEventListener("input", () => {
+    const current = loadRoutineSession();
+    if (!current || current.status !== "active" || current.routineId !== routine.id) return;
+    const value = input.value === "" ? "" : Math.max(0, Math.floor(Number(input.value) || 0));
+    if (input.value !== "") input.value = String(value);
+    saveRoutineSession({ ...current, absCount: value });
+    const preview = $("routinePreview-abdominals")?.querySelector("strong");
+    if (preview) preview.textContent = value === "" ? "—" : String(value);
+  });
+  control.append(caption, input);
+  card.append(top, description, benefit, control);
+  return card;
+}
+
 function createRoutineFinishPanel(routine, session, progress, settings, dateISO) {
   if (!session || session.routineId !== routine.id) return null;
   const panel = document.createElement("section");
@@ -1799,7 +1865,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     eyebrow.textContent = "Balance final";
     heading.textContent = "Entrenamiento registrado";
     copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
-    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories));
+    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount));
     const note = document.createElement("small");
     note.textContent = "Volumen estimado = peso anotado × repeticiones de las series marcadas. No incluye ejercicios por tiempo ni sin carga.";
     const history = document.createElement("button");
@@ -1835,7 +1901,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   finish.className = "routine-finish-button";
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", true), caloriesLabel, calories, sensations, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true), caloriesLabel, calories, sensations, message, finish);
   const note = document.createElement("small");
   note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
   panel.append(note);
@@ -2022,12 +2088,76 @@ function renderRoutines() {
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
+    body.append(createRoutineAbsFinisher(routine, session));
     const finishPanel = createRoutineFinishPanel(routine, session, progress, settings, dateISO);
     if (finishPanel) body.append(finishPanel);
     card.append(summary, body);
     container.append(card);
   });
   ensureRoutineSessionTicker();
+}
+
+function renderPhysicalRankings(records) {
+  const container = $("physicalRankings");
+  const rankings = physicalBestRecords(records);
+  container.replaceChildren();
+  if (!rankings.abdominals.length && !rankings.volume.length) {
+    const empty = document.createElement("div");
+    empty.className = "trekking-ranking-empty";
+    empty.textContent = "Cuando finalices una rutina, aquí aparecerán tus récords de abdominales y volumen de carga.";
+    container.append(empty);
+    return;
+  }
+
+  const addRanking = ({ titleText, attempts, valueFor }) => {
+    if (!attempts.length) return;
+    const details = document.createElement("details");
+    details.className = "trekking-ranking-group";
+    details.open = true;
+    const summary = document.createElement("summary");
+    const copy = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = titleText;
+    const count = document.createElement("p");
+    count.textContent = `${attempts.length} ${attempts.length === 1 ? "rutina registrada" : "rutinas registradas"}`;
+    copy.append(title, count);
+    const best = document.createElement("div");
+    const bestLabel = document.createElement("span");
+    bestLabel.textContent = "Récord";
+    const bestValue = document.createElement("strong");
+    bestValue.textContent = valueFor(attempts[0]);
+    best.append(bestLabel, bestValue);
+    summary.append(copy, best);
+    const list = document.createElement("ol");
+    list.className = "trekking-attempts";
+    attempts.forEach((attempt, index) => {
+      const item = document.createElement("li");
+      const position = document.createElement("span");
+      position.className = "trekking-position";
+      position.textContent = `#${index + 1}`;
+      const attemptCopy = document.createElement("div");
+      const value = document.createElement("strong");
+      value.textContent = valueFor(attempt);
+      const meta = document.createElement("small");
+      meta.textContent = `${formatShortDate(attempt.dateISO)} · ${attempt.routineName || "Entrenamiento físico"}`;
+      attemptCopy.append(value, meta);
+      item.append(position, attemptCopy);
+      list.append(item);
+    });
+    details.append(summary, list);
+    container.append(details);
+  };
+
+  addRanking({
+    titleText: "Abdominales finales",
+    attempts: rankings.abdominals,
+    valueFor: record => `${record.routineAbsCount} abdominales`
+  });
+  addRanking({
+    titleText: "Volumen total levantado",
+    attempts: rankings.volume,
+    valueFor: record => `${Number(record.routineVolumeKg).toLocaleString("es-CL")} kg`
+  });
 }
 
 function runningPace(rankingSeconds, distanceKm) {
@@ -2156,6 +2286,7 @@ function renderTrekkingRankings(records) {
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderPhysicalRankings(records);
   renderRunningRankings(records);
   renderTrekkingRankings(records);
   $("historyTotal").textContent = `${records.length} ${records.length === 1 ? "registro" : "registros"}`;
@@ -2245,7 +2376,8 @@ function createHistoryEntry(sourceRecord) {
       ["Series", `${record.routineCompletedSets}/${record.routinePlannedSets}`],
       ["Ejercicios", `${record.routineStartedExercises}/${record.routineTotalExercises}`],
       ["Reps", String(record.routineTotalReps || 0)],
-      ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`]
+      ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`],
+      ["Abdominales", record.routineAbsCount === "" ? "—" : String(record.routineAbsCount)]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
     copy.append(balance);
   }

@@ -6,6 +6,7 @@ import {
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
+  physicalBestRecords,
   recordDetails,
   recordsToCSV,
   runningBestTimes,
@@ -152,6 +153,17 @@ test("ordena los mejores tiempos de trote por distancia", () => {
   assert.deepEqual(groups[1].attempts.map(record => record.id), ["five-fast", "five-slow"]);
 });
 
+test("ordena los récords físicos de abdominales y volumen", () => {
+  const records = [
+    { ...physicalRecord, id: "first", routineAbsCount: 40, routineVolumeKg: 1200 },
+    { ...physicalRecord, id: "second", dateISO: "2026-08-27", routineAbsCount: 55, routineVolumeKg: 1100 },
+    { ...physicalRecord, id: "third", dateISO: "2026-08-28", routineAbsCount: 45, routineVolumeKg: 1500 }
+  ];
+  const rankings = physicalBestRecords(records);
+  assert.deepEqual(rankings.abdominals.map(record => record.id), ["second", "third", "first"]);
+  assert.deepEqual(rankings.volume.map(record => record.id), ["third", "first", "second"]);
+});
+
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
   const migrated = normalizeRecord({
     id: "old-1",
@@ -182,6 +194,7 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
     routineTotalExercises: 9,
     routineTotalReps: 210,
     routineVolumeKg: 1680,
+    routineAbsCount: 60,
     routineExercises: [{
       id: "unilateral-loaded-squat",
       name: "Sentadilla con carga unilateral",
@@ -200,15 +213,18 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
   assert.equal(record.routineCompletedSets, 24);
   assert.equal(record.routineVolumeKg, 1680);
   assert.equal(record.routineStartedExercises, 9);
+  assert.equal(record.routineAbsCount, 60);
   assert.equal(record.routineExercises[0].completedSetNumbers.join(","), "1,2,4");
   assert.match(routineExerciseLine(record.routineExercises[0]), /3\/4 series realizadas/);
   assert.match(routineExerciseLine(record.routineExercises[0]), /240 kg de volumen/);
   assert.match(recordDetails(record), /24\/28 series/);
   assert.match(recordDetails(record), /1\.680 kg volumen/);
+  assert.match(recordDetails(record), /60 abdominales/);
   const report = weeklyReport([record], isoWeekInfo(record.dateISO));
   assert.match(report, /Ejercicios, cargas y repeticiones realizadas/);
   assert.match(report, /Sentadilla con carga unilateral/);
   assert.match(report, /series marcadas: 1, 2, 4/);
+  assert.match(report, /Abdominales finales: 60/);
 });
 
 test("formatea duraciones exactas para trote, trekking y tenis", () => {
@@ -261,6 +277,7 @@ test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fór
   assert.match(csv, /Fuerza de piernas/);
   assert.match(csv, /tipo_tenis/);
   assert.match(csv, /detalle_ejercicios/);
+  assert.match(csv, /abdominales_finales/);
   assert.match(csv, /Remo a una mano/);
   assert.match(csv, /'=SUM/);
 });
