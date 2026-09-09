@@ -8,6 +8,7 @@ import {
   normalizeRecord,
   recordDetails,
   recordsToCSV,
+  runningBestTimes,
   routineExerciseLine,
   trekkingBestTimes,
   validateRecord,
@@ -130,6 +131,27 @@ test("ordena las mejores subidas por cerro y ruta", () => {
   assert.deepEqual(groups[0].attempts.map(record => record.id), ["fast", "slow"]);
 });
 
+test("ordena los mejores tiempos de trote por distancia", () => {
+  const base = {
+    ...physicalRecord,
+    category: "cardio",
+    categoryName: "Cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "running",
+    cardioTypeName: "Trote",
+    distanceKm: 5,
+    durationPrecision: "hms"
+  };
+  const groups = runningBestTimes([
+    { ...base, id: "five-slow", dateISO: "2026-08-20", durationSeconds: 2100 },
+    { ...base, id: "five-fast", dateISO: "2026-08-27", durationSeconds: 1800 },
+    { ...base, id: "three", distanceKm: 3, durationSeconds: 1200 }
+  ]);
+  assert.deepEqual(groups.map(group => group.label), ["3K", "5K"]);
+  assert.deepEqual(groups[1].attempts.map(record => record.id), ["five-fast", "five-slow"]);
+});
+
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
   const migrated = normalizeRecord({
     id: "old-1",
@@ -195,9 +217,11 @@ test("formatea duraciones exactas para trote, trekking y tenis", () => {
   assert.equal(formatDuration({ durationMinutes: 60, durationSeconds: 3600, durationPrecision: "minutes" }), "60 min");
 });
 
-test("formatea la distancia en kilómetros y metros", () => {
-  assert.equal(formatDistance(8.5), "08:500 (km:m)");
-  assert.equal(formatDistance(12.045), "12:045 (km:m)");
+test("formatea la distancia como marca de carrera legible", () => {
+  assert.equal(formatDistance(5), "5K");
+  assert.equal(formatDistance(10), "10K");
+  assert.equal(formatDistance(8.5), "8,5 km");
+  assert.equal(formatDistance(12.045), "12,045 km");
 });
 
 test("agrupa por semana y genera el informe completo de lunes a domingo", () => {

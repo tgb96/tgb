@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=30";
+} from "./data.js?v=31";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -214,6 +214,7 @@ export function validateRecord(record) {
   if (normalized.category === "cardio") {
     const cardio = cardioTypeById(normalized.cardioTypeId);
     if (!cardio) errors.push("Selecciona un tipo de cardio.");
+    if (cardio?.id === "running" && (normalized.distanceKm === "" || normalized.distanceKm === null || normalized.distanceKm <= 0)) errors.push("Selecciona la distancia del trote.");
     if (cardio?.id === "trekking" && !normalized.location.trim()) errors.push("Ingresa el cerro o lugar del trekking.");
     if (cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
     if (cardio?.id === "trekking" && (normalized.elevationGainM === "" || normalized.elevationGainM === null)) errors.push("Ingresa el desnivel del trekking.");
@@ -283,9 +284,8 @@ export function routineExerciseLine(exercise) {
 
 export function formatDistance(distanceKm) {
   const totalMeters = Math.max(0, Math.round((Number(distanceKm) || 0) * 1000));
-  const kilometers = Math.floor(totalMeters / 1000);
-  const meters = totalMeters % 1000;
-  return `${String(kilometers).padStart(2, "0")}:${String(meters).padStart(3, "0")} (km:m)`;
+  if (totalMeters % 1000 === 0) return `${totalMeters / 1000}K`;
+  return `${(totalMeters / 1000).toLocaleString("es-CL", { maximumFractionDigits: 3 })} km`;
 }
 
 export function formatDuration(record) {
@@ -336,6 +336,32 @@ export function trekkingBestTimes(records) {
       attempts: group.attempts.sort((a, b) => a.rankingSeconds - b.rankingSeconds || b.dateISO.localeCompare(a.dateISO))
     }))
     .sort((a, b) => a.location.localeCompare(b.location, "es") || a.route.localeCompare(b.route, "es"));
+}
+
+export function runningBestTimes(records) {
+  const groups = new Map();
+  records.map(normalizeRecord)
+    .filter(record => record.category === "cardio" && record.cardioTypeId === "running")
+    .forEach(record => {
+      const distanceMeters = Math.round((Number(record.distanceKm) || 0) * 1000);
+      const rankingSeconds = Number(record.durationSeconds) || Math.round((Number(record.durationMinutes) || 0) * 60);
+      if (distanceMeters <= 0 || rankingSeconds <= 0) return;
+      if (!groups.has(distanceMeters)) {
+        groups.set(distanceMeters, {
+          key: String(distanceMeters),
+          distanceKm: distanceMeters / 1000,
+          label: formatDistance(distanceMeters / 1000),
+          attempts: []
+        });
+      }
+      groups.get(distanceMeters).attempts.push({ ...record, rankingSeconds });
+    });
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      attempts: group.attempts.sort((a, b) => a.rankingSeconds - b.rankingSeconds || b.dateISO.localeCompare(a.dateISO))
+    }))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
 export function weeklyReport(records, week) {

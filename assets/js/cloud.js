@@ -1,4 +1,4 @@
-import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=30";
+import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=31";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;

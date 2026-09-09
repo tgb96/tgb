@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=30">
+  <link rel="stylesheet" href="assets/css/styles.css?v=31">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -176,6 +176,13 @@
         <span id="historyTotal" class="history-total"></span>
       </div>
 
+      <section class="trekking-ranking-card running-ranking-card" aria-labelledby="runningRankingTitle">
+        <p class="eyebrow dark">Progreso en trote</p>
+        <h2 id="runningRankingTitle">Mejores tiempos por distancia</h2>
+        <p>Tus marcas se ordenan automáticamente, separadas en 3K, 5K, 10K y cualquier otra distancia que registres.</p>
+        <div id="runningRankings" class="trekking-rankings"></div>
+      </section>
+
       <section class="trekking-ranking-card" aria-labelledby="trekkingRankingTitle">
         <p class="eyebrow dark">Progreso en cerros</p>
         <h2 id="trekkingRankingTitle">Mejores tiempos de subida</h2>
@@ -239,6 +246,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=30"></script>
+  <script type="module" src="assets/js/app.js?v=31"></script>
 </body>
 </html>

@@ -15,9 +15,9 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=30";
-import { createRepository } from "./storage.js?v=30";
-import { createCloudSync } from "./cloud.js?v=30";
+} from "./data.js?v=31";
+import { createRepository } from "./storage.js?v=31";
+import { createCloudSync } from "./cloud.js?v=31";
 import {
   dayIndexFromISO,
   formatLongDate,
@@ -29,12 +29,13 @@ import {
   recordDetails,
   recordTitle,
   recordsToCSV,
+  runningBestTimes,
   routineExerciseLine,
   trekkingBestTimes,
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=30";
+} from "./utils.js?v=31";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -414,6 +415,9 @@ function currentAscentDurationSeconds() {
 }
 
 function currentDistanceKm() {
+  const runningPreset = $("runningDistanceSelect")?.value;
+  if (runningPreset && runningPreset !== "other") return Number(runningPreset);
+  if (runningPreset === "") return "";
   if (!$("distanceKilometers") && !$("distanceMeters")) return "";
   const kilometers = Number($("distanceKilometers")?.value || 0);
   const meters = Number($("distanceMeters")?.value || 0);
@@ -526,11 +530,7 @@ function updateCardioExtraFields(values = {}) {
     }
   }
   if (cardio.distance) {
-    const label = document.createElement("label");
-    label.textContent = cardio.id === "trekking" ? "Distancia del trekking (KK:MMM)" : "Distancia (KK:MMM)";
     const distance = distanceParts(values.distanceKm);
-    const fields = document.createElement("div");
-    fields.className = "distance-parts";
     const createDistancePart = ({ id, value, max, caption }) => {
       const wrapper = document.createElement("div");
       const input = document.createElement("input");
@@ -548,11 +548,59 @@ function updateCardioExtraFields(values = {}) {
       wrapper.append(input, unit);
       return wrapper;
     };
-    fields.append(
-      createDistancePart({ id: "distanceKilometers", value: distance.kilometers, max: 999, caption: "km" }),
-      createDistancePart({ id: "distanceMeters", value: distance.meters, max: 999, caption: "m" })
-    );
-    box.append(label, fields);
+    const createDistanceFields = () => {
+      const fields = document.createElement("div");
+      fields.className = "distance-parts";
+      fields.append(
+        createDistancePart({ id: "distanceKilometers", value: distance.kilometers, max: 999, caption: "km" }),
+        createDistancePart({ id: "distanceMeters", value: distance.meters, max: 999, caption: "m" })
+      );
+      return fields;
+    };
+
+    if (cardio.id === "running") {
+      const label = document.createElement("label");
+      label.htmlFor = "runningDistanceSelect";
+      label.textContent = "Distancia del trote";
+      const select = document.createElement("select");
+      select.id = "runningDistanceSelect";
+      select.className = "running-distance-select";
+      select.required = true;
+      [
+        ["", "Selecciona una distancia"],
+        ["3", "3K"],
+        ["5", "5K"],
+        ["10", "10K"],
+        ["other", "Otra distancia"]
+      ].forEach(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        select.append(option);
+      });
+      const exactDistance = Number(values.distanceKm);
+      const knownDistance = [3, 5, 10].includes(exactDistance);
+      select.value = values.distanceKm === "" || values.distanceKm === null || values.distanceKm === undefined || exactDistance <= 0
+        ? ""
+        : knownDistance ? String(exactDistance) : "other";
+      const helper = document.createElement("small");
+      helper.className = "distance-helper";
+      helper.textContent = "El ranking de tiempos se separará automáticamente por distancia.";
+      const custom = document.createElement("div");
+      custom.className = "running-distance-custom";
+      custom.append(createDistanceFields());
+      const updateCustom = () => custom.classList.toggle("hidden", select.value !== "other");
+      select.addEventListener("change", updateCustom);
+      updateCustom();
+      box.append(label, select, helper, custom);
+    } else {
+      const label = document.createElement("label");
+      label.textContent = cardio.id === "trekking" ? "Distancia del trekking" : "Distancia recorrida";
+      const helper = document.createElement("small");
+      helper.className = "distance-helper";
+      helper.textContent = "Anota los kilómetros y metros por separado.";
+      box.append(label, helper, createDistanceFields());
+    }
   }
   if (cardio.id === "trekking") {
     const elevationLabel = document.createElement("label");
@@ -1982,6 +2030,68 @@ function renderRoutines() {
   ensureRoutineSessionTicker();
 }
 
+function runningPace(rankingSeconds, distanceKm) {
+  const secondsPerKm = Math.round(Number(rankingSeconds) / Number(distanceKm));
+  if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "";
+  const minutes = Math.floor(secondsPerKm / 60);
+  const seconds = secondsPerKm % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")} min/km`;
+}
+
+function renderRunningRankings(records) {
+  const container = $("runningRankings");
+  const groups = runningBestTimes(records);
+  container.replaceChildren();
+  if (!groups.length) {
+    const empty = document.createElement("div");
+    empty.className = "trekking-ranking-empty";
+    empty.textContent = "Cuando registres un trote de 3K, 5K o 10K, aquí aparecerán tus mejores tiempos.";
+    container.append(empty);
+    return;
+  }
+
+  groups.forEach((group, groupIndex) => {
+    const details = document.createElement("details");
+    details.className = "trekking-ranking-group";
+    details.open = groupIndex === 0;
+    const summary = document.createElement("summary");
+    const copy = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = group.label;
+    const count = document.createElement("p");
+    count.textContent = `${group.attempts.length} ${group.attempts.length === 1 ? "trote registrado" : "trotes registrados"}`;
+    copy.append(title, count);
+    const best = document.createElement("div");
+    const bestLabel = document.createElement("span");
+    bestLabel.textContent = "Mejor tiempo";
+    const bestTime = document.createElement("strong");
+    bestTime.textContent = formatTimerClock(group.attempts[0].rankingSeconds);
+    best.append(bestLabel, bestTime);
+    summary.append(copy, best);
+
+    const list = document.createElement("ol");
+    list.className = "trekking-attempts";
+    group.attempts.forEach((attempt, index) => {
+      const item = document.createElement("li");
+      const position = document.createElement("span");
+      position.className = "trekking-position";
+      position.textContent = `#${index + 1}`;
+      const attemptCopy = document.createElement("div");
+      const time = document.createElement("strong");
+      time.textContent = formatTimerClock(attempt.rankingSeconds);
+      const meta = document.createElement("small");
+      meta.textContent = [formatShortDate(attempt.dateISO), runningPace(attempt.rankingSeconds, group.distanceKm), `${attempt.calories || 0} kcal`]
+        .filter(Boolean)
+        .join(" · ");
+      attemptCopy.append(time, meta);
+      item.append(position, attemptCopy);
+      list.append(item);
+    });
+    details.append(summary, list);
+    container.append(details);
+  });
+}
+
 function renderTrekkingRankings(records) {
   const container = $("trekkingRankings");
   const groups = trekkingBestTimes(records);
@@ -2046,6 +2156,7 @@ function renderTrekkingRankings(records) {
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderRunningRankings(records);
   renderTrekkingRankings(records);
   $("historyTotal").textContent = `${records.length} ${records.length === 1 ? "registro" : "registros"}`;
   const container = $("historyWeeks");
