@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=34";
+} from "./data.js?v=35";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -196,7 +196,6 @@ export function normalizeRecord(record) {
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
-    coachSentAt: String(record?.coachSentAt || ""),
     createdAt: String(record?.createdAt || ""),
     updatedAt: String(record?.updatedAt || "")
   };
@@ -468,24 +467,6 @@ export function weeklyReport(records, week) {
   return report;
 }
 
-export function coachUpdateReport(records, preparedDateISO = getChileDateISO()) {
-  const pending = records
-    .map(normalizeRecord)
-    .filter(record => isValidISODate(record.dateISO) && !record.coachSentAt);
-  if (!pending.length) return "";
-
-  const groups = groupRecordsByWeek(pending).sort((a, b) => a.key.localeCompare(b.key));
-  const reports = groups.map(group => weeklyReport(pending, group).trim());
-  return [
-    "ACTUALIZACIÓN TGTRAIN PARA MI ENTRENADOR",
-    `Preparada: ${preparedDateISO}`,
-    `Registros nuevos: ${pending.length}`,
-    "Este informe contiene únicamente actividades nuevas o modificadas desde la última actualización confirmada.",
-    "",
-    ...reports
-  ].join("\n\n") + "\n";
-}
-
 function csvCell(value) {
   let text = value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@]/.test(text)) text = `'${text}`;
@@ -503,7 +484,7 @@ export function recordsToCSV(records) {
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
-    ["detalle_ejercicios", "routineExercisesExport"], ["enviado_entrenador", "coachSentAt"],
+    ["detalle_ejercicios", "routineExercisesExport"],
     ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];

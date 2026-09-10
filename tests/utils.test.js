@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  coachUpdateReport,
   formatDistance,
   formatDuration,
   groupRecordsByWeek,
@@ -281,34 +280,6 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
   assert.match(report, /Sin entrenamiento registrado/);
 });
 
-test("el informe del entrenador incluye solo registros nuevos o modificados", () => {
-  const alreadySent = { ...physicalRecord, id: "sent", coachSentAt: "2026-09-08T20:00:00.000Z" };
-  const newRunning = {
-    ...physicalRecord,
-    id: "running-new",
-    dateISO: "2026-09-08",
-    category: "cardio",
-    categoryName: "Cardio",
-    routineId: "",
-    routineName: "",
-    cardioTypeId: "running",
-    cardioTypeName: "Trote",
-    durationMinutes: 30,
-    durationSeconds: 1800,
-    durationPrecision: "hms",
-    distanceKm: 5,
-    calories: 250,
-    coachSentAt: ""
-  };
-  const report = coachUpdateReport([alreadySent, newRunning], "2026-09-09");
-  assert.match(report, /ACTUALIZACIÓN TGTRAIN PARA MI ENTRENADOR/);
-  assert.match(report, /Registros nuevos: 1/);
-  assert.match(report, /Trote/);
-  assert.match(report, /Distancia: 5K/);
-  assert.doesNotMatch(report, /Fuerza de piernas/);
-  assert.equal(coachUpdateReport([alreadySent], "2026-09-09"), "");
-});
-
 test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fórmulas", () => {
   const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)", routineExercises: [{
     name: "Remo a una mano", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3,
@@ -319,7 +290,6 @@ test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fór
   assert.match(csv, /tipo_tenis/);
   assert.match(csv, /detalle_ejercicios/);
   assert.match(csv, /abdominales_finales/);
-  assert.match(csv, /enviado_entrenador/);
   assert.match(csv, /Remo a una mano/);
   assert.match(csv, /'=SUM/);
 });

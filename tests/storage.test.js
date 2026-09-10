@@ -85,10 +85,3 @@ test("notifica cambios locales y aplica cambios de la nube sin duplicarlos", () 
   assert.equal(repository.get("record-1"), null);
   unsubscribe();
 });
-
-test("conserva la confirmación de envío al entrenador en local, nube y respaldo", () => {
-  const repository = createRepository(new FakeStorage());
-  repository.upsert({ ...record(1), coachSentAt: "2026-09-09T21:00:00.000Z" });
-  assert.equal(repository.get("record-1").coachSentAt, "2026-09-09T21:00:00.000Z");
-  assert.match(repository.backup(), /"coachSentAt": "2026-09-09T21:00:00.000Z"/);
-});

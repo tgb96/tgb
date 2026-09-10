@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="assets/css/styles.css?v=34">
+  <link rel="stylesheet" href="assets/css/styles.css?v=35">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -176,36 +176,6 @@
         <span id="historyTotal" class="history-total"></span>
       </div>
 
-      <section class="coach-share-card" aria-labelledby="coachShareTitle">
-        <div class="coach-share-heading">
-          <div>
-            <p class="eyebrow">Conexión con tu entrenador</p>
-            <h2 id="coachShareTitle">Actualizar a mi entrenador</h2>
-            <p id="coachShareDescription">TGTrain preparará únicamente los registros que todavía no hayas confirmado como enviados.</p>
-          </div>
-          <div class="coach-pending-badge">
-            <strong id="coachPendingCount">0</strong>
-            <span>pendientes</span>
-          </div>
-        </div>
-        <button id="coachSendButton" class="coach-send-button" type="button">Enviar a mi entrenador</button>
-        <button id="coachConversationToggle" class="coach-link-toggle" type="button" aria-expanded="false" aria-controls="coachConversationPanel">Configurar conversación</button>
-        <div id="coachConversationPanel" class="coach-conversation-panel hidden">
-          <label for="coachConversationUrl">Enlace de la conversación</label>
-          <input id="coachConversationUrl" type="url" inputmode="url" autocomplete="url" placeholder="https://chatgpt.com/c/…">
-          <small>Abre la conversación en el navegador y copia su dirección. Si no guardas un enlace, TGTrain abrirá la página principal de ChatGPT.</small>
-          <button id="coachSaveConversationButton" type="button">Guardar enlace</button>
-        </div>
-        <div id="coachConfirmPanel" class="coach-confirm-panel hidden" role="status">
-          <p>El informe quedó copiado. Pégalo en la conversación y, después de enviarlo, confirma aquí.</p>
-          <div>
-            <button id="coachConfirmSentButton" type="button">Ya lo envié</button>
-            <button id="coachCopyAgainButton" type="button">Copiar otra vez</button>
-          </div>
-        </div>
-        <button id="coachBaselineButton" class="coach-baseline-button hidden" type="button">Mi entrenador ya conoce estos registros</button>
-      </section>
-
       <section class="trekking-ranking-card physical-ranking-card" aria-labelledby="physicalRankingTitle">
         <p class="eyebrow dark">Progreso de fuerza</p>
         <h2 id="physicalRankingTitle">Récords de tus rutinas</h2>
@@ -283,6 +253,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=34"></script>
+  <script type="module" src="assets/js/app.js?v=35"></script>
 </body>
 </html>
