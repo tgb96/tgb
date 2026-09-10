@@ -15,9 +15,9 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=33";
-import { createRepository } from "./storage.js?v=33";
-import { createCloudSync } from "./cloud.js?v=33";
+} from "./data.js?v=34";
+import { createRepository } from "./storage.js?v=34";
+import { createCloudSync } from "./cloud.js?v=34";
 import {
   coachUpdateReport,
   dayIndexFromISO,
@@ -28,6 +28,7 @@ import {
   isoWeekInfo,
   normalizeRecord,
   physicalBestRecords,
+  physicalRoutineDurationAverages,
   recordDetails,
   recordTitle,
   recordsToCSV,
@@ -37,7 +38,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=33";
+} from "./utils.js?v=34";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -304,6 +305,7 @@ function createChoice({ name, value, title, description, checked }) {
 
 function renderPhysicalFields(record = {}) {
   if (!editingRecordId) {
+    const durationAverages = physicalRoutineDurationAverages(repository.list());
     const heading = document.createElement("div");
     heading.className = "routine-launch-heading";
     const title = document.createElement("h2");
@@ -322,11 +324,14 @@ function renderPhysicalFields(record = {}) {
       number.className = "routine-launch-number";
       number.textContent = String(index + 1).padStart(2, "0");
       const copy = document.createElement("span");
+      const nameLine = document.createElement("span");
+      nameLine.className = "routine-name-line";
       const name = document.createElement("strong");
       name.textContent = routine.name;
+      nameLine.append(name, createRoutineDurationBadge(routine, durationAverages));
       const focus = document.createElement("small");
       focus.textContent = routine.focus;
-      copy.append(name, focus);
+      copy.append(nameLine, focus);
       const action = document.createElement("span");
       action.className = "routine-launch-action";
       action.textContent = "Ver rutina →";
@@ -1805,6 +1810,17 @@ function createRoutineSensationPicker(routine) {
   return box;
 }
 
+function createRoutineDurationBadge(routine, averages) {
+  const average = averages.get(routine.id) || averages.get(routine.name);
+  const badge = document.createElement("span");
+  badge.className = "routine-duration-average";
+  badge.textContent = average ? `Duración aprox. ${average.minutes} min` : "Sin promedio aún";
+  badge.title = average
+    ? `Promedio calculado con ${average.sessions} ${average.sessions === 1 ? "entrenamiento" : "entrenamientos"}`
+    : "Aparecerá después de registrar esta rutina";
+  return badge;
+}
+
 function createRoutineAbsFinisher(routine, session) {
   const isCurrentRoutine = session?.routineId === routine.id;
   const isActive = isCurrentRoutine && session.status === "active";
@@ -1919,6 +1935,7 @@ function renderRoutines() {
   const dateISO = session?.status === "active" ? session.dateISO : getChileDateISO();
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
+  const durationAverages = physicalRoutineDurationAverages(repository.list());
   container.replaceChildren();
 
   physicalRoutines.forEach((routine, routineIndex) => {
@@ -1935,11 +1952,14 @@ function renderRoutines() {
     number.className = "routine-number";
     number.textContent = String(routineIndex + 1).padStart(2, "0");
     const summaryCopy = document.createElement("div");
+    const titleLine = document.createElement("div");
+    titleLine.className = "routine-name-line";
     const title = document.createElement("h2");
     title.textContent = routine.name;
+    titleLine.append(title, createRoutineDurationBadge(routine, durationAverages));
     const focus = document.createElement("p");
     focus.textContent = routine.focus;
-    summaryCopy.append(title, focus);
+    summaryCopy.append(titleLine, focus);
     const counter = document.createElement("span");
     counter.className = "routine-progress";
     const updateCounter = () => {
@@ -2135,7 +2155,7 @@ function renderPhysicalRankings(records) {
     summary.append(copy, best);
     const list = document.createElement("ol");
     list.className = "trekking-attempts";
-    attempts.forEach((attempt, index) => {
+    attempts.slice(0, 3).forEach((attempt, index) => {
       const item = document.createElement("li");
       const position = document.createElement("span");
       position.className = "trekking-position";
@@ -2440,13 +2460,13 @@ async function prepareCoachUpdate({ openConversation = true } = {}) {
   const report = coachUpdateReport(pending);
   const batch = pending.map(record => ({ id: record.id, updatedAt: record.updatedAt }));
   saveCoachPendingBatch(batch);
-  if (openConversation) {
-    const destination = normalizeCoachConversationUrl(loadCoachConversationUrl()) || "https://chatgpt.com/";
-    window.open(destination, "_blank", "noopener,noreferrer");
-  }
   await copyText(report);
   renderCoachShare();
   showToast(`${pending.length} ${pending.length === 1 ? "registro copiado" : "registros copiados"}. Pégalos en tu conversación.`);
+  if (openConversation) {
+    const destination = normalizeCoachConversationUrl(loadCoachConversationUrl()) || "https://chatgpt.com/";
+    window.location.assign(destination);
+  }
 }
 
 function confirmCoachUpdateSent() {

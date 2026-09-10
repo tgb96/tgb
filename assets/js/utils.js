@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=33";
+} from "./data.js?v=34";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -377,6 +377,24 @@ export function physicalBestRecords(records) {
     abdominals: byHighestValue("routineAbsCount"),
     volume: byHighestValue("routineVolumeKg")
   };
+}
+
+export function physicalRoutineDurationAverages(records) {
+  const totals = new Map();
+  records.map(normalizeRecord)
+    .filter(record => record.category === "physical" && Number(record.durationMinutes) > 0)
+    .forEach(record => {
+      const key = record.routineId || record.routineName;
+      if (!key) return;
+      const current = totals.get(key) || { totalMinutes: 0, sessions: 0 };
+      current.totalMinutes += Number(record.durationMinutes);
+      current.sessions += 1;
+      totals.set(key, current);
+    });
+  return new Map([...totals].map(([key, value]) => [key, {
+    minutes: Math.max(1, Math.round(value.totalMinutes / value.sessions)),
+    sessions: value.sessions
+  }]));
 }
 
 export function weeklyReport(records, week) {

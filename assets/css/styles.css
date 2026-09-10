@@ -139,6 +139,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .routine-launch-card strong, .routine-launch-card small { display: block; }
 .routine-launch-card strong { font-size: 14px; line-height: 1.25; }
 .routine-launch-card small { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.routine-name-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.routine-duration-average { display: inline-flex !important; width: fit-content; margin: 0 !important; padding: 5px 7px; border-radius: 9px; background: #eaf0ff; color: var(--blue-dark) !important; font-size: 8px !important; font-weight: 900; line-height: 1 !important; white-space: nowrap; }
 .routine-launch-action { color: var(--blue); font-size: 10px; font-weight: 900; white-space: nowrap; }
 .category-icon.rest { color: #d8bfff; }
 

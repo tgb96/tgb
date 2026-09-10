@@ -8,6 +8,7 @@ import {
   isoWeekInfo,
   normalizeRecord,
   physicalBestRecords,
+  physicalRoutineDurationAverages,
   recordDetails,
   recordsToCSV,
   runningBestTimes,
@@ -163,6 +164,17 @@ test("ordena los récords físicos de abdominales y volumen", () => {
   const rankings = physicalBestRecords(records);
   assert.deepEqual(rankings.abdominals.map(record => record.id), ["second", "third", "first"]);
   assert.deepEqual(rankings.volume.map(record => record.id), ["third", "first", "second"]);
+});
+
+test("calcula la duración promedio de cada rutina física", () => {
+  const averages = physicalRoutineDurationAverages([
+    { ...physicalRecord, id: "avg-1", durationMinutes: 45 },
+    { ...physicalRecord, id: "avg-2", durationMinutes: 56 },
+    { ...physicalRecord, id: "ignored-cardio", category: "cardio", durationMinutes: 100 },
+    { ...physicalRecord, id: "upper-1", routineId: "upper", routineName: "Tren superior", durationMinutes: 61 }
+  ]);
+  assert.deepEqual(averages.get("legs"), { minutes: 51, sessions: 2 });
+  assert.deepEqual(averages.get("upper"), { minutes: 61, sessions: 1 });
 });
 
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
