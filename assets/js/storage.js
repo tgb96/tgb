@@ -1,4 +1,4 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=40";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=41";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";

@@ -19,7 +19,6 @@ import {
   validateRecord,
   weekDays,
   weeklyEvolution,
-  weeklyPlanProgress,
   weeklyReport
 } from "../assets/js/utils.js";
 
@@ -340,24 +339,13 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
   const groups = groupRecordsByWeek([physicalRecord, tennis]);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].weekNumber, 35);
-  const plan = {
-    weekKey: groups[0].key,
-    days: {
-      "2026-08-24": { activityId: "physical:legs", label: "Día 1 · Piernas" },
-      "2026-08-26": { activityId: "tennis", label: "Tenis" }
-    }
-  };
-  const planProgress = weeklyPlanProgress([physicalRecord, tennis], groups[0], plan);
-  assert.deepEqual({ planned: planProgress.planned, completed: planProgress.completed }, { planned: 2, completed: 2 });
-  const report = weeklyReport([physicalRecord, tennis], groups[0], plan);
+  const report = weeklyReport([physicalRecord, tennis], groups[0]);
   assert.match(report, /SEMANA 35 DE 2026/);
   assert.match(report, /Tiempo total: 150 min/);
   assert.match(report, /LUNES 2026-08-24/);
   assert.match(report, /DOMINGO 2026-08-30/);
   assert.match(report, /Tipo de tenis: Peloteo amistoso/);
   assert.match(report, /RESUMEN PARA EL ENTRENADOR/);
-  assert.match(report, /Cumplimiento del plan: 2\/2 actividades/);
-  assert.match(report, /PLAN SEMANAL/);
   assert.match(report, /Sin entrenamiento registrado/);
 });
 

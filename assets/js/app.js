@@ -16,7 +16,7 @@ import {
   trekkingRoutes,
   trainingCategories
 } from "./data.js?v=38";
-import { createRepository } from "./storage.js?v=40";
+import { createRepository } from "./storage.js?v=41";
 import { createCloudSync } from "./cloud.js?v=40";
 import {
   dayIndexFromISO,
@@ -29,7 +29,6 @@ import {
   normalizeRecord,
   physicalBestRecords,
   physicalRoutineDurationAverages,
-  planMatchesRecord,
   recordDetails,
   recordTitle,
   recordsToCSV,
@@ -40,9 +39,8 @@ import {
   validateRecord,
   weekDays,
   weeklyEvolution,
-  weeklyPlanProgress,
   weeklyReport
-} from "./utils.js?v=40";
+} from "./utils.js?v=41";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -192,7 +190,6 @@ function renderHome() {
   $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
   $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
-  renderWeeklyPlan(week, records, todayISO);
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
@@ -1475,64 +1472,6 @@ function currentExerciseSettings(routine, exercise, settings) {
   return { sets, target, weightKg };
 }
 
-function weeklyPlanOptions() {
-  return [
-    { id: "", label: "Sin actividad planificada" },
-    ...physicalRoutines.map(routine => ({ id: `physical:${routine.id}`, label: routine.name })),
-    ...cardioTypes.map(cardio => ({ id: `cardio:${cardio.id}`, label: `Cardio · ${cardio.name}` })),
-    { id: "tennis", label: "Tenis" },
-    { id: "rest", label: "Descanso" }
-  ];
-}
-
-function renderWeeklyPlan(week, records, todayISO) {
-  const container = $("weeklyPlanDays");
-  const plan = repository.getWeekPlan(week.key) || { weekKey: week.key, days: {} };
-  const progress = weeklyPlanProgress(records, week, plan);
-  $("weeklyPlanProgress").textContent = progress.planned ? `${progress.completed}/${progress.planned} cumplidas` : "Sin plan";
-  container.replaceChildren();
-  const options = weeklyPlanOptions();
-
-  weekDays(week.startISO).forEach(dateISO => {
-    const planned = plan.days?.[dateISO] || null;
-    const complete = planned && records.some(record => record.dateISO === dateISO && planMatchesRecord(planned.activityId, record));
-    const row = document.createElement("div");
-    row.className = "weekly-plan-day";
-    row.classList.toggle("today", dateISO === todayISO);
-    row.classList.toggle("complete", Boolean(complete));
-    const date = document.createElement("div");
-    date.className = "weekly-plan-date";
-    const name = document.createElement("strong");
-    name.textContent = dayNamesShort[dayIndexFromISO(dateISO)];
-    const number = document.createElement("span");
-    number.textContent = String(Number(dateISO.slice(-2)));
-    date.append(name, number);
-    const select = document.createElement("select");
-    select.setAttribute("aria-label", `Plan para ${dayNamesFull[dayIndexFromISO(dateISO)]}`);
-    options.forEach(option => {
-      const element = document.createElement("option");
-      element.value = option.id;
-      element.textContent = option.label;
-      select.append(element);
-    });
-    select.value = planned?.activityId || "";
-    select.addEventListener("change", () => {
-      const days = { ...(repository.getWeekPlan(week.key)?.days || {}) };
-      const selected = options.find(option => option.id === select.value);
-      if (!selected?.id) delete days[dateISO];
-      else days[dateISO] = { activityId: selected.id, label: selected.label };
-      repository.saveWeekPlan({ weekKey: week.key, days, updatedAt: new Date().toISOString() });
-      renderHome();
-      showToast(selected?.id ? "Plan semanal actualizado." : "Día liberado del plan.");
-    });
-    const status = document.createElement("span");
-    status.className = "weekly-plan-status";
-    status.textContent = !planned ? "Libre" : complete ? "Cumplido" : dateISO < todayISO ? "Pendiente" : dateISO === todayISO ? "Para hoy" : "Planificado";
-    row.append(date, select, status);
-    container.append(row);
-  });
-}
-
 function routineSettingsSnapshot(routine, settings) {
   return Object.fromEntries(routine.exercises.map(exercise => [
     exercise.id,
@@ -2748,7 +2687,7 @@ async function copyText(text) {
 }
 
 async function copyWeeklyReport(group) {
-  await copyText(weeklyReport(repository.list(), group, repository.getWeekPlan(group.key)));
+  await copyText(weeklyReport(repository.list(), group));
   showToast(`Informe de la semana ${group.weekNumber} copiado.`);
 }
 
@@ -2765,7 +2704,7 @@ function downloadText(filename, content, type = "text/plain;charset=utf-8") {
 }
 
 function downloadWeeklyReport(group) {
-  downloadText(`tgtrain-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group, repository.getWeekPlan(group.key)));
+  downloadText(`tgtrain-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group));
   showToast("Informe semanal descargado.");
 }
 

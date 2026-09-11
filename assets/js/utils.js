@@ -454,29 +454,6 @@ export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6)
   });
 }
 
-export function planMatchesRecord(activityId, sourceRecord) {
-  const record = normalizeRecord(sourceRecord);
-  const [category, detail = ""] = String(activityId || "").split(":");
-  if (!category || record.category !== category) return false;
-  if (category === "physical" && detail) return record.routineId === detail;
-  if (category === "cardio" && detail) return record.cardioTypeId === detail;
-  return true;
-}
-
-export function weeklyPlanProgress(records, week, plan = null) {
-  const weekRecords = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
-  const items = Object.entries(plan?.days || {}).map(([dateISO, item]) => ({
-    dateISO,
-    ...item,
-    complete: weekRecords.some(record => record.dateISO === dateISO && planMatchesRecord(item.activityId, record))
-  })).sort((a, b) => a.dateISO.localeCompare(b.dateISO));
-  return {
-    items,
-    planned: items.length,
-    completed: items.filter(item => item.complete).length
-  };
-}
-
 export function routineCompletionSummary(sourceRecord, previousRecords = []) {
   const record = normalizeRecord(sourceRecord);
   if (record.category !== "physical") return "";
@@ -509,7 +486,7 @@ export function routineCompletionSummary(sourceRecord, previousRecords = []) {
   return insights.join(" ");
 }
 
-export function weeklyReport(records, week, plan = null) {
+export function weeklyReport(records, week) {
   const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const trainings = normalized.filter(record => record.category !== "rest");
   const restDays = normalized.filter(record => record.category === "rest");
@@ -526,7 +503,6 @@ export function weeklyReport(records, week, plan = null) {
   const previousMinutes = previous.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
   const sessionDifference = trainings.length - previous.length;
   const minuteDifference = Math.round(totalMinutes - previousMinutes);
-  const planProgress = weeklyPlanProgress(records, week, plan);
 
   let report = `REGISTRO TGTRAIN — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
@@ -539,14 +515,6 @@ export function weeklyReport(records, week, plan = null) {
   report += `- Desnivel registrado: ${totalElevation} m\n`;
   for (const [category, count] of Object.entries(categoryCounts)) report += `- ${category}: ${count}\n`;
   report += `- Comparación con la semana anterior: ${sessionDifference >= 0 ? "+" : ""}${sessionDifference} sesiones y ${minuteDifference >= 0 ? "+" : ""}${minuteDifference} min\n`;
-  if (planProgress.planned) report += `- Cumplimiento del plan: ${planProgress.completed}/${planProgress.planned} actividades (${Math.round((planProgress.completed / planProgress.planned) * 100)}%)\n`;
-
-  if (planProgress.planned) {
-    report += "\nPLAN SEMANAL\n";
-    planProgress.items.forEach(item => {
-      report += `- ${dayNamesFull[dayIndexFromISO(item.dateISO)]} ${item.dateISO}: ${item.label} — ${item.complete ? "realizado" : "pendiente"}\n`;
-    });
-  }
 
   report += "\nDETALLE DE LA SEMANA\n";
   for (const dateISO of weekDays(week.startISO)) {
