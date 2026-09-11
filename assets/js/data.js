@@ -15,7 +15,7 @@ export const trainingCategories = [
     id: "cardio",
     name: "Cardio",
     shortName: "Cardio",
-    description: "Resistencia en bicicleta, trote, caminata o trekking.",
+    description: "Bicicleta, trote, caminata, trekking o pádel.",
     accent: "coral"
   },
   {
@@ -122,7 +122,8 @@ export const cardioTypes = [
   { id: "stationary-bike", name: "Bicicleta estática", description: "Sesión en bicicleta fija", distance: false },
   { id: "running", name: "Trote", description: "Trote continuo o por intervalos", distance: true },
   { id: "walking", name: "Caminata", description: "Caminata suave o rápida", distance: true },
-  { id: "trekking", name: "Trekking", description: "Cerro, sendero o ruta", distance: true, location: true }
+  { id: "trekking", name: "Trekking", description: "Cerro, sendero o ruta", distance: true, location: true },
+  { id: "padel", name: "Pádel", description: "Sesión ocasional de pádel", distance: false }
 ];
 
 export const trekkingLocations = ["Cerro La Región", "Cerro El Carbón", "Cerro Manquehue", "Cerro San Cristóbal"];

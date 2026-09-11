@@ -9,6 +9,7 @@ import {
   physicalBestRecords,
   physicalRoutineDurationAverages,
   recordDetails,
+  recordTitle,
   recordsToCSV,
   runningBestTimes,
   routineExerciseLine,
@@ -49,6 +50,20 @@ test("las semanas respetan el año ISO en cambios de año", () => {
 
 test("valida entrenamientos, descansos y campos especiales", () => {
   assert.equal(validateRecord(physicalRecord).valid, true);
+  const padel = validateRecord({
+    ...physicalRecord,
+    id: "padel-1",
+    category: "cardio",
+    categoryName: "Cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "padel",
+    cardioTypeName: "Pádel",
+    durationSeconds: 3600,
+    durationPrecision: "hms"
+  });
+  assert.equal(padel.valid, true);
+  assert.equal(recordTitle(padel.record), "Pádel");
   assert.equal(validateRecord({
     ...physicalRecord,
     id: "trekking-1",

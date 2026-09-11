@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=35";
+} from "./data.js?v=38";
 import { createRepository } from "./storage.js?v=37";
 import { createCloudSync } from "./cloud.js?v=35";
 import {

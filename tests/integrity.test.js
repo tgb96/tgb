@@ -34,7 +34,13 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.equal(data.physicalRoutines.length, 4);
   assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [9, 12, 10, 11]);
   assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
-  assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking"]);
+  assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking", "padel"]);
+  assert.deepEqual(data.cardioTypes.find(type => type.id === "padel"), {
+    id: "padel",
+    name: "Pádel",
+    description: "Sesión ocasional de pádel",
+    distance: false
+  });
   assert.deepEqual(data.tennisSurfaces, ["Arcilla", "Cemento"]);
   assert.deepEqual(data.tennisTypes.map(type => type.name), ["Entrenamiento grupal", "Partido", "Frontón", "Peloteo amistoso"]);
   assert.ok(data.trekkingLocations.includes("Cerro El Carbón"));
@@ -95,7 +101,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v37/);
+  assert.match(worker, /tgtrain-shell-v38/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {
