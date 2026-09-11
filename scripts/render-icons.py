@@ -1,27 +1,49 @@
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+
+from PIL import Image
+
 
 ROOT = Path(__file__).resolve().parents[1]
-SIZE = 512
+SOURCE = ROOT / "assets" / "brand" / "tgtrain-mark-v2.png"
+NAVY = (4, 35, 78, 255)
 
 
-def font(size):
-    candidates = [Path("C:/Windows/Fonts/arialbd.ttf"), Path("C:/Windows/Fonts/segoeuib.ttf")]
-    for candidate in candidates:
-        if candidate.exists():
-            return ImageFont.truetype(str(candidate), size)
-    return ImageFont.load_default()
+def trimmed_mark():
+    source = Image.open(SOURCE).convert("RGBA")
+    bounds = source.getchannel("A").getbbox()
+    if bounds:
+        source = source.crop(bounds)
+
+    side = max(source.size)
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.alpha_composite(source, ((side - source.width) // 2, (side - source.height) // 2))
+    return square
 
 
-image = Image.new("RGB", (SIZE, SIZE), "#111522")
-draw = ImageDraw.Draw(image)
-draw.rounded_rectangle((24, 24, 488, 488), radius=101, outline="#7FAF57", width=8)
-draw.ellipse((132, 94, 380, 342), fill="#C8FF4D")
-draw.line([(158, 142), (192, 161), (220, 196), (242, 250), (262, 298), (300, 326)], fill="#111522", width=15, joint="curve")
-draw.line([(354, 142), (320, 161), (292, 196), (270, 250), (250, 298), (212, 326)], fill="#111522", width=15, joint="curve")
-draw.line([(176, 259), (226, 209), (268, 247), (338, 166)], fill="#3157FF", width=19, joint="curve")
-draw.line([(306, 166), (338, 166), (338, 198)], fill="#3157FF", width=19, joint="curve")
-draw.text((256, 393), "TGTRAIN", font=font(61), fill="#FFFFFF", anchor="mm")
-draw.text((256, 435), "PROGRESO SEMANAL", font=font(17), fill="#AAB3C5", anchor="mm")
-image.save(ROOT / "icon-512.png", optimize=True)
-image.resize((192, 192), Image.Resampling.LANCZOS).save(ROOT / "icon-192.png", optimize=True)
+def render_icon(mark, size, mark_ratio, background, output):
+    canvas = Image.new("RGBA", (size, size), background)
+    mark_size = round(size * mark_ratio)
+    scaled = mark.resize((mark_size, mark_size), Image.Resampling.LANCZOS)
+    offset = (size - mark_size) // 2
+    canvas.alpha_composite(scaled, (offset, offset))
+    if background[3] == 255:
+        canvas = canvas.convert("RGB")
+    canvas.save(ROOT / output, optimize=True)
+
+
+mark = trimmed_mark()
+
+# Standard Android/PWA icons: generous padding and an opaque launcher background.
+render_icon(mark, 192, 0.86, NAVY, "icon-192.png")
+render_icon(mark, 512, 0.86, NAVY, "icon-512.png")
+
+# Android adaptive icons: the complete symbol stays inside the central safe area.
+render_icon(mark, 192, 0.70, NAVY, "icon-maskable-192.png")
+render_icon(mark, 512, 0.70, NAVY, "icon-maskable-512.png")
+
+# iOS home-screen icon. Apple applies the final rounded-corner mask.
+render_icon(mark, 180, 0.86, NAVY, "apple-touch-icon.png")
+
+# Small browser/app-header versions retain transparency around the circular mark.
+render_icon(mark, 32, 0.96, (0, 0, 0, 0), "favicon-32.png")
+render_icon(mark, 160, 0.96, (0, 0, 0, 0), "assets/brand/tgtrain-mark-160.png")

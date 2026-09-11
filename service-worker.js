@@ -1,11 +1,11 @@
-const CACHE_NAME = "tgtrain-shell-v35";
+const CACHE_NAME = "tgtrain-shell-v36";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./assets/css/styles.css?v=35",
-  "./assets/js/app.js?v=35",
+  "./assets/css/styles.css?v=36",
+  "./assets/js/app.js?v=36",
   "./assets/js/data.js?v=35",
   "./assets/js/storage.js?v=35",
   "./assets/js/utils.js?v=35",
@@ -13,7 +13,11 @@ const APP_SHELL = [
   "./assets/js/firebase-config.js?v=35",
   "./icon-192.png",
   "./icon-512.png",
-  "./icon.svg"
+  "./icon-maskable-192.png",
+  "./icon-maskable-512.png",
+  "./apple-touch-icon.png",
+  "./favicon-32.png?v=36",
+  "./assets/brand/tgtrain-mark-160.png?v=36"
 ];
 
 self.addEventListener("install", event => {

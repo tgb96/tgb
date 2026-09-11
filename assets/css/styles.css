@@ -34,10 +34,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .app-shell { width: min(100%, 560px); margin: 0 auto; }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin: 4px 2px 18px; }
-.brand { min-height: 44px; border: 0; background: transparent; padding: 0; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-align: left; }
-.brand-mark { width: 42px; height: 42px; border-radius: 14px; display: block; transform: rotate(-4deg); box-shadow: 0 8px 18px rgba(17, 21, 34, 0.2); }
-.brand strong { display: block; font-size: 17px; letter-spacing: -0.4px; }
-.brand small { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1.4px; font-weight: 800; }
+.brand { min-height: 48px; border: 0; background: transparent; padding: 0; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-align: left; }
+.brand-mark { width: 46px; height: 46px; border-radius: 50%; display: block; filter: drop-shadow(0 7px 10px rgba(4, 35, 78, 0.24)); }
+.brand-copy { display: block; }
+.brand-name { position: relative; display: inline-block; color: var(--night); font-family: "Avenir Next", "Segoe UI Variable Display", "Trebuchet MS", sans-serif; font-size: 21px; font-style: italic; font-weight: 900; line-height: 1; letter-spacing: -1.15px; }
+.brand-name span { color: var(--blue); }
+.brand-name::after { content: ""; position: absolute; right: -1px; bottom: -4px; width: 23px; height: 3px; border-radius: 999px; background: var(--lime); transform: skewX(-28deg); }
+.brand small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1.25px; font-weight: 850; }
 .cloud-status-button { min-height: 34px; padding: 7px 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255, 255, 255, 0.72); font-size: 10px; font-weight: 850; }
 .cloud-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #a0a5ae; box-shadow: 0 0 0 3px rgba(160, 165, 174, 0.14); }
 .cloud-status-button.syncing .cloud-status-dot { background: #f5ad37; box-shadow: 0 0 0 3px rgba(245, 173, 55, 0.16); animation: cloud-pulse 1s infinite alternate; }

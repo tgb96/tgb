@@ -127,7 +127,7 @@ function updateCloudStatus(status) {
   if (hasUser) {
     $("cloudUserName").textContent = status.user.displayName || "Cuenta de Google";
     $("cloudUserEmail").textContent = status.user.email || "";
-    $("cloudUserPhoto").src = status.user.photoURL || "icon.svg";
+    $("cloudUserPhoto").src = status.user.photoURL || "assets/brand/tgtrain-mark-160.png?v=36";
   }
   $("cloudSignInButton").classList.toggle("hidden", hasUser);
   $("cloudSignInButton").disabled = !cloudSync.configured || status.state === "syncing";

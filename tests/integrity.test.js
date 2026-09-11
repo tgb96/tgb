@@ -92,17 +92,18 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v35/);
+  assert.match(worker, /tgtrain-shell-v36/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {
   const manifest = JSON.parse(await readFile(resolve(root, "manifest.json"), "utf8"));
-  const icon = await readFile(resolve(root, "icon.svg"), "utf8");
+  const page = await readFile(resolve(root, "index.html"), "utf8");
   assert.equal(manifest.name, "TGTrain");
   assert.equal(manifest.short_name, "TGTrain");
-  assert.match(icon, /TGTRAIN/);
-  assert.doesNotMatch(icon, />TGB</);
+  assert.ok(manifest.icons.some(icon => icon.purpose === "maskable" && icon.sizes === "512x512"));
+  assert.match(page, /tgtrain-mark-160\.png/);
+  assert.match(page, /apple-touch-icon\.png/);
 });
