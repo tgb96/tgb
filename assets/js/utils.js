@@ -194,6 +194,7 @@ export function normalizeRecord(record) {
     routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
     routineAbsCount: optionalNumber(record?.routineAbsCount, { min: 0 }),
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
+    routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
     createdAt: String(record?.createdAt || ""),

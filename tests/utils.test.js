@@ -207,6 +207,7 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
     routineTotalReps: 210,
     routineVolumeKg: 1680,
     routineAbsCount: 60,
+    routineDefaultsSaved: true,
     routineExercises: [{
       id: "unilateral-loaded-squat",
       name: "Sentadilla con carga unilateral",
@@ -226,6 +227,7 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
   assert.equal(record.routineVolumeKg, 1680);
   assert.equal(record.routineStartedExercises, 9);
   assert.equal(record.routineAbsCount, 60);
+  assert.equal(record.routineDefaultsSaved, true);
   assert.equal(record.routineExercises[0].completedSetNumbers.join(","), "1,2,4");
   assert.match(routineExerciseLine(record.routineExercises[0]), /3\/4 series realizadas/);
   assert.match(routineExerciseLine(record.routineExercises[0]), /240 kg de volumen/);

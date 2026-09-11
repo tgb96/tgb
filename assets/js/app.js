@@ -16,7 +16,7 @@ import {
   trekkingRoutes,
   trainingCategories
 } from "./data.js?v=35";
-import { createRepository } from "./storage.js?v=35";
+import { createRepository } from "./storage.js?v=37";
 import { createCloudSync } from "./cloud.js?v=35";
 import {
   dayIndexFromISO,
@@ -37,7 +37,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=35";
+} from "./utils.js?v=37";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1468,6 +1468,57 @@ function currentExerciseSettings(routine, exercise, settings) {
   return { sets, target, weightKg };
 }
 
+function routineSettingsSnapshot(routine, settings) {
+  return Object.fromEntries(routine.exercises.map(exercise => [
+    exercise.id,
+    currentExerciseSettings(routine, exercise, settings)
+  ]));
+}
+
+function routineSettingsChangeCount(routine, settings, settingsAtStart = {}) {
+  return routine.exercises.filter(exercise => {
+    const current = currentExerciseSettings(routine, exercise, settings);
+    const initial = settingsAtStart?.[exercise.id]
+      || currentExerciseSettings(routine, exercise, {});
+    return current.sets !== initial.sets
+      || String(current.target) !== String(initial.target)
+      || String(current.weightKg) !== String(initial.weightKg);
+  }).length;
+}
+
+function restoreRoutineSettings(routine, settings, settingsAtStart = {}) {
+  routine.exercises.forEach(exercise => {
+    const initial = settingsAtStart?.[exercise.id]
+      || currentExerciseSettings(routine, exercise, {});
+    settings[routineSettingsKey(routine.id, exercise.id)] = { ...initial };
+  });
+  saveRoutineSettings(settings);
+}
+
+function updateRoutineDefaultsChoice(routine, session, settings) {
+  const checkbox = $(`routineSaveDefaults-${routine.id}`);
+  const helper = $(`routineSaveDefaultsHelp-${routine.id}`);
+  const finish = $(`routineFinishButton-${routine.id}`);
+  if (!checkbox || !helper) return;
+  const changeCount = routineSettingsChangeCount(routine, settings, session.settingsAtStart);
+  const previouslyHadChanges = checkbox.dataset.hadChanges === "true";
+  checkbox.disabled = changeCount === 0;
+  if (changeCount === 0) {
+    checkbox.checked = false;
+    checkbox.dataset.hadChanges = "";
+    helper.textContent = "Aún no has cambiado los valores con los que comenzaste.";
+  } else {
+    if (!previouslyHadChanges) checkbox.checked = true;
+    checkbox.dataset.hadChanges = "true";
+    helper.textContent = checkbox.checked
+      ? `${changeCount} ${changeCount === 1 ? "ejercicio modificado" : "ejercicios modificados"}. Se usarán como punto de partida la próxima vez.`
+      : "Los cambios quedarán registrados solo en este entrenamiento.";
+  }
+  if (finish) finish.textContent = changeCount && checkbox.checked
+    ? "Finalizar, registrar y guardar cambios"
+    : "Finalizar y registrar";
+}
+
 function routineProgressKey(dateISO, routineId, exerciseId, setIndex) {
   return `${dateISO}:${routineId}:${exerciseId}:${setIndex}`;
 }
@@ -1502,6 +1553,7 @@ function startRoutineSession(routine) {
     clearRoutineProgress(loadRoutineProgress(), dateISO, routine.id);
   }
   const now = new Date().toISOString();
+  const settingsAtStart = routineSettingsSnapshot(routine, loadRoutineSettings());
   saveRoutineSession({
     status: "active",
     routineId: routine.id,
@@ -1509,7 +1561,8 @@ function startRoutineSession(routine) {
     startedAt: now,
     endedAt: "",
     elapsedSeconds: 0,
-    absCount: ""
+    absCount: "",
+    settingsAtStart
   });
   openRoutineId = routine.id;
   renderRoutines();
@@ -1579,6 +1632,8 @@ function finishRoutineSession(routine) {
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
   const summary = routineSessionSummary(routine, progress, settings, session.dateISO);
+  const settingsChangeCount = routineSettingsChangeCount(routine, settings, session.settingsAtStart);
+  const saveSettingsForNextTime = settingsChangeCount > 0 && Boolean($(`routineSaveDefaults-${routine.id}`)?.checked);
 
   if (summary.completedSets === 0) {
     message.textContent = "Marca al menos una serie antes de finalizar.";
@@ -1633,6 +1688,7 @@ function finishRoutineSession(routine) {
     routineVolumeKg: summary.volumeKg,
     routineAbsCount: absCount,
     routineExercises: summary.exercises,
+    routineDefaultsSaved: saveSettingsForNextTime,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
     createdAt: session.startedAt,
@@ -1647,13 +1703,33 @@ function finishRoutineSession(routine) {
     return;
   }
 
-  saveRoutineSession({ ...session, status: "complete", endedAt, elapsedSeconds, calories, sensations, absCount, recordId: record.id, summary });
+  if (settingsChangeCount > 0 && !saveSettingsForNextTime) {
+    restoreRoutineSettings(routine, settings, session.settingsAtStart);
+  }
+
+  saveRoutineSession({
+    ...session,
+    status: "complete",
+    endedAt,
+    elapsedSeconds,
+    calories,
+    sensations,
+    absCount,
+    recordId: record.id,
+    summary,
+    settingsChangeCount,
+    defaultSettingsSaved: saveSettingsForNextTime
+  });
   if (routineSessionTicker) clearInterval(routineSessionTicker);
   routineSessionTicker = null;
   openRoutineId = routine.id;
   renderRoutines();
   renderHome();
-  showToast("Rutina finalizada y registrada como entrenamiento de hoy.");
+  showToast(saveSettingsForNextTime
+    ? "Rutina registrada y cambios guardados para la próxima vez."
+    : settingsChangeCount > 0
+      ? "Rutina registrada. Los cambios se usaron solo esta vez."
+      : "Rutina finalizada y registrada como entrenamiento de hoy.");
 }
 
 function balanceMetric(label, value) {
@@ -1883,7 +1959,11 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
     panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount));
     const note = document.createElement("small");
-    note.textContent = "Volumen estimado = peso anotado × repeticiones de las series marcadas. No incluye ejercicios por tiempo ni sin carga.";
+    note.textContent = session.settingsChangeCount > 0
+      ? session.defaultSettingsSaved
+        ? "Tus nuevos pesos, repeticiones y series quedaron guardados para esta rutina."
+        : "Los cambios quedaron registrados en este entrenamiento, pero la rutina conserva sus valores anteriores."
+      : "Volumen estimado = peso anotado × repeticiones de las series marcadas. No incluye ejercicios por tiempo ni sin carga.";
     const history = document.createElement("button");
     history.type = "button";
     history.className = "routine-history-button";
@@ -1908,6 +1988,20 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   calories.step = "1";
   calories.placeholder = "Ej: 420";
   const sensations = createRoutineSensationPicker(routine);
+  const defaultsOption = document.createElement("label");
+  defaultsOption.className = "routine-defaults-option";
+  defaultsOption.htmlFor = `routineSaveDefaults-${routine.id}`;
+  const defaultsCheckbox = document.createElement("input");
+  defaultsCheckbox.id = `routineSaveDefaults-${routine.id}`;
+  defaultsCheckbox.type = "checkbox";
+  const defaultsCopy = document.createElement("span");
+  const defaultsTitle = document.createElement("strong");
+  defaultsTitle.textContent = "Usar mis cambios la próxima vez";
+  const defaultsHelp = document.createElement("small");
+  defaultsHelp.id = `routineSaveDefaultsHelp-${routine.id}`;
+  defaultsCopy.append(defaultsTitle, defaultsHelp);
+  defaultsOption.append(defaultsCheckbox, defaultsCopy);
+  defaultsCheckbox.addEventListener("change", () => updateRoutineDefaultsChoice(routine, session, settings));
   const message = document.createElement("div");
   message.id = `routineFinishMessage-${routine.id}`;
   message.className = "form-message error hidden";
@@ -1915,21 +2009,30 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   const finish = document.createElement("button");
   finish.type = "button";
   finish.className = "routine-finish-button";
+  finish.id = `routineFinishButton-${routine.id}`;
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true), caloriesLabel, calories, sensations, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true), caloriesLabel, calories, sensations, defaultsOption, message, finish);
   const note = document.createElement("small");
   note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
   panel.append(note);
+  updateRoutineDefaultsChoice(routine, session, settings);
   return panel;
 }
 
 function renderRoutines() {
   const container = $("routineLibrary");
-  const session = loadRoutineSession();
+  let session = loadRoutineSession();
   const dateISO = session?.status === "active" ? session.dateISO : getChileDateISO();
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
+  if (session?.status === "active" && !session.settingsAtStart) {
+    const activeRoutine = physicalRoutineById(session.routineId);
+    if (activeRoutine) {
+      session = { ...session, settingsAtStart: routineSettingsSnapshot(activeRoutine, settings) };
+      saveRoutineSession(session);
+    }
+  }
   const durationAverages = physicalRoutineDurationAverages(repository.list());
   container.replaceChildren();
 
@@ -1970,7 +2073,7 @@ function renderRoutines() {
     body.className = "routine-body";
     const note = document.createElement("p");
     note.className = "routine-note";
-    note.textContent = `Avance del ${formatShortDate(dateISO)} · tus cambios quedan guardados`;
+    note.textContent = `Avance del ${formatShortDate(dateISO)} · al finalizar eliges si conservar los cambios`;
     const objective = document.createElement("p");
     objective.className = "routine-objective";
     objective.textContent = routine.objective;
@@ -2098,6 +2201,7 @@ function renderRoutines() {
         renderSeries();
         updateCounter();
         updateRoutineSessionPreview(routine, progress, settings, dateISO);
+        if (isRoutineActive) updateRoutineDefaultsChoice(routine, session, settings);
       };
       setsInput.addEventListener("change", persistExerciseSettings);
       targetInput.addEventListener("input", persistExerciseSettings);

@@ -95,7 +95,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v36/);
+  assert.match(worker, /tgtrain-shell-v37/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {
@@ -106,4 +106,13 @@ test("el nombre y el logo corresponden a TGTrain", async () => {
   assert.ok(manifest.icons.some(icon => icon.purpose === "maskable" && icon.sizes === "512x512"));
   assert.match(page, /tgtrain-mark-160\.png/);
   assert.match(page, /apple-touch-icon\.png/);
+});
+
+test("al finalizar una rutina permite conservar o descartar los ajustes", async () => {
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.match(app, /Usar mis cambios la próxima vez/);
+  assert.match(app, /routineSettingsSnapshot/);
+  assert.match(app, /restoreRoutineSettings/);
+  assert.match(app, /routineDefaultsSaved/);
+  assert.match(app, /Finalizar, registrar y guardar cambios/);
 });
