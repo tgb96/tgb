@@ -194,6 +194,7 @@ export function normalizeRecord(record) {
     routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
     routineAbsCount: optionalNumber(record?.routineAbsCount, { min: 0 }),
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
+    routineSummary: String(record?.routineSummary || "").slice(0, 3000),
     routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
@@ -400,7 +401,115 @@ export function physicalRoutineDurationAverages(records) {
   }]));
 }
 
-export function weeklyReport(records, week) {
+export function exerciseProgress(records) {
+  const groups = new Map();
+  records.map(normalizeRecord)
+    .filter(record => record.category === "physical" && record.routineExercises.length)
+    .forEach(record => record.routineExercises
+      .filter(exercise => Number(exercise.completedSets) > 0)
+      .forEach(exercise => {
+        const key = exercise.id || exercise.name.toLocaleLowerCase("es");
+        if (!groups.has(key)) groups.set(key, { key, id: exercise.id, name: exercise.name, attempts: [] });
+        groups.get(key).attempts.push({
+          dateISO: record.dateISO,
+          createdAt: record.createdAt,
+          routineName: record.routineName,
+          target: exercise.target,
+          weightKg: exercise.weightKg,
+          completedSets: exercise.completedSets,
+          totalReps: exercise.totalReps,
+          volumeKg: exercise.volumeKg
+        });
+      }));
+  return [...groups.values()].map(group => {
+    const attempts = group.attempts.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || String(b.createdAt).localeCompare(String(a.createdAt)));
+    return {
+      ...group,
+      attempts,
+      latest: attempts[0],
+      previous: attempts[1] || null,
+      bestWeightKg: Math.max(0, ...attempts.map(attempt => Number(attempt.weightKg) || 0)),
+      bestVolumeKg: Math.max(0, ...attempts.map(attempt => Number(attempt.volumeKg) || 0))
+    };
+  }).sort((a, b) => b.latest.dateISO.localeCompare(a.latest.dateISO) || a.name.localeCompare(b.name, "es"));
+}
+
+export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6) {
+  const currentStart = isoWeekInfo(dateISO).startISO;
+  const normalized = records.map(normalizeRecord);
+  return Array.from({ length: Math.max(1, count) }, (_, index) => {
+    const startISO = addDaysISO(currentStart, (index - (count - 1)) * 7);
+    const week = isoWeekInfo(startISO);
+    const weekRecords = normalized.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+    const trainings = weekRecords.filter(record => record.category !== "rest");
+    return {
+      ...week,
+      sessions: trainings.length,
+      activeDays: new Set(trainings.map(record => record.dateISO)).size,
+      minutes: Math.round(trainings.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)),
+      calories: Math.round(trainings.reduce((sum, record) => sum + (Number(record.calories) || 0), 0)),
+      volumeKg: Math.round(trainings.reduce((sum, record) => sum + (Number(record.routineVolumeKg) || 0), 0)),
+      maxAbdominals: Math.max(0, ...trainings.map(record => Number(record.routineAbsCount) || 0))
+    };
+  });
+}
+
+export function planMatchesRecord(activityId, sourceRecord) {
+  const record = normalizeRecord(sourceRecord);
+  const [category, detail = ""] = String(activityId || "").split(":");
+  if (!category || record.category !== category) return false;
+  if (category === "physical" && detail) return record.routineId === detail;
+  if (category === "cardio" && detail) return record.cardioTypeId === detail;
+  return true;
+}
+
+export function weeklyPlanProgress(records, week, plan = null) {
+  const weekRecords = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+  const items = Object.entries(plan?.days || {}).map(([dateISO, item]) => ({
+    dateISO,
+    ...item,
+    complete: weekRecords.some(record => record.dateISO === dateISO && planMatchesRecord(item.activityId, record))
+  })).sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  return {
+    items,
+    planned: items.length,
+    completed: items.filter(item => item.complete).length
+  };
+}
+
+export function routineCompletionSummary(sourceRecord, previousRecords = []) {
+  const record = normalizeRecord(sourceRecord);
+  if (record.category !== "physical") return "";
+  const insights = [];
+  const plannedSets = Number(record.routinePlannedSets) || 0;
+  const completedSets = Number(record.routineCompletedSets) || 0;
+  const completion = plannedSets ? Math.round((completedSets / plannedSets) * 100) : 0;
+  insights.push(`Completaste ${completedSets}/${plannedSets || completedSets} series (${completion || 100}%) y trabajaste ${Number(record.routineStartedExercises) || 0}/${Number(record.routineTotalExercises) || 0} ejercicios.`);
+
+  const previous = previousRecords.map(normalizeRecord)
+    .filter(item => item.category === "physical" && (record.routineId ? item.routineId === record.routineId : item.routineName === record.routineName))
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || String(b.createdAt).localeCompare(String(a.createdAt)));
+  const last = previous[0];
+  const currentVolume = Number(record.routineVolumeKg) || 0;
+  const lastVolume = Number(last?.routineVolumeKg) || 0;
+  const bestVolume = Math.max(0, ...previous.map(item => Number(item.routineVolumeKg) || 0));
+  if (currentVolume > 0) {
+    if (bestVolume > 0 && currentVolume > bestVolume) insights.push(`Nuevo récord de volumen para esta rutina: ${currentVolume.toLocaleString("es-CL")} kg.`);
+    else if (lastVolume > 0) {
+      const change = Math.round(((currentVolume - lastVolume) / lastVolume) * 100);
+      insights.push(change === 0
+        ? `Igualaste el volumen de tu sesión anterior: ${currentVolume.toLocaleString("es-CL")} kg.`
+        : `Moviste ${currentVolume.toLocaleString("es-CL")} kg, ${Math.abs(change)}% ${change > 0 ? "más" : "menos"} que en tu sesión anterior.`);
+    } else insights.push(`Volumen registrado: ${currentVolume.toLocaleString("es-CL")} kg.`);
+  }
+  const abs = Number(record.routineAbsCount) || 0;
+  const bestAbs = Math.max(0, ...previous.map(item => Number(item.routineAbsCount) || 0));
+  if (abs > bestAbs && abs > 0) insights.push(`Nuevo récord de abdominales: ${abs}.`);
+  else if (abs > 0) insights.push(`Terminaste con ${abs} abdominales.`);
+  return insights.join(" ");
+}
+
+export function weeklyReport(records, week, plan = null) {
   const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const trainings = normalized.filter(record => record.category !== "rest");
   const restDays = normalized.filter(record => record.category === "rest");
@@ -412,10 +521,16 @@ export function weeklyReport(records, week) {
     counts[record.categoryName] = (counts[record.categoryName] || 0) + 1;
     return counts;
   }, {});
+  const previousWeek = isoWeekInfo(addDaysISO(week.startISO, -7));
+  const previous = records.map(normalizeRecord).filter(record => record.dateISO >= previousWeek.startISO && record.dateISO <= previousWeek.endISO && record.category !== "rest");
+  const previousMinutes = previous.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
+  const sessionDifference = trainings.length - previous.length;
+  const minuteDifference = Math.round(totalMinutes - previousMinutes);
+  const planProgress = weeklyPlanProgress(records, week, plan);
 
   let report = `REGISTRO TGTRAIN — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
-  report += "RESUMEN\n";
+  report += "RESUMEN PARA EL ENTRENADOR\n";
   report += `- Entrenamientos: ${trainings.length}\n`;
   report += `- Días de descanso registrados: ${restDays.length}\n`;
   report += `- Tiempo total: ${Math.round(totalMinutes)} min\n`;
@@ -423,6 +538,15 @@ export function weeklyReport(records, week) {
   report += `- Distancia registrada: ${formatDistance(totalDistance)}\n`;
   report += `- Desnivel registrado: ${totalElevation} m\n`;
   for (const [category, count] of Object.entries(categoryCounts)) report += `- ${category}: ${count}\n`;
+  report += `- Comparación con la semana anterior: ${sessionDifference >= 0 ? "+" : ""}${sessionDifference} sesiones y ${minuteDifference >= 0 ? "+" : ""}${minuteDifference} min\n`;
+  if (planProgress.planned) report += `- Cumplimiento del plan: ${planProgress.completed}/${planProgress.planned} actividades (${Math.round((planProgress.completed / planProgress.planned) * 100)}%)\n`;
+
+  if (planProgress.planned) {
+    report += "\nPLAN SEMANAL\n";
+    planProgress.items.forEach(item => {
+      report += `- ${dayNamesFull[dayIndexFromISO(item.dateISO)]} ${item.dateISO}: ${item.label} — ${item.complete ? "realizado" : "pendiente"}\n`;
+    });
+  }
 
   report += "\nDETALLE DE LA SEMANA\n";
   for (const dateISO of weekDays(week.startISO)) {
@@ -455,6 +579,7 @@ export function weeklyReport(records, week) {
         report += `   Repeticiones contabilizadas: ${record.routineTotalReps}\n`;
         report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
         if (record.routineAbsCount !== "") report += `   Abdominales finales: ${record.routineAbsCount}\n`;
+        if (record.routineSummary) report += `   Resumen automático: ${record.routineSummary}\n`;
       }
       if (record.category === "physical" && record.routineExercises.length) {
         report += "   Ejercicios, cargas y repeticiones realizadas:\n";
@@ -488,7 +613,7 @@ export function recordsToCSV(records) {
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
-    ["detalle_ejercicios", "routineExercisesExport"],
+    ["resumen_automatico", "routineSummary"], ["detalle_ejercicios", "routineExercisesExport"],
     ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];

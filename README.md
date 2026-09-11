@@ -15,6 +15,9 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Biblioteca de cuatro rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
+- Plan semanal editable de lunes a domingo, con cumplimiento automático y sincronización en la nube.
+- Panel de evolución de seis semanas y progreso detallado por ejercicio.
+- Resumen automático al finalizar cada rutina física, comparado con la sesión anterior y los récords personales.
 - Copia local para funcionamiento sin conexión y sincronización privada en Firestore al iniciar sesión con Google.
 
 ## Tipos de entrenamiento
@@ -56,7 +59,7 @@ Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20,
 
 ## Semanas e informes
 
-TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe con resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
+TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe para el entrenador con comparación respecto de la semana anterior, cumplimiento del plan, resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el resumen automático y el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
 
 ## Cuenta de Google y nube
 

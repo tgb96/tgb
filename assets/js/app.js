@@ -16,10 +16,11 @@ import {
   trekkingRoutes,
   trainingCategories
 } from "./data.js?v=38";
-import { createRepository } from "./storage.js?v=37";
-import { createCloudSync } from "./cloud.js?v=35";
+import { createRepository } from "./storage.js?v=40";
+import { createCloudSync } from "./cloud.js?v=40";
 import {
   dayIndexFromISO,
+  exerciseProgress,
   formatLongDate,
   formatShortDate,
   getChileDateISO,
@@ -28,16 +29,20 @@ import {
   normalizeRecord,
   physicalBestRecords,
   physicalRoutineDurationAverages,
+  planMatchesRecord,
   recordDetails,
   recordTitle,
   recordsToCSV,
   runningBestTimes,
   routineExerciseLine,
+  routineCompletionSummary,
   trekkingBestTimes,
   validateRecord,
   weekDays,
+  weeklyEvolution,
+  weeklyPlanProgress,
   weeklyReport
-} from "./utils.js?v=39";
+} from "./utils.js?v=40";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -187,6 +192,7 @@ function renderHome() {
   $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
   $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
+  renderWeeklyPlan(week, records, todayISO);
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
@@ -1214,6 +1220,7 @@ function formRecord() {
     routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
     routineAbsCount: preserveRoutineBalance ? existing.routineAbsCount : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
+    routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
     createdAt: existing?.createdAt || new Date().toISOString(),
@@ -1468,6 +1475,64 @@ function currentExerciseSettings(routine, exercise, settings) {
   return { sets, target, weightKg };
 }
 
+function weeklyPlanOptions() {
+  return [
+    { id: "", label: "Sin actividad planificada" },
+    ...physicalRoutines.map(routine => ({ id: `physical:${routine.id}`, label: routine.name })),
+    ...cardioTypes.map(cardio => ({ id: `cardio:${cardio.id}`, label: `Cardio · ${cardio.name}` })),
+    { id: "tennis", label: "Tenis" },
+    { id: "rest", label: "Descanso" }
+  ];
+}
+
+function renderWeeklyPlan(week, records, todayISO) {
+  const container = $("weeklyPlanDays");
+  const plan = repository.getWeekPlan(week.key) || { weekKey: week.key, days: {} };
+  const progress = weeklyPlanProgress(records, week, plan);
+  $("weeklyPlanProgress").textContent = progress.planned ? `${progress.completed}/${progress.planned} cumplidas` : "Sin plan";
+  container.replaceChildren();
+  const options = weeklyPlanOptions();
+
+  weekDays(week.startISO).forEach(dateISO => {
+    const planned = plan.days?.[dateISO] || null;
+    const complete = planned && records.some(record => record.dateISO === dateISO && planMatchesRecord(planned.activityId, record));
+    const row = document.createElement("div");
+    row.className = "weekly-plan-day";
+    row.classList.toggle("today", dateISO === todayISO);
+    row.classList.toggle("complete", Boolean(complete));
+    const date = document.createElement("div");
+    date.className = "weekly-plan-date";
+    const name = document.createElement("strong");
+    name.textContent = dayNamesShort[dayIndexFromISO(dateISO)];
+    const number = document.createElement("span");
+    number.textContent = String(Number(dateISO.slice(-2)));
+    date.append(name, number);
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Plan para ${dayNamesFull[dayIndexFromISO(dateISO)]}`);
+    options.forEach(option => {
+      const element = document.createElement("option");
+      element.value = option.id;
+      element.textContent = option.label;
+      select.append(element);
+    });
+    select.value = planned?.activityId || "";
+    select.addEventListener("change", () => {
+      const days = { ...(repository.getWeekPlan(week.key)?.days || {}) };
+      const selected = options.find(option => option.id === select.value);
+      if (!selected?.id) delete days[dateISO];
+      else days[dateISO] = { activityId: selected.id, label: selected.label };
+      repository.saveWeekPlan({ weekKey: week.key, days, updatedAt: new Date().toISOString() });
+      renderHome();
+      showToast(selected?.id ? "Plan semanal actualizado." : "Día liberado del plan.");
+    });
+    const status = document.createElement("span");
+    status.className = "weekly-plan-status";
+    status.textContent = !planned ? "Libre" : complete ? "Cumplido" : dateISO < todayISO ? "Pendiente" : dateISO === todayISO ? "Para hoy" : "Planificado";
+    row.append(date, select, status);
+    container.append(row);
+  });
+}
+
 function routineSettingsSnapshot(routine, settings) {
   return Object.fromEntries(routine.exercises.map(exercise => [
     exercise.id,
@@ -1688,12 +1753,14 @@ function finishRoutineSession(routine) {
     routineVolumeKg: summary.volumeKg,
     routineAbsCount: absCount,
     routineExercises: summary.exercises,
+    routineSummary: "",
     routineDefaultsSaved: saveSettingsForNextTime,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
     createdAt: session.startedAt,
     updatedAt: endedAt
   };
+  record.routineSummary = routineCompletionSummary(record, repository.list());
 
   try {
     repository.upsert(record);
@@ -1717,6 +1784,7 @@ function finishRoutineSession(routine) {
     absCount,
     recordId: record.id,
     summary,
+    routineSummary: record.routineSummary,
     settingsChangeCount,
     defaultSettingsSaved: saveSettingsForNextTime
   });
@@ -1958,6 +2026,10 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     heading.textContent = "Entrenamiento registrado";
     copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
     panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount));
+    const automaticSummary = document.createElement("p");
+    automaticSummary.className = "routine-auto-summary";
+    automaticSummary.textContent = session.routineSummary || "Tu balance completo quedó guardado para comparar la próxima sesión.";
+    panel.append(automaticSummary);
     const note = document.createElement("small");
     note.textContent = session.settingsChangeCount > 0
       ? session.defaultSettingsSaved
@@ -2407,9 +2479,123 @@ function renderTrekkingRankings(records) {
   });
 }
 
+function signedDifference(current, previous, suffix = "") {
+  const difference = Number(current) - Number(previous);
+  if (!difference) return `Igual que la semana anterior${suffix}`;
+  return `${difference > 0 ? "+" : ""}${difference.toLocaleString("es-CL")}${suffix} vs. semana anterior`;
+}
+
+function renderEvolution(records) {
+  const weeks = weeklyEvolution(records, getChileDateISO(), 6);
+  const current = weeks.at(-1);
+  const previous = weeks.at(-2) || { sessions: 0, activeDays: 0, minutes: 0, calories: 0, volumeKg: 0, maxAbdominals: 0 };
+  $("evolutionComparison").textContent = current.sessions
+    ? `Semana ${current.weekNumber}: ${current.sessions} ${current.sessions === 1 ? "entrenamiento" : "entrenamientos"} en ${current.activeDays} ${current.activeDays === 1 ? "día activo" : "días activos"}.`
+    : `Todavía no hay entrenamientos registrados en la semana ${current.weekNumber}.`;
+  const metrics = $("evolutionMetrics");
+  metrics.replaceChildren();
+  [
+    ["Sesiones", current.sessions, signedDifference(current.sessions, previous.sessions)],
+    ["Minutos", current.minutes.toLocaleString("es-CL"), signedDifference(current.minutes, previous.minutes, " min")],
+    ["Calorías", current.calories.toLocaleString("es-CL"), signedDifference(current.calories, previous.calories, " kcal")],
+    ["Días activos", current.activeDays, signedDifference(current.activeDays, previous.activeDays)],
+    ["Volumen físico", `${current.volumeKg.toLocaleString("es-CL")} kg`, signedDifference(current.volumeKg, previous.volumeKg, " kg")],
+    ["Mejor abdominal", current.maxAbdominals || "—", current.maxAbdominals ? signedDifference(current.maxAbdominals, previous.maxAbdominals) : "Sin marca esta semana"]
+  ].forEach(([label, value, comparison]) => {
+    const card = document.createElement("div");
+    card.className = "evolution-metric";
+    const strong = document.createElement("strong");
+    strong.textContent = String(value);
+    const span = document.createElement("span");
+    span.textContent = label;
+    const small = document.createElement("small");
+    small.textContent = comparison;
+    card.append(strong, span, small);
+    metrics.append(card);
+  });
+
+  const chart = $("evolutionChart");
+  chart.replaceChildren();
+  const maximum = Math.max(1, ...weeks.map(item => item.minutes));
+  weeks.forEach((item, index) => {
+    const column = document.createElement("div");
+    column.className = `evolution-bar${index === weeks.length - 1 ? " current" : ""}`;
+    const track = document.createElement("div");
+    track.className = "evolution-bar-track";
+    const fill = document.createElement("span");
+    fill.className = "evolution-bar-fill";
+    fill.style.height = `${Math.max(4, Math.round((item.minutes / maximum) * 100))}%`;
+    fill.title = `Semana ${item.weekNumber}: ${item.minutes} min`;
+    track.append(fill);
+    const label = document.createElement("small");
+    label.textContent = `S${item.weekNumber} · ${item.minutes}m`;
+    column.append(track, label);
+    chart.append(column);
+  });
+}
+
+function renderExerciseProgress(records) {
+  const container = $("exerciseProgress");
+  const exercises = exerciseProgress(records);
+  container.replaceChildren();
+  if (!exercises.length) {
+    const empty = document.createElement("div");
+    empty.className = "exercise-progress-empty";
+    empty.textContent = "Cuando completes rutinas físicas, aquí verás la evolución de cada ejercicio.";
+    container.append(empty);
+    return;
+  }
+  exercises.forEach((exercise, index) => {
+    const details = document.createElement("details");
+    details.className = "exercise-progress-item";
+    details.open = index === 0;
+    const summary = document.createElement("summary");
+    const copy = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = exercise.name;
+    const latest = document.createElement("p");
+    const latestWeight = Number(exercise.latest.weightKg) || 0;
+    const previousWeight = Number(exercise.previous?.weightKg) || 0;
+    const weightChange = exercise.previous && latestWeight !== previousWeight
+      ? ` · ${latestWeight > previousWeight ? "+" : ""}${(latestWeight - previousWeight).toLocaleString("es-CL")} kg`
+      : "";
+    latest.textContent = `Último: ${exercise.latest.target || "sin objetivo"}${latestWeight ? ` · ${latestWeight.toLocaleString("es-CL")} kg` : ""}${weightChange}`;
+    copy.append(title, latest);
+    const best = document.createElement("div");
+    best.className = "exercise-progress-best";
+    const bestLabel = document.createElement("span");
+    bestLabel.textContent = exercise.bestWeightKg ? "Mejor carga" : "Mejor volumen";
+    const bestValue = document.createElement("strong");
+    bestValue.textContent = exercise.bestWeightKg
+      ? `${exercise.bestWeightKg.toLocaleString("es-CL")} kg`
+      : `${exercise.bestVolumeKg.toLocaleString("es-CL")} kg`;
+    best.append(bestLabel, bestValue);
+    summary.append(copy, best);
+    const attempts = document.createElement("ol");
+    attempts.className = "exercise-attempts";
+    exercise.attempts.slice(0, 5).forEach(attempt => {
+      const item = document.createElement("li");
+      const attemptCopy = document.createElement("div");
+      const date = document.createElement("strong");
+      date.textContent = `${formatShortDate(attempt.dateISO)} · ${attempt.routineName}`;
+      const performed = document.createElement("span");
+      performed.textContent = `${attempt.completedSets} series · ${attempt.target || "sin objetivo"}${Number(attempt.weightKg) ? ` · ${Number(attempt.weightKg).toLocaleString("es-CL")} kg` : ""}`;
+      const volume = document.createElement("em");
+      volume.textContent = `${Number(attempt.volumeKg || 0).toLocaleString("es-CL")} kg vol.`;
+      attemptCopy.append(date, performed);
+      item.append(attemptCopy, volume);
+      attempts.append(item);
+    });
+    details.append(summary, attempts);
+    container.append(details);
+  });
+}
+
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderEvolution(records);
+  renderExerciseProgress(records);
   renderPhysicalRankings(records);
   renderRunningRankings(records);
   renderTrekkingRankings(records);
@@ -2448,7 +2634,7 @@ function renderHistory() {
     const copyButton = document.createElement("button");
     copyButton.type = "button";
     copyButton.className = "copy-week-button";
-    copyButton.textContent = "Copiar informe semanal";
+    copyButton.textContent = "Copiar informe para el entrenador";
     copyButton.addEventListener("click", () => copyWeeklyReport(group));
     const downloadButton = document.createElement("button");
     downloadButton.type = "button";
@@ -2504,6 +2690,12 @@ function createHistoryEntry(sourceRecord) {
       ["Abdominales", record.routineAbsCount === "" ? "—" : String(record.routineAbsCount)]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
     copy.append(balance);
+    if (record.routineSummary) {
+      const automaticSummary = document.createElement("p");
+      automaticSummary.className = "history-auto-summary";
+      automaticSummary.textContent = record.routineSummary;
+      copy.append(automaticSummary);
+    }
   }
   if (record.category === "physical" && record.routineExercises.length) {
     const exerciseDisclosure = document.createElement("details");
@@ -2556,7 +2748,7 @@ async function copyText(text) {
 }
 
 async function copyWeeklyReport(group) {
-  await copyText(weeklyReport(repository.list(), group));
+  await copyText(weeklyReport(repository.list(), group, repository.getWeekPlan(group.key)));
   showToast(`Informe de la semana ${group.weekNumber} copiado.`);
 }
 
@@ -2573,7 +2765,7 @@ function downloadText(filename, content, type = "text/plain;charset=utf-8") {
 }
 
 function downloadWeeklyReport(group) {
-  downloadText(`tgtrain-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group));
+  downloadText(`tgtrain-semana-${group.weekNumber}-${group.weekYear}.txt`, weeklyReport(repository.list(), group, repository.getWeekPlan(group.key)));
   showToast("Informe semanal descargado.");
 }
 

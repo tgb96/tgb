@@ -24,6 +24,9 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /id="cloudDialog"/);
   assert.match(html, /id="runningRankings"/);
   assert.match(html, /id="physicalRankings"/);
+  assert.match(html, /id="weeklyPlanDays"/);
+  assert.match(html, /id="evolutionMetrics"/);
+  assert.match(html, /id="exerciseProgress"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
@@ -94,6 +97,11 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineAbsCount/);
   assert.match(app, /renderPhysicalRankings/);
   assert.match(app, /physicalRoutineDurationAverages/);
+  assert.match(app, /renderWeeklyPlan/);
+  assert.match(app, /renderEvolution/);
+  assert.match(app, /renderExerciseProgress/);
+  assert.match(app, /routineCompletionSummary/);
+  assert.match(app, /Copiar informe para el entrenador/);
   assert.match(app, /attempts\.slice\(0, 3\)/);
   assert.match(app, /Duración aprox\./);
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
@@ -104,7 +112,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v39/);
+  assert.match(worker, /tgtrain-shell-v40/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {

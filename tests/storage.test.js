@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 9/);
+  assert.match(repository.backup(), /"schemaVersion": 10/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -84,4 +84,24 @@ test("notifica cambios locales y aplica cambios de la nube sin duplicarlos", () 
   assert.equal(repository.applyCloudDeletion("record-1", "2026-09-08T14:00:00.000Z"), true);
   assert.equal(repository.get("record-1"), null);
   unsubscribe();
+});
+
+test("guarda el plan semanal, lo respalda y acepta actualizaciones de la nube", () => {
+  const repository = createRepository(new FakeStorage());
+  const changes = [];
+  repository.subscribe(change => changes.push(change));
+  repository.saveWeekPlan({
+    weekKey: "2026-W35",
+    days: { "2026-08-24": { activityId: "physical:legs", label: "Día 1 · Piernas" } },
+    updatedAt: "2026-08-20T12:00:00.000Z"
+  });
+  assert.equal(repository.getWeekPlan("2026-W35").days["2026-08-24"].activityId, "physical:legs");
+  assert.equal(changes.at(-1).type, "plan-upsert");
+  assert.match(repository.backup(), /"plans"/);
+  assert.equal(repository.applyCloudPlan({
+    weekKey: "2026-W35",
+    days: { "2026-08-25": { activityId: "tennis", label: "Tenis" } },
+    updatedAt: "2026-08-21T12:00:00.000Z"
+  }), true);
+  assert.equal(repository.getWeekPlan("2026-W35").days["2026-08-25"].activityId, "tennis");
 });

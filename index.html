@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=37">
+  <link rel="stylesheet" href="assets/css/styles.css?v=40">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -48,6 +48,18 @@
           <div><strong id="weekCalories">0</strong><span>kcal</span></div>
         </div>
       </div>
+
+      <section class="weekly-plan-card" aria-labelledby="weeklyPlanTitle">
+        <div class="weekly-plan-heading">
+          <div>
+            <p class="eyebrow dark">Plan semanal</p>
+            <h2 id="weeklyPlanTitle">Organiza tus próximos días</h2>
+            <p>Elige una actividad para cada día. TGTrain marcará automáticamente lo que vayas cumpliendo.</p>
+          </div>
+          <span id="weeklyPlanProgress" class="progress-pill">0/0</span>
+        </div>
+        <div id="weeklyPlanDays" class="weekly-plan-days"></div>
+      </section>
 
       <div class="section-title-row">
         <div>
@@ -171,10 +183,25 @@
         <div>
           <p class="eyebrow dark">Registro anual</p>
           <h1 id="historyHeading">Historial por semanas</h1>
-          <p class="page-subtitle">Cada semana comprende de lunes a domingo.</p>
+          <p class="page-subtitle">Revisa tu evolución y prepara un informe completo para tu entrenador.</p>
         </div>
         <span id="historyTotal" class="history-total"></span>
       </div>
+
+      <section class="evolution-card" aria-labelledby="evolutionTitle">
+        <p class="eyebrow dark">Panel de evolución</p>
+        <h2 id="evolutionTitle">Tu progreso de las últimas semanas</h2>
+        <p id="evolutionComparison" class="evolution-comparison"></p>
+        <div id="evolutionMetrics" class="evolution-metrics"></div>
+        <div id="evolutionChart" class="evolution-chart" aria-label="Minutos entrenados durante las últimas seis semanas"></div>
+      </section>
+
+      <section class="exercise-progress-card" aria-labelledby="exerciseProgressTitle">
+        <p class="eyebrow dark">Progreso por ejercicio</p>
+        <h2 id="exerciseProgressTitle">Cargas y volumen de cada movimiento</h2>
+        <p>Compara tu última ejecución con la anterior y revisa tus mejores marcas.</p>
+        <div id="exerciseProgress" class="exercise-progress-list"></div>
+      </section>
 
       <section class="trekking-ranking-card physical-ranking-card" aria-labelledby="physicalRankingTitle">
         <p class="eyebrow dark">Progreso de fuerza</p>
@@ -253,6 +280,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=39"></script>
+  <script type="module" src="assets/js/app.js?v=40"></script>
 </body>
 </html>

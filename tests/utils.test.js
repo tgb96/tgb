@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   formatDistance,
   formatDuration,
+  exerciseProgress,
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
@@ -13,9 +14,12 @@ import {
   recordsToCSV,
   runningBestTimes,
   routineExerciseLine,
+  routineCompletionSummary,
   trekkingBestTimes,
   validateRecord,
   weekDays,
+  weeklyEvolution,
+  weeklyPlanProgress,
   weeklyReport
 } from "../assets/js/utils.js";
 
@@ -191,6 +195,39 @@ test("calcula la duración promedio de cada rutina física", () => {
   assert.deepEqual(averages.get("upper"), { minutes: 61, sessions: 1 });
 });
 
+test("calcula la evolución semanal y el progreso de cada ejercicio", () => {
+  const earlier = {
+    ...physicalRecord,
+    id: "progress-1",
+    dateISO: "2026-08-24",
+    routinePlannedSets: 3,
+    routineCompletedSets: 3,
+    routineStartedExercises: 1,
+    routineTotalExercises: 1,
+    routineVolumeKg: 210,
+    routineAbsCount: 40,
+    routineExercises: [{ id: "row", name: "Remo", target: "10", weightKg: 7, plannedSets: 3, completedSets: 3, totalReps: 30, volumeKg: 210 }]
+  };
+  const latest = {
+    ...earlier,
+    id: "progress-2",
+    dateISO: "2026-08-31",
+    routineVolumeKg: 240,
+    routineAbsCount: 50,
+    routineExercises: [{ id: "row", name: "Remo", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3, totalReps: 30, volumeKg: 240 }]
+  };
+  const evolution = weeklyEvolution([earlier, latest], "2026-09-02", 2);
+  assert.deepEqual(evolution.map(week => week.volumeKg), [210, 240]);
+  assert.equal(evolution[1].maxAbdominals, 50);
+  const exercises = exerciseProgress([earlier, latest]);
+  assert.equal(exercises[0].name, "Remo");
+  assert.equal(exercises[0].latest.weightKg, 8);
+  assert.equal(exercises[0].previous.weightKg, 7);
+  assert.equal(exercises[0].bestVolumeKg, 240);
+  assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de volumen/);
+  assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de abdominales/);
+});
+
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
   const migrated = normalizeRecord({
     id: "old-1",
@@ -303,17 +340,29 @@ test("agrupa por semana y genera el informe completo de lunes a domingo", () => 
   const groups = groupRecordsByWeek([physicalRecord, tennis]);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].weekNumber, 35);
-  const report = weeklyReport([physicalRecord, tennis], groups[0]);
+  const plan = {
+    weekKey: groups[0].key,
+    days: {
+      "2026-08-24": { activityId: "physical:legs", label: "Día 1 · Piernas" },
+      "2026-08-26": { activityId: "tennis", label: "Tenis" }
+    }
+  };
+  const planProgress = weeklyPlanProgress([physicalRecord, tennis], groups[0], plan);
+  assert.deepEqual({ planned: planProgress.planned, completed: planProgress.completed }, { planned: 2, completed: 2 });
+  const report = weeklyReport([physicalRecord, tennis], groups[0], plan);
   assert.match(report, /SEMANA 35 DE 2026/);
   assert.match(report, /Tiempo total: 150 min/);
   assert.match(report, /LUNES 2026-08-24/);
   assert.match(report, /DOMINGO 2026-08-30/);
   assert.match(report, /Tipo de tenis: Peloteo amistoso/);
+  assert.match(report, /RESUMEN PARA EL ENTRENADOR/);
+  assert.match(report, /Cumplimiento del plan: 2\/2 actividades/);
+  assert.match(report, /PLAN SEMANAL/);
   assert.match(report, /Sin entrenamiento registrado/);
 });
 
 test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fórmulas", () => {
-  const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)", routineExercises: [{
+  const csv = recordsToCSV([{ ...physicalRecord, sensations: "=SUM(A1:A2)", routineSummary: "Mejoraste tu volumen.", routineExercises: [{
     name: "Remo a una mano", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3,
     completedSetNumbers: [1, 2, 3], totalReps: 30, volumeKg: 240
   }] }]);
@@ -322,6 +371,8 @@ test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fór
   assert.match(csv, /tipo_tenis/);
   assert.match(csv, /detalle_ejercicios/);
   assert.match(csv, /abdominales_finales/);
+  assert.match(csv, /resumen_automatico/);
+  assert.match(csv, /Mejoraste tu volumen/);
   assert.match(csv, /Remo a una mano/);
   assert.match(csv, /'=SUM/);
 });
