@@ -262,6 +262,21 @@ test("formatea duraciones exactas para trote, trekking y tenis", () => {
   assert.equal(formatDuration({ durationMinutes: 60, durationSeconds: 3600, durationPrecision: "minutes" }), "60 min");
 });
 
+test("oculta los segundos de los registros de cardio aunque sean antiguos", () => {
+  assert.equal(recordDetails({
+    ...physicalRecord,
+    category: "cardio",
+    categoryName: "Cardio",
+    routineId: "",
+    routineName: "",
+    cardioTypeId: "running",
+    cardioTypeName: "Trote",
+    durationMinutes: 36 + (38 / 60),
+    durationSeconds: 2198,
+    durationPrecision: "hms"
+  }), "36 min · 420 kcal");
+});
+
 test("formatea la distancia como marca de carrera legible", () => {
   assert.equal(formatDistance(5), "5K");
   assert.equal(formatDistance(10), "10K");

@@ -86,6 +86,9 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineSensations-/);
   assert.match(app, /Elige al menos una sensación/);
   assert.match(app, /runningDistanceSelect/);
+  assert.match(app, /currentCategory === "cardio" \? "hm" : "hms"/);
+  assert.match(app, /Tiempo de subida \(HH:MM\)/);
+  assert.doesNotMatch(app, /id: "ascentSeconds"/);
   assert.match(app, /renderRunningRankings/);
   assert.match(app, /createRoutineAbsFinisher/);
   assert.match(app, /routineAbsCount/);
@@ -101,7 +104,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v38/);
+  assert.match(worker, /tgtrain-shell-v39/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {

@@ -256,10 +256,13 @@ export function recordDetails(record) {
   if (normalized.category === "rest") return normalized.restTypeId === "discomfort"
     ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
     : "Recuperación planificada";
-  const details = [formatDuration(normalized), `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  const displayedDuration = normalized.category === "cardio"
+    ? formatDuration({ ...normalized, durationPrecision: "hm" })
+    : formatDuration(normalized);
+  const details = [displayedDuration, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
   if (normalized.category === "tennis" && normalized.location) details.push(normalized.location);
   if (normalized.trekkingRoute) details.push(normalized.trekkingRoute);
-  if (normalized.ascentDurationSeconds !== "") details.push(`Subida ${formatDuration({ durationSeconds: normalized.ascentDurationSeconds, durationMinutes: normalized.ascentDurationSeconds / 60, durationPrecision: "hms" })}`);
+  if (normalized.ascentDurationSeconds !== "") details.push(`Subida ${formatDuration({ durationSeconds: normalized.ascentDurationSeconds, durationMinutes: normalized.ascentDurationSeconds / 60, durationPrecision: "hm" })}`);
   if (normalized.distanceKm !== "") details.push(formatDistance(normalized.distanceKm));
   if (normalized.elevationGainM !== "") details.push(`${normalized.elevationGainM} m desnivel`);
   if (normalized.surface) details.push(normalized.surface);
@@ -434,7 +437,7 @@ export function weeklyReport(records, week) {
       report += `${index + 1}. ${recordTitle(record)}\n`;
       report += `   Tipo: ${record.categoryName}\n`;
       if (record.category !== "rest") {
-        report += `   Duración: ${formatDuration(record)}\n`;
+        report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: "hm" } : record)}\n`;
         report += `   Calorías: ${record.calories} kcal\n`;
       }
       if (record.category === "tennis" && record.tennisTypeName) report += `   Tipo de tenis: ${record.tennisTypeName}\n`;
@@ -443,7 +446,7 @@ export function weeklyReport(records, week) {
       if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;
       if (record.trekkingRoute) report += `   Ruta: ${record.trekkingRoute}\n`;
-      if (record.ascentDurationSeconds !== "") report += `   Tiempo de subida: ${formatDuration({ durationSeconds: record.ascentDurationSeconds, durationMinutes: record.ascentDurationSeconds / 60, durationPrecision: "hms" })}\n`;
+      if (record.ascentDurationSeconds !== "") report += `   Tiempo de subida: ${formatDuration({ durationSeconds: record.ascentDurationSeconds, durationMinutes: record.ascentDurationSeconds / 60, durationPrecision: "hm" })}\n`;
       if (record.surface) report += `   Superficie: ${record.surface}\n`;
       if (record.category === "physical" && record.routinePlannedSets !== "") {
         report += `   Series: ${record.routineCompletedSets}/${record.routinePlannedSets}\n`;

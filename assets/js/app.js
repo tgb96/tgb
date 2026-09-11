@@ -37,7 +37,7 @@ import {
   validateRecord,
   weekDays,
   weeklyReport
-} from "./utils.js?v=37";
+} from "./utils.js?v=39";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -414,10 +414,9 @@ function currentCardioExtraValues() {
 }
 
 function currentAscentDurationSeconds() {
-  if (!$("ascentHours") && !$("ascentMinutes") && !$("ascentSeconds")) return "";
+  if (!$("ascentHours") && !$("ascentMinutes")) return "";
   return (Number($("ascentHours")?.value || 0) * 3600)
-    + (Number($("ascentMinutes")?.value || 0) * 60)
-    + Number($("ascentSeconds")?.value || 0);
+    + (Number($("ascentMinutes")?.value || 0) * 60);
 }
 
 function currentDistanceKm() {
@@ -625,14 +624,13 @@ function updateCardioExtraFields(values = {}) {
     box.append(elevationLabel, elevation);
 
     const ascentLabel = document.createElement("label");
-    ascentLabel.textContent = "Tiempo de subida (HH:MM:SS)";
+    ascentLabel.textContent = "Tiempo de subida (HH:MM)";
     const ascentParts = durationParts({ durationSeconds: values.ascentDurationSeconds || 0 });
     const ascentFields = document.createElement("div");
-    ascentFields.className = "duration-parts hms";
+    ascentFields.className = "duration-parts";
     ascentFields.append(
       durationPart({ id: "ascentHours", label: "Horas", max: 12, value: ascentParts.hours }),
-      durationPart({ id: "ascentMinutes", label: "Min", max: 59, value: ascentParts.minutes }),
-      durationPart({ id: "ascentSeconds", label: "Seg", max: 59, value: ascentParts.seconds })
+      durationPart({ id: "ascentMinutes", label: "Min", max: 59, value: ascentParts.minutes })
     );
     box.append(ascentLabel, ascentFields);
   }
@@ -727,7 +725,7 @@ function renderTennisFields(record = {}) {
 }
 
 function durationMode() {
-  return "hms";
+  return currentCategory === "cardio" ? "hm" : "hms";
 }
 
 function currentDurationValues() {
@@ -770,16 +768,18 @@ function durationPart({ id, label, max, value = 0 }) {
 function renderDurationField(record = {}) {
   const box = $("durationField");
   box.replaceChildren();
+  const includeSeconds = durationMode() === "hms";
   const label = document.createElement("label");
-  label.textContent = "Duración (HH:MM:SS)";
+  label.textContent = includeSeconds ? "Duración (HH:MM:SS)" : "Duración (HH:MM)";
   const parts = durationParts(record);
   const fields = document.createElement("div");
-  fields.className = "duration-parts hms";
-  fields.append(
+  fields.className = `duration-parts${includeSeconds ? " hms" : ""}`;
+  const controls = [
     durationPart({ id: "durationHours", label: "Horas", max: 12, value: parts.hours }),
-    durationPart({ id: "durationMinutesPart", label: "Min", max: 59, value: parts.minutes }),
-    durationPart({ id: "durationSecondsPart", label: "Seg", max: 59, value: parts.seconds })
-  );
+    durationPart({ id: "durationMinutesPart", label: "Min", max: 59, value: parts.minutes })
+  ];
+  if (includeSeconds) controls.push(durationPart({ id: "durationSecondsPart", label: "Seg", max: 59, value: parts.seconds }));
+  fields.append(...controls);
   box.append(label, fields);
 }
 
@@ -1242,7 +1242,7 @@ function distancePartsAreValid() {
 
 function saveTraining(event) {
   event.preventDefault();
-  if (!durationPartsAreValid()) return showFormError("Revisa la duración: los minutos y segundos deben estar entre 0 y 59.");
+  if (!durationPartsAreValid()) return showFormError(`Revisa la duración: los minutos${durationMode() === "hms" ? " y segundos" : ""} deben estar entre 0 y 59.`);
   if (!distancePartsAreValid()) return showFormError("Revisa la distancia: usa kilómetros entre 0 y 999 y metros entre 0 y 999.");
   const candidate = formRecord();
   const validation = validateRecord(candidate);
