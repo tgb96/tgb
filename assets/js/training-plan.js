@@ -3,8 +3,8 @@ import {
   physicalRoutineById,
   restTypes,
   tennisTypeById
-} from "./data.js?v=43";
-import { isValidISODate, isoWeekInfo } from "./utils.js?v=43";
+} from "./data.js?v=45";
+import { isValidISODate, isoWeekInfo } from "./utils.js?v=45";
 
 const text = (value, max = 500) => String(value || "").trim().slice(0, max);
 const list = (value, maxItems = 20, maxLength = 500) => Array.isArray(value)
@@ -147,7 +147,7 @@ export function normalizeTrainingBlock(raw) {
     subtitle: text(raw.subtitle, 500),
     startISO,
     endISO,
-    source: text(raw.source, 200) || "Importado con GPT",
+    source: text(raw.source, 200) || "Importado con IA",
     rules: list(raw.rules, 30, 1000),
     priority: list(raw.priority, 10, 200),
     weeks,

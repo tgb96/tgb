@@ -15,17 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=43";
+} from "./data.js?v=45";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=43";
-import { createRepository } from "./storage.js?v=43";
-import { createCloudSync } from "./cloud.js?v=43";
-import { createAiClient } from "./ai.js?v=43";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=43";
+} from "./coach-plan.js?v=45";
+import { createRepository } from "./storage.js?v=45";
+import { createCloudSync } from "./cloud.js?v=45";
+import { createAiClient } from "./ai.js?v=45";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=45";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -48,7 +48,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=43";
+} from "./utils.js?v=45";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -457,18 +457,18 @@ function renderAiPlanPreview(block) {
 async function analyzeAiPlan() {
   const planText = $("aiPlanText").value.trim();
   if (planText.length < 100) {
-    setAiPlanMessage("Pega una planificación más completa para que GPT pueda reconocer semanas, días y actividades.");
+    setAiPlanMessage("Pega una planificación más completa para que la IA pueda reconocer semanas, días y actividades.");
     $("aiPlanText").focus();
     return;
   }
   const button = $("analyzeAiPlanButton");
   button.disabled = true;
-  button.textContent = "GPT está organizando el plan…";
+  button.textContent = "La IA está organizando el plan…";
   setAiPlanMessage("Puede tardar algunos segundos. No cierres esta ventana.", "success");
   try {
     const result = await aiClient.importTrainingPlan(planText, getChileDateISO());
     const block = normalizeTrainingBlock(result?.block || result);
-    if (!block) throw new Error("GPT no devolvió una planificación que TGTrain pudiera validar.");
+    if (!block) throw new Error("La IA no devolvió una planificación que TGTrain pudiera validar.");
     aiPlanCandidate = block;
     renderAiPlanPreview(block);
     setAiPlanMessage("");
@@ -2093,7 +2093,7 @@ async function requestRoutineAiAnalysis(recordId, planDetails = []) {
   if (!record) return;
   if (!cloudSync.currentUser) {
     openCloudDialog();
-    showToast("Inicia sesión con Google para generar el análisis GPT.");
+    showToast("Inicia sesión con Google para generar el análisis inteligente.");
     return;
   }
   aiAnalysisInFlight.add(recordId);
@@ -2115,7 +2115,7 @@ async function requestRoutineAiAnalysis(recordId, planDetails = []) {
       },
       updatedAt: new Date().toISOString()
     });
-    showToast("Análisis GPT listo y guardado en el historial.");
+    showToast("Análisis inteligente listo y guardado en el historial.");
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -2286,7 +2286,7 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const card = document.createElement("section");
   card.className = `routine-ai-card${compact ? " compact" : ""}`;
   const eyebrow = document.createElement("span");
-  eyebrow.textContent = "✦ Análisis GPT";
+  eyebrow.textContent = "✦ Análisis inteligente";
   card.append(eyebrow);
   const loading = aiAnalysisInFlight.has(record?.id);
   const analysis = record?.routineAiAnalysis;
@@ -2325,13 +2325,13 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   heading.textContent = loading ? "Analizando tu entrenamiento…" : "Obtén una lectura más profunda";
   const summary = document.createElement("p");
   summary.textContent = loading
-    ? "GPT está comparando esta rutina con tus sesiones anteriores. El entrenamiento ya quedó guardado."
+    ? "La IA está comparando esta rutina con tus sesiones anteriores. El entrenamiento ya quedó guardado."
     : "Compara cargas, volumen, cumplimiento, abdominales y sensaciones con tus registros anteriores.";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "routine-ai-button";
   button.disabled = loading;
-  button.textContent = loading ? "Preparando análisis…" : cloudSync.currentUser ? "Analizar con GPT" : "Iniciar sesión para analizar";
+  button.textContent = loading ? "Preparando análisis…" : cloudSync.currentUser ? "Analizar con IA" : "Iniciar sesión para analizar";
   button.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
   card.append(heading, summary, button);
   return card;
