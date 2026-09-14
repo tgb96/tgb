@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=38";
+} from "./data.js?v=43";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -195,6 +195,7 @@ export function normalizeRecord(record) {
     routineAbsCount: optionalNumber(record?.routineAbsCount, { min: 0 }),
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
     routineSummary: String(record?.routineSummary || "").slice(0, 3000),
+    routineAiAnalysis: normalizeRoutineAiAnalysis(record?.routineAiAnalysis),
     routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
@@ -459,6 +460,26 @@ export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6)
   });
 }
 
+function normalizeRoutineAiAnalysis(value) {
+  if (!value || typeof value !== "object") return null;
+  const cleanList = (items, max = 6) => Array.isArray(items)
+    ? items.slice(0, max).map(item => String(item || "").trim().slice(0, 500)).filter(Boolean)
+    : [];
+  const headline = String(value.headline || "").trim().slice(0, 300);
+  const summary = String(value.summary || "").trim().slice(0, 2000);
+  if (!headline && !summary) return null;
+  return {
+    headline,
+    summary,
+    highlights: cleanList(value.highlights),
+    progress: cleanList(value.progress),
+    nextSession: cleanList(value.nextSession),
+    cautions: cleanList(value.cautions),
+    generatedAt: String(value.generatedAt || "").slice(0, 40),
+    model: String(value.model || "").slice(0, 100)
+  };
+}
+
 export function routineCompletionSummary(sourceRecord, previousRecords = []) {
   const record = normalizeRecord(sourceRecord);
   if (record.category !== "physical") return "";
@@ -554,6 +575,14 @@ export function weeklyReport(records, week) {
         report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
         if (record.routineAbsCount !== "") report += `   Abdominales finales: ${record.routineAbsCount}\n`;
         if (record.routineSummary) report += `   Resumen automático: ${record.routineSummary}\n`;
+        if (record.routineAiAnalysis) {
+          report += `   Análisis GPT: ${record.routineAiAnalysis.headline || record.routineAiAnalysis.summary}\n`;
+          if (record.routineAiAnalysis.summary && record.routineAiAnalysis.headline) report += `   Lectura: ${record.routineAiAnalysis.summary}\n`;
+          record.routineAiAnalysis.highlights.forEach(item => { report += `   Punto destacado: ${item}\n`; });
+          record.routineAiAnalysis.progress.forEach(item => { report += `   Progreso: ${item}\n`; });
+          record.routineAiAnalysis.nextSession.forEach(item => { report += `   Próxima sesión: ${item}\n`; });
+          record.routineAiAnalysis.cautions.forEach(item => { report += `   Atención: ${item}\n`; });
+        }
       }
       if (record.category === "physical" && record.routineExercises.length) {
         report += "   Ejercicios, cargas y repeticiones realizadas:\n";
@@ -587,7 +616,7 @@ export function recordsToCSV(records) {
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
-    ["resumen_automatico", "routineSummary"], ["detalle_ejercicios", "routineExercisesExport"],
+    ["resumen_automatico", "routineSummary"], ["analisis_gpt", "routineAiAnalysisExport"], ["detalle_ejercicios", "routineExercisesExport"],
     ["plan_entrenador", "plannedTitle"], ["plan_semana", "planWeekKey"], ["plan_sesion", "planSessionId"],
     ["sensaciones", "sensations"]
   ];
@@ -597,7 +626,10 @@ export function recordsToCSV(records) {
       ...record,
       routineExercisesExport: record.routineExercises
         .map((exercise, index) => `${index + 1}. ${exercise.name}: ${routineExerciseLine(exercise)}`)
-        .join(" | ")
+        .join(" | "),
+      routineAiAnalysisExport: record.routineAiAnalysis
+        ? [record.routineAiAnalysis.headline, record.routineAiAnalysis.summary, ...record.routineAiAnalysis.highlights, ...record.routineAiAnalysis.progress, ...record.routineAiAnalysis.nextSession, ...record.routineAiAnalysis.cautions].filter(Boolean).join(" | ")
+        : ""
     };
     rows.push(columns.map(([, key]) => csvCell(csvRecord[key])).join(","));
   }

@@ -214,16 +214,16 @@ export const coachTrainingBlock = {
   ]
 };
 
-export function coachSessionForDate(dateISO) {
-  for (const week of coachTrainingBlock.weeks) {
+export function coachSessionForDate(dateISO, block = coachTrainingBlock) {
+  for (const week of block.weeks) {
     const session = week.sessions.find(item => item.dateISO === dateISO);
     if (session) return { ...session, week };
   }
   return null;
 }
 
-export function coachWeekForDate(dateISO) {
-  return coachTrainingBlock.weeks.find(week => dateISO >= week.startISO && dateISO <= week.endISO) || null;
+export function coachWeekForDate(dateISO, block = coachTrainingBlock) {
+  return block.weeks.find(week => dateISO >= week.startISO && dateISO <= week.endISO) || null;
 }
 
 export function coachOption(session, optionId) {

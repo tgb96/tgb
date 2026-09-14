@@ -1,9 +1,10 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=42";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=43";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=43";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 function parseJSON(value, fallback) {
   try {
@@ -51,19 +52,25 @@ export function loadData(storage) {
     schemaVersion: SCHEMA_VERSION,
     records: ensureIds(current.records),
     plans: normalizePlans(current.plans),
+    trainingBlocks: normalizeTrainingBlocks(current.trainingBlocks),
     migrated: false,
     sourceKey: DATA_KEY
   };
 
   const previous = parseJSON(storage.getItem(PREVIOUS_DATA_KEY), null);
-  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
+  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
 
   const legacy = parseJSON(storage.getItem(LEGACY_HISTORY_KEY), []);
-  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
+  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
 }
 
 export function saveData(storage, data) {
-  const payload = { schemaVersion: SCHEMA_VERSION, records: ensureIds(data.records || []), plans: normalizePlans(data.plans) };
+  const payload = {
+    schemaVersion: SCHEMA_VERSION,
+    records: ensureIds(data.records || []),
+    plans: normalizePlans(data.plans),
+    trainingBlocks: normalizeTrainingBlocks(data.trainingBlocks)
+  };
   try {
     storage.setItem(DATA_KEY, JSON.stringify(payload));
   } catch (error) {
@@ -97,8 +104,8 @@ export function createRepository(storage) {
     }
   }
 
-  const persist = ({ records = state.records, plans = state.plans } = {}) => {
-    state = { ...saveData(storage, { records, plans }), migrated: false, sourceKey: DATA_KEY };
+  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks } = {}) => {
+    state = { ...saveData(storage, { records, plans, trainingBlocks }), migrated: false, sourceKey: DATA_KEY };
     return state;
   };
 
@@ -141,10 +148,13 @@ export function createRepository(storage) {
       const incoming = parseBackup(jsonText);
       const backup = parseJSON(jsonText, null);
       const incomingPlans = normalizePlans(backup?.plans);
+      const incomingBlocks = normalizeTrainingBlocks(backup?.trainingBlocks);
       const merged = new Map(state.records.map(record => [record.id, record]));
       incoming.forEach(record => merged.set(record.id, record));
       const plans = { ...state.plans };
       const appliedPlans = [];
+      const trainingBlocks = { ...state.trainingBlocks };
+      const appliedBlocks = [];
       Object.values(incomingPlans).forEach(plan => {
         const current = plans[plan.weekKey];
         if (!current || recordTimestamp(plan) >= recordTimestamp(current)) {
@@ -152,9 +162,17 @@ export function createRepository(storage) {
           appliedPlans.push(plan);
         }
       });
-      persist({ records: [...merged.values()], plans });
+      Object.values(incomingBlocks).forEach(block => {
+        const current = trainingBlocks[block.id];
+        if (!current || recordTimestamp(block) >= recordTimestamp(current)) {
+          trainingBlocks[block.id] = block;
+          appliedBlocks.push(block);
+        }
+      });
+      persist({ records: [...merged.values()], plans, trainingBlocks });
       incoming.forEach(record => notify({ type: "upsert", record }));
       appliedPlans.forEach(plan => notify({ type: "plan-upsert", plan }));
+      appliedBlocks.forEach(block => notify({ type: "training-block-upsert", block }));
       return incoming.length;
     },
     applyCloudRecord(record) {
@@ -196,13 +214,36 @@ export function createRepository(storage) {
       persist({ plans: { ...state.plans, [next.weekKey]: next } });
       return true;
     },
+    listTrainingBlocks() {
+      return Object.values(state.trainingBlocks).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    },
+    getTrainingBlock(id) {
+      return state.trainingBlocks[String(id)] || null;
+    },
+    saveTrainingBlock(block, { silent = false } = {}) {
+      const normalized = normalizeTrainingBlocks([block]);
+      const next = Object.values(normalized)[0];
+      if (!next) throw new Error("La planificación importada no es válida.");
+      persist({ trainingBlocks: { ...state.trainingBlocks, [next.id]: next } });
+      if (!silent) notify({ type: "training-block-upsert", block: next });
+      return next;
+    },
+    applyCloudTrainingBlock(block) {
+      const normalized = normalizeTrainingBlocks([block]);
+      const next = Object.values(normalized)[0];
+      if (!next) return false;
+      const current = state.trainingBlocks[next.id];
+      if (current && recordTimestamp(current) > recordTimestamp(next)) return false;
+      persist({ trainingBlocks: { ...state.trainingBlocks, [next.id]: next } });
+      return true;
+    },
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     backup() {
-      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans }, null, 2);
+      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks }, null, 2);
     }
   };
 }

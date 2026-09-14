@@ -133,6 +133,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .coach-today-plan small { margin-top: 3px; color: rgba(255,255,255,0.62); font-size: 9px; line-height: 1.35; }
 .coach-plan-done { margin: 0; color: rgba(255,255,255,0.72); font-size: 12px; }
 .coach-plan-open { width: 100%; margin-top: 12px; padding: 10px 2px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1); background: transparent; color: white; font-size: 11px; font-weight: 900; text-align: left; }
+.coach-plan-actions { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 12px; padding-top: 10px; }
+.coach-plan-actions .coach-plan-open { margin: 0; padding: 10px 2px; border: 0; }
+.coach-ai-open { min-height: 40px; padding: 0 12px; border: 1px solid rgba(200,255,77,0.34); border-radius: 12px; background: rgba(200,255,77,0.1); color: var(--lime); font-size: 10px; font-weight: 900; white-space: nowrap; }
 .coach-option-button { width: 100%; min-height: 43px; padding: 9px 12px; border: 0; border-radius: 12px; background: var(--blue); color: white; font-size: 10px; font-weight: 900; }
 .coach-option-button.compact { width: auto; min-width: 105px; flex: 0 0 auto; background: var(--lime); color: var(--night); }
 .coach-option-button:disabled { cursor: default; background: #e6e7e3; color: #8a8f99; }
@@ -398,6 +401,44 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-attempts em { align-self: center; color: var(--blue-dark); font-size: 9px; font-style: normal; font-weight: 900; }
 .routine-auto-summary { margin: 12px 0 0; padding: 12px; border-left: 4px solid var(--lime); border-radius: 12px; background: var(--night); color: white; font-size: 10px; line-height: 1.5; }
 .history-auto-summary { margin-top: 9px !important; padding: 9px; border-radius: 11px; background: #eef7d7; color: #364115 !important; font-size: 10px !important; }
+.routine-ai-card { margin-top: 12px; padding: 14px; border: 1px solid rgba(59, 91, 255, 0.2); border-radius: 17px; background: linear-gradient(145deg, #f3f5ff, #fff); color: var(--ink); }
+.routine-ai-card > span { display: block; color: var(--blue); font-size: 9px; font-weight: 950; letter-spacing: .6px; text-transform: uppercase; }
+.routine-ai-card h4 { margin: 5px 0 0; font-size: 16px; line-height: 1.2; }
+.routine-ai-card p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.routine-ai-groups { display: grid; gap: 8px; margin-top: 10px; }
+.routine-ai-group { padding: 10px; border-radius: 12px; background: white; }
+.routine-ai-group strong { display: block; font-size: 10px; }
+.routine-ai-group ul { margin: 6px 0 0; padding-left: 16px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.routine-ai-button { width: 100%; min-height: 46px; margin-top: 10px; border: 0; border-radius: 13px; background: var(--blue); color: white; font-size: 11px; font-weight: 900; }
+.routine-ai-button:disabled { opacity: .58; cursor: wait; }
+
+.ai-plan-dialog { background: white; }
+.ai-plan-step > label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 900; }
+.ai-plan-step > textarea { width: 100%; min-height: 230px; resize: vertical; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); font-size: 12px; line-height: 1.5; }
+.ai-privacy-note { display: flex; gap: 7px; margin: 9px 2px 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.ai-privacy-note span { color: #76a600; }
+.ai-action-button { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ai-preview-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ai-preview-heading span { color: var(--blue); font-size: 9px; font-weight: 950; letter-spacing: .6px; text-transform: uppercase; }
+.ai-preview-heading h3 { margin: 5px 0 0; font-size: 21px; letter-spacing: -.5px; }
+.ai-preview-heading p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+.ai-preview-heading button { min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--muted); font-size: 10px; font-weight: 850; }
+.ai-plan-preview-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 14px; }
+.ai-plan-preview-summary div { padding: 11px 8px; border-radius: 13px; background: var(--night); color: white; text-align: center; }
+.ai-plan-preview-summary strong { display: block; color: var(--lime); font-size: 18px; }
+.ai-plan-preview-summary span { display: block; margin-top: 2px; color: rgba(255,255,255,.62); font-size: 8px; text-transform: uppercase; }
+.ai-plan-preview-weeks { display: grid; gap: 8px; margin-top: 12px; }
+.ai-preview-week { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; }
+.ai-preview-week > strong { display: block; padding: 10px 12px; background: var(--paper); font-size: 11px; }
+.ai-preview-day { display: grid; grid-template-columns: 70px 1fr; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 10px; }
+.ai-preview-day span { color: var(--muted); }
+.ai-preview-day b { font-weight: 850; }
+.ai-confirm-note { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; text-align: center; }
+
+@media (max-width: 430px) {
+  .coach-plan-actions { grid-template-columns: 1fr; }
+  .coach-ai-open { width: 100%; }
+}
 .trekking-ranking-card + .trekking-ranking-card { margin-top: 0; }
 .trekking-ranking-card .eyebrow { color: var(--lime); }
 .trekking-ranking-card > h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -0.6px; }

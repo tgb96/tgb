@@ -24,6 +24,8 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /id="cloudDialog"/);
   assert.match(html, /id="runningRankings"/);
   assert.match(html, /id="physicalRankings"/);
+  assert.match(html, /id="openAiPlanButton"/);
+  assert.match(html, /id="aiPlanDialog"/);
   assert.doesNotMatch(html, /weeklyPlan|Plan semanal/);
   assert.match(html, /id="evolutionMetrics"/);
   assert.match(html, /id="exerciseProgress"/);
@@ -104,6 +106,8 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /Copiar informe para el entrenador/);
   assert.match(app, /attempts\.slice\(0, 3\)/);
   assert.match(app, /Duración aprox\./);
+  assert.match(app, /requestRoutineAiAnalysis/);
+  assert.match(app, /routineAiAnalysis/);
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
@@ -133,10 +137,10 @@ test("integra el bloque de cuatro semanas del entrenador con sesiones y alternat
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v42/);
+  assert.match(worker, /tgtrain-shell-v43/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {

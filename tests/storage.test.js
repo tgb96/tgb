@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 10/);
+  assert.match(repository.backup(), /"schemaVersion": 11/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -104,4 +104,27 @@ test("guarda el plan semanal, lo respalda y acepta actualizaciones de la nube", 
     updatedAt: "2026-08-21T12:00:00.000Z"
   }), true);
   assert.equal(repository.getWeekPlan("2026-W35").days["2026-08-25"].activityId, "tennis");
+});
+
+test("guarda y respalda bloques completos importados para el entrenador", () => {
+  const repository = createRepository(new FakeStorage());
+  const changes = [];
+  repository.subscribe(change => changes.push(change));
+  const saved = repository.saveTrainingBlock({
+    id: "bloque-octubre",
+    title: "Bloque octubre",
+    weeks: [{
+      weekKey: "2026-W42",
+      label: "Adaptación",
+      sessions: [{
+        dateISO: "2026-10-12",
+        objective: "Fuerza controlada",
+        options: [{ id: "legs", title: "Día 1", category: "physical", routineId: "legs" }]
+      }]
+    }]
+  });
+  assert.equal(saved.id, "bloque-octubre");
+  assert.equal(repository.listTrainingBlocks().length, 1);
+  assert.equal(changes.at(-1).type, "training-block-upsert");
+  assert.match(repository.backup(), /bloque-octubre/);
 });

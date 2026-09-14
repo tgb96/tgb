@@ -15,15 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=38";
+} from "./data.js?v=43";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=42";
-import { createRepository } from "./storage.js?v=42";
-import { createCloudSync } from "./cloud.js?v=40";
+} from "./coach-plan.js?v=43";
+import { createRepository } from "./storage.js?v=43";
+import { createCloudSync } from "./cloud.js?v=43";
+import { createAiClient } from "./ai.js?v=43";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=43";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -46,10 +48,11 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=42";
+} from "./utils.js?v=43";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
+const aiClient = createAiClient();
 const cloudSync = createCloudSync({
   repository,
   storage: window.localStorage,
@@ -57,6 +60,7 @@ const cloudSync = createCloudSync({
   onDataChanged: () => {
     renderHome();
     renderHistory();
+    renderCoachPlanDialog();
   }
 });
 
@@ -71,6 +75,8 @@ let routineSessionTicker = null;
 let openRoutineId = "";
 let currentCloudStatus = { state: "unconfigured", user: null };
 let plannedRegistrationContext = null;
+let aiPlanCandidate = null;
+const aiAnalysisInFlight = new Set();
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -115,14 +121,18 @@ function openRegistration() {
   showView("register");
 }
 
-function planRecordForSession(session, records = repository.list()) {
-  return records.find(record => record.planBlockId === coachTrainingBlock.id && record.planSessionId === session?.id) || null;
+function activeTrainingBlock() {
+  return newestTrainingBlock(repository.listTrainingBlocks()) || coachTrainingBlock;
+}
+
+function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
+  return records.find(record => record.planBlockId === block.id && record.planSessionId === session?.id) || null;
 }
 
 function loadPlannedRoutineContext() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(PLANNED_ROUTINE_CONTEXT_KEY) || "null");
-    if (!parsed || parsed.blockId !== coachTrainingBlock.id || !physicalRoutineById(parsed.routineId)) return null;
+    if (!parsed || !parsed.blockId || !physicalRoutineById(parsed.routineId)) return null;
     return parsed;
   } catch {
     return null;
@@ -159,10 +169,10 @@ function clearPlannedRoutineContext({ restore = false } = {}) {
   savePlannedRoutineContext(null);
 }
 
-function planContextPayload(session, option) {
+function planContextPayload(session, option, block = activeTrainingBlock()) {
   return {
-    blockId: coachTrainingBlock.id,
-    blockTitle: coachTrainingBlock.title,
+    blockId: block.id,
+    blockTitle: block.title,
     weekKey: session.week.weekKey,
     weekNumber: session.week.number,
     sessionId: session.id,
@@ -199,6 +209,7 @@ function applyPlannedRoutineSettings(routine, option) {
 }
 
 function openPlannedOption(session, optionId) {
+  const block = activeTrainingBlock();
   const option = coachOption(session, optionId);
   if (!option) return;
   const todayISO = getChileDateISO();
@@ -206,13 +217,13 @@ function openPlannedOption(session, optionId) {
     showToast(`Esta sesión estará disponible el ${formatShortDate(session.dateISO)}.`);
     return;
   }
-  if (planRecordForSession(session)) {
+  if (planRecordForSession(session, repository.list(), block)) {
     $("coachPlanDialog")?.close();
     showView("history");
     showToast("Esta sesión ya está registrada. Puedes revisarla en el historial.");
     return;
   }
-  const payload = planContextPayload(session, option);
+  const payload = planContextPayload(session, option, block);
   $("coachPlanDialog")?.close();
   if (option.category === "physical") {
     const routine = physicalRoutineById(option.prefill?.routineId);
@@ -260,10 +271,11 @@ function createPlanOptionButton(session, option, records, { compact = false } = 
 }
 
 function renderCoachTodayPlan(records) {
+  const block = activeTrainingBlock();
   const todayISO = getChileDateISO();
-  const exact = coachSessionForDate(todayISO);
-  const next = coachTrainingBlock.weeks.flatMap(week => week.sessions.map(session => ({ ...session, week })))
-    .find(session => session.dateISO >= todayISO && !planRecordForSession(session, records));
+  const exact = coachSessionForDate(todayISO, block);
+  const next = block.weeks.flatMap(week => week.sessions.map(session => ({ ...session, week })))
+    .find(session => session.dateISO >= todayISO && !planRecordForSession(session, records, block));
   const session = exact || next;
   const container = $("coachTodayPlan");
   container.replaceChildren();
@@ -288,30 +300,36 @@ function renderCoachTodayPlan(records) {
 }
 
 function renderCoachBlock(records = repository.list()) {
+  const block = activeTrainingBlock();
   const todayISO = getChileDateISO();
-  const week = coachWeekForDate(todayISO)
-    || (todayISO < coachTrainingBlock.startISO ? coachTrainingBlock.weeks[0] : coachTrainingBlock.weeks.at(-1));
-  const sessions = coachTrainingBlock.weeks.flatMap(item => item.sessions);
-  const completed = sessions.filter(session => planRecordForSession(session, records)).length;
-  const phase = todayISO < coachTrainingBlock.startISO
-    ? `Comienza ${formatShortDate(coachTrainingBlock.startISO)}`
-    : todayISO > coachTrainingBlock.endISO ? "Bloque finalizado" : `Semana ${week.number} · ${week.label}`;
+  const week = coachWeekForDate(todayISO, block)
+    || (todayISO < block.startISO ? block.weeks[0] : block.weeks.at(-1));
+  const sessions = block.weeks.flatMap(item => item.sessions);
+  const completed = sessions.filter(session => planRecordForSession(session, records, block)).length;
+  const phase = todayISO < block.startISO
+    ? `Comienza ${formatShortDate(block.startISO)}`
+    : todayISO > block.endISO ? "Bloque finalizado" : `Semana ${week.number} · ${week.label}`;
   $("coachBlockPhase").textContent = phase;
   $("coachBlockProgress").textContent = `${completed}/${sessions.length} días registrados`;
-  $("coachBlockContext").textContent = week.context;
+  $("coachBlockTitle").textContent = block.title;
+  $("coachBlockContext").textContent = week?.context || block.subtitle || "Plan indicado por tu entrenador.";
+  $("coachBlockCard").querySelector(".coach-block-weeks").innerHTML = `${block.weeks.length}<br><small>semanas</small>`;
   renderCoachTodayPlan(records);
 }
 
 function renderCoachPlanDialog(records = repository.list()) {
+  const block = activeTrainingBlock();
   const container = $("coachPlanWeeks");
   container.replaceChildren();
-  coachTrainingBlock.weeks.forEach((week, weekIndex) => {
+  $("coachPlanDialogTitle").textContent = `${block.title} · ${block.weeks.length} ${block.weeks.length === 1 ? "semana" : "semanas"}`;
+  $("coachPlanDialogTitle").nextElementSibling.textContent = `Del ${formatShortDate(block.startISO)} al ${formatShortDate(block.endISO)} · ${block.source}`;
+  block.weeks.forEach((week, weekIndex) => {
     const weekCard = document.createElement("details");
     weekCard.className = "coach-week-card";
     const todayISO = getChileDateISO();
-    weekCard.open = coachWeekForDate(todayISO)?.weekKey === week.weekKey
-      || (todayISO < coachTrainingBlock.startISO && weekIndex === 0);
-    const completed = week.sessions.filter(session => planRecordForSession(session, records)).length;
+    weekCard.open = coachWeekForDate(todayISO, block)?.weekKey === week.weekKey
+      || (todayISO < block.startISO && weekIndex === 0);
+    const completed = week.sessions.filter(session => planRecordForSession(session, records, block)).length;
     const summary = document.createElement("summary");
     const copy = document.createElement("div");
     const eyebrow = document.createElement("span");
@@ -322,7 +340,7 @@ function renderCoachPlanDialog(records = repository.list()) {
     objective.textContent = week.objective;
     copy.append(eyebrow, title, objective);
     const counter = document.createElement("b");
-    counter.textContent = `${completed}/7`;
+    counter.textContent = `${completed}/${week.sessions.length}`;
     summary.append(copy, counter);
     const body = document.createElement("div");
     body.className = "coach-week-body";
@@ -330,7 +348,7 @@ function renderCoachPlanDialog(records = repository.list()) {
       const day = document.createElement("article");
       day.className = "coach-session-card";
       if (session.dateISO === getChileDateISO()) day.classList.add("today");
-      if (planRecordForSession(session, records)) day.classList.add("complete");
+      if (planRecordForSession(session, records, block)) day.classList.add("complete");
       const heading = document.createElement("div");
       const date = document.createElement("span");
       date.textContent = formatLongDate(session.dateISO);
@@ -361,7 +379,7 @@ function renderCoachPlanDialog(records = repository.list()) {
   });
   const rules = $("coachPlanRules");
   rules.replaceChildren();
-  coachTrainingBlock.rules.forEach(text => {
+  block.rules.forEach(text => {
     const item = document.createElement("li");
     item.textContent = text;
     rules.append(item);
@@ -371,6 +389,109 @@ function renderCoachPlanDialog(records = repository.list()) {
 function openCoachPlanDialog() {
   renderCoachPlanDialog();
   if (!$("coachPlanDialog").open) $("coachPlanDialog").showModal();
+}
+
+function setAiPlanMessage(message, type = "error", targetId = "aiPlanMessage") {
+  const target = $(targetId);
+  target.textContent = message;
+  target.className = message ? `form-message ${type}` : "form-message hidden";
+}
+
+function showAiPlanInput() {
+  $("aiPlanInputStep").hidden = false;
+  $("aiPlanInputStep").classList.remove("hidden");
+  $("aiPlanPreviewStep").hidden = true;
+  $("aiPlanPreviewStep").classList.add("hidden");
+}
+
+function openAiPlanDialog() {
+  aiPlanCandidate = null;
+  showAiPlanInput();
+  setAiPlanMessage("");
+  setAiPlanMessage("", "error", "aiPlanSaveMessage");
+  if (!$("aiPlanDialog").open) $("aiPlanDialog").showModal();
+}
+
+function renderAiPlanPreview(block) {
+  const summary = summarizeTrainingBlock(block);
+  $("aiPlanPreviewTitle").textContent = block.title;
+  $("aiPlanPreviewDates").textContent = `${formatShortDate(block.startISO)} — ${formatShortDate(block.endISO)} · ${block.source}`;
+  const summaryBox = $("aiPlanPreviewSummary");
+  summaryBox.replaceChildren();
+  [[summary.weeks, "semanas"], [summary.sessions, "días planificados"], [block.rules.length, "reglas"]].forEach(([value, label]) => {
+    const metric = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = String(value);
+    const span = document.createElement("span");
+    span.textContent = label;
+    metric.append(strong, span);
+    summaryBox.append(metric);
+  });
+  const weeks = $("aiPlanPreviewWeeks");
+  weeks.replaceChildren();
+  block.weeks.forEach(week => {
+    const card = document.createElement("section");
+    card.className = "ai-preview-week";
+    const title = document.createElement("strong");
+    title.textContent = `Semana ${week.number} · ${week.label}`;
+    card.append(title);
+    week.sessions.forEach(session => {
+      const option = coachOption(session, session.primaryOptionId) || session.options[0];
+      const row = document.createElement("div");
+      row.className = "ai-preview-day";
+      const date = document.createElement("span");
+      date.textContent = formatShortDate(session.dateISO);
+      const activity = document.createElement("b");
+      activity.textContent = option.title;
+      row.append(date, activity);
+      card.append(row);
+    });
+    weeks.append(card);
+  });
+  $("aiPlanInputStep").hidden = true;
+  $("aiPlanInputStep").classList.add("hidden");
+  $("aiPlanPreviewStep").hidden = false;
+  $("aiPlanPreviewStep").classList.remove("hidden");
+}
+
+async function analyzeAiPlan() {
+  const planText = $("aiPlanText").value.trim();
+  if (planText.length < 100) {
+    setAiPlanMessage("Pega una planificación más completa para que GPT pueda reconocer semanas, días y actividades.");
+    $("aiPlanText").focus();
+    return;
+  }
+  const button = $("analyzeAiPlanButton");
+  button.disabled = true;
+  button.textContent = "GPT está organizando el plan…";
+  setAiPlanMessage("Puede tardar algunos segundos. No cierres esta ventana.", "success");
+  try {
+    const result = await aiClient.importTrainingPlan(planText, getChileDateISO());
+    const block = normalizeTrainingBlock(result?.block || result);
+    if (!block) throw new Error("GPT no devolvió una planificación que TGTrain pudiera validar.");
+    aiPlanCandidate = block;
+    renderAiPlanPreview(block);
+    setAiPlanMessage("");
+  } catch (error) {
+    setAiPlanMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = '<span aria-hidden="true">✦</span> Analizar y preparar vista previa';
+  }
+}
+
+function saveAiPlan() {
+  if (!aiPlanCandidate) return;
+  try {
+    const saved = repository.saveTrainingBlock({ ...aiPlanCandidate, updatedAt: new Date().toISOString() });
+    aiPlanCandidate = null;
+    $("aiPlanDialog").close();
+    renderHome();
+    renderCoachPlanDialog();
+    showToast(`${saved.title} quedó guardado como tu planificación activa.`);
+  } catch (error) {
+    setAiPlanMessage(error.message, "error", "aiPlanSaveMessage");
+  }
 }
 
 function updateCloudStatus(status) {
@@ -443,6 +564,7 @@ function openRegistrationOrActiveRoutine() {
 
 function renderHome() {
   const todayISO = getChileDateISO();
+  const block = activeTrainingBlock();
   const week = isoWeekInfo(todayISO);
   const allRecords = repository.list();
   const records = allRecords.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
@@ -465,7 +587,7 @@ function renderHome() {
   for (const dateISO of weekDays(todayISO)) {
     const day = dayIndexFromISO(dateISO);
     const dayRecords = records.filter(record => record.dateISO === dateISO);
-    const plannedSession = coachSessionForDate(dateISO);
+    const plannedSession = coachSessionForDate(dateISO, block);
     const row = document.createElement("article");
     row.className = "day-row";
     row.classList.toggle("today", dateISO === todayISO);
@@ -492,9 +614,9 @@ function renderHome() {
       if (plannedSession) {
         const primary = coachOption(plannedSession, plannedSession.primaryOptionId) || plannedSession.options[0];
         const planLine = document.createElement("div");
-        planLine.className = `planned-activity-line ${planRecordForSession(plannedSession, allRecords) ? "complete" : ""}`;
+        planLine.className = `planned-activity-line ${planRecordForSession(plannedSession, allRecords, block) ? "complete" : ""}`;
         const planBadge = document.createElement("span");
-        planBadge.textContent = planRecordForSession(plannedSession, allRecords) ? "Hecho" : "Plan";
+        planBadge.textContent = planRecordForSession(plannedSession, allRecords, block) ? "Hecho" : "Plan";
         const planCopy = document.createElement("div");
         const planTitle = document.createElement("strong");
         planTitle.textContent = primary.title;
@@ -1504,6 +1626,7 @@ function formRecord() {
     routineAbsCount: preserveRoutineBalance ? existing.routineAbsCount : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
+    routineAiAnalysis: preserveRoutineBalance ? existing.routineAiAnalysis : null,
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
     planBlockId: plannedRegistrationContext?.blockId || existing?.planBlockId || "",
@@ -1937,6 +2060,71 @@ function launchRoutineFromRegistration(routine) {
   scrollToRoutine(routine.id);
 }
 
+function routineForAi(record) {
+  return {
+    dateISO: record.dateISO,
+    routineId: record.routineId,
+    routineName: record.routineName,
+    durationMinutes: record.durationMinutes,
+    calories: record.calories,
+    sensations: record.sensations,
+    completedSets: record.routineCompletedSets,
+    plannedSets: record.routinePlannedSets,
+    completedExercises: record.routineCompletedExercises,
+    totalExercises: record.routineTotalExercises,
+    totalReps: record.routineTotalReps,
+    volumeKg: record.routineVolumeKg,
+    abdominalCount: record.routineAbsCount,
+    exercises: record.routineExercises.map(exercise => ({
+      name: exercise.name,
+      target: exercise.target,
+      weightKg: exercise.weightKg,
+      plannedSets: exercise.plannedSets,
+      completedSets: exercise.completedSets,
+      totalReps: exercise.totalReps,
+      volumeKg: exercise.volumeKg
+    }))
+  };
+}
+
+async function requestRoutineAiAnalysis(recordId, planDetails = []) {
+  if (aiAnalysisInFlight.has(recordId)) return;
+  const record = repository.get(recordId);
+  if (!record) return;
+  if (!cloudSync.currentUser) {
+    openCloudDialog();
+    showToast("Inicia sesión con Google para generar el análisis GPT.");
+    return;
+  }
+  aiAnalysisInFlight.add(recordId);
+  renderRoutines();
+  try {
+    const recentRecords = repository.list()
+      .filter(item => item.id !== record.id && item.category === "physical" && (item.routineId === record.routineId || item.routineName === record.routineName))
+      .slice(0, 8)
+      .reverse()
+      .map(routineForAi);
+    const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails);
+    const analysis = result?.analysis || result;
+    repository.upsert({
+      ...record,
+      routineAiAnalysis: {
+        ...analysis,
+        generatedAt: new Date().toISOString(),
+        model: result?.model || analysis?.model || ""
+      },
+      updatedAt: new Date().toISOString()
+    });
+    showToast("Análisis GPT listo y guardado en el historial.");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    aiAnalysisInFlight.delete(recordId);
+    renderRoutines();
+    renderHistory();
+  }
+}
+
 function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
@@ -2007,6 +2195,7 @@ function finishRoutineSession(routine) {
     routineAbsCount: absCount,
     routineExercises: summary.exercises,
     routineSummary: "",
+    routineAiAnalysis: null,
     routineDefaultsSaved: saveSettingsForNextTime,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
@@ -2055,6 +2244,7 @@ function finishRoutineSession(routine) {
   renderRoutines();
   renderHome();
   renderCoachPlanDialog();
+  if (cloudSync.currentUser) requestRoutineAiAnalysis(record.id, session.planDetails || []);
   showToast(saveSettingsForNextTime
     ? "Rutina registrada y cambios guardados para la próxima vez."
     : settingsChangeCount > 0
@@ -2090,6 +2280,61 @@ function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", pr
     grid.append(metric);
   });
   return grid;
+}
+
+function createRoutineAiCard(record, { compact = false } = {}) {
+  const card = document.createElement("section");
+  card.className = `routine-ai-card${compact ? " compact" : ""}`;
+  const eyebrow = document.createElement("span");
+  eyebrow.textContent = "✦ Análisis GPT";
+  card.append(eyebrow);
+  const loading = aiAnalysisInFlight.has(record?.id);
+  const analysis = record?.routineAiAnalysis;
+  if (analysis) {
+    const heading = document.createElement("h4");
+    heading.textContent = analysis.headline || "Lectura de tu entrenamiento";
+    const summary = document.createElement("p");
+    summary.textContent = analysis.summary;
+    card.append(heading, summary);
+    const groups = document.createElement("div");
+    groups.className = "routine-ai-groups";
+    [
+      ["Puntos destacados", analysis.highlights],
+      ["Evolución", analysis.progress],
+      ["Para la próxima sesión", analysis.nextSession],
+      ["Atención", analysis.cautions]
+    ].forEach(([title, items]) => {
+      if (!items?.length) return;
+      const group = document.createElement("div");
+      group.className = "routine-ai-group";
+      const strong = document.createElement("strong");
+      strong.textContent = title;
+      const list = document.createElement("ul");
+      items.forEach(item => {
+        const row = document.createElement("li");
+        row.textContent = item;
+        list.append(row);
+      });
+      group.append(strong, list);
+      groups.append(group);
+    });
+    if (groups.childElementCount) card.append(groups);
+    return card;
+  }
+  const heading = document.createElement("h4");
+  heading.textContent = loading ? "Analizando tu entrenamiento…" : "Obtén una lectura más profunda";
+  const summary = document.createElement("p");
+  summary.textContent = loading
+    ? "GPT está comparando esta rutina con tus sesiones anteriores. El entrenamiento ya quedó guardado."
+    : "Compara cargas, volumen, cumplimiento, abdominales y sensaciones con tus registros anteriores.";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "routine-ai-button";
+  button.disabled = loading;
+  button.textContent = loading ? "Preparando análisis…" : cloudSync.currentUser ? "Analizar con GPT" : "Iniciar sesión para analizar";
+  button.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
+  card.append(heading, summary, button);
+  return card;
 }
 
 function updateRoutineSessionPreview(routine, progress, settings, dateISO) {
@@ -2306,6 +2551,8 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     automaticSummary.className = "routine-auto-summary";
     automaticSummary.textContent = session.routineSummary || "Tu balance completo quedó guardado para comparar la próxima sesión.";
     panel.append(automaticSummary);
+    const completedRecord = repository.get(session.recordId);
+    if (completedRecord) panel.append(createRoutineAiCard(completedRecord));
     const note = document.createElement("small");
     note.textContent = session.settingsChangeCount > 0
       ? session.defaultSettingsSaved
@@ -2980,6 +3227,9 @@ function createHistoryEntry(sourceRecord) {
       automaticSummary.textContent = record.routineSummary;
       copy.append(automaticSummary);
     }
+    if (record.routineAiAnalysis || aiAnalysisInFlight.has(record.id)) {
+      copy.append(createRoutineAiCard(record, { compact: true }));
+    }
   }
   if (record.category === "physical" && record.routineExercises.length) {
     const exerciseDisclosure = document.createElement("details");
@@ -3118,7 +3368,12 @@ function bindEvents() {
   }));
   $("homeRegisterButton").addEventListener("click", openRegistrationOrActiveRoutine);
   $("openCoachPlanButton").addEventListener("click", openCoachPlanDialog);
+  $("openAiPlanButton").addEventListener("click", openAiPlanDialog);
   $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());
+  $("aiPlanDialogClose").addEventListener("click", () => $("aiPlanDialog").close());
+  $("analyzeAiPlanButton").addEventListener("click", analyzeAiPlan);
+  $("editAiPlanButton").addEventListener("click", showAiPlanInput);
+  $("saveAiPlanButton").addEventListener("click", saveAiPlan);
   $("registrationBackButton").addEventListener("click", () => {
     if (editingRecordId && !window.confirm("¿Cancelar la edición del entrenamiento?")) return;
     resetRegistration();

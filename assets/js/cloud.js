@@ -39,6 +39,7 @@ export function createCloudSync({
   let unsubscribeAuth = null;
   let unsubscribeRecords = null;
   let unsubscribePlans = null;
+  let unsubscribeTrainingBlocks = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
 
@@ -59,11 +60,17 @@ export function createCloudSync({
   const documentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "records", cloudDocumentId(id));
   const plansCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "plans");
   const planDocumentReference = weekKey => modules.firestoreModule.doc(database, "users", user.uid, "plans", String(weekKey));
+  const trainingBlocksCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "trainingBlocks");
+  const trainingBlockDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "trainingBlocks", String(id));
 
   async function writeChange(change) {
     if (!user) return;
     if (change.type === "plan-upsert") {
       await modules.firestoreModule.setDoc(planDocumentReference(change.plan.weekKey), change.plan);
+      return;
+    }
+    if (change.type === "training-block-upsert") {
+      await modules.firestoreModule.setDoc(trainingBlockDocumentReference(change.block.id), change.block);
       return;
     }
     if (change.type === "remove") {
@@ -135,6 +142,25 @@ export function createCloudSync({
       if (!remotePlans.has(weekKey)) uploads.push({ type: "plan-upsert", plan: localPlan });
     });
     for (const change of uploads.filter(change => change.type === "plan-upsert")) await writeChange(change);
+    const blocksSnapshot = await modules.firestoreModule.getDocs(trainingBlocksCollectionReference());
+    const remoteBlocks = new Map();
+    blocksSnapshot.forEach(item => {
+      const value = item.data();
+      if (value?.id) remoteBlocks.set(String(value.id), value);
+    });
+    const localBlocks = new Map(repository.listTrainingBlocks().map(block => [block.id, block]));
+    remoteBlocks.forEach((cloudBlock, id) => {
+      const localBlock = localBlocks.get(id);
+      if (!localBlock || recordTimestamp(cloudBlock) >= recordTimestamp(localBlock)) {
+        if (repository.applyCloudTrainingBlock(cloudBlock)) localChanged = true;
+      } else {
+        uploads.push({ type: "training-block-upsert", block: localBlock });
+      }
+    });
+    localBlocks.forEach((localBlock, id) => {
+      if (!remoteBlocks.has(id)) uploads.push({ type: "training-block-upsert", block: localBlock });
+    });
+    for (const change of uploads.filter(change => change.type === "training-block-upsert")) await writeChange(change);
     if (localChanged) onDataChanged();
   }
 
@@ -165,6 +191,18 @@ export function createCloudSync({
     }, () => emit("offline", "Sin conexión con la nube. Tus cambios siguen seguros en este dispositivo."));
   }
 
+  function observeCloudTrainingBlocks() {
+    unsubscribeTrainingBlocks?.();
+    unsubscribeTrainingBlocks = modules.firestoreModule.onSnapshot(trainingBlocksCollectionReference(), snapshot => {
+      let changed = false;
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") return;
+        changed = repository.applyCloudTrainingBlock(change.doc.data()) || changed;
+      });
+      if (changed) onDataChanged();
+    }, () => emit("offline", "Sin conexión con la nube. Tus datos locales permanecen seguros."));
+  }
+
   async function connect(currentUser) {
     user = currentUser;
     unsubscribeRepository?.();
@@ -173,6 +211,8 @@ export function createCloudSync({
     unsubscribeRecords = null;
     unsubscribePlans?.();
     unsubscribePlans = null;
+    unsubscribeTrainingBlocks?.();
+    unsubscribeTrainingBlocks = null;
     if (!user) {
       emit("signed-out", "Inicia sesión para guardar tus entrenamientos en la nube.");
       return;
@@ -188,6 +228,7 @@ export function createCloudSync({
       unsubscribeRepository = repository.subscribe(queueChange);
       observeCloudRecords();
       observeCloudPlans();
+      observeCloudTrainingBlocks();
       emit("synced", "Todos tus cambios están guardados en la nube.");
     } catch {
       unsubscribeRepository = repository.subscribe(queueChange);
@@ -237,6 +278,7 @@ export function createCloudSync({
       unsubscribeAuth?.();
       unsubscribeRecords?.();
       unsubscribePlans?.();
+      unsubscribeTrainingBlocks?.();
       unsubscribeRepository?.();
     }
   };

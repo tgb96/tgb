@@ -19,6 +19,8 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 - Panel de evolución de seis semanas y progreso detallado por ejercicio.
 - Resumen automático al finalizar cada rutina física, comparado con la sesión anterior y los récords personales.
+- Importación de nuevas planificaciones con GPT, vista previa y confirmación antes de activarlas.
+- Análisis GPT opcional al finalizar una rutina, comparado con hasta ocho sesiones anteriores de la misma rutina y guardado dentro del historial.
 - Copia local para funcionamiento sin conexión y sincronización privada en Firestore al iniciar sesión con Google.
 
 ## Tipos de entrenamiento
@@ -70,7 +72,7 @@ Las reglas incluidas en `firestore.rules` limitan cada historial al identificado
 
 ## Datos y migración
 
-Los registros permanecen disponibles en el navegador y, al iniciar sesión, se sincronizan con la nube de TGTrain bajo la cuenta de Google correspondiente. La versión actual usa el esquema 10 y migra automáticamente:
+Los registros permanecen disponibles en el navegador y, al iniciar sesión, se sincronizan con la nube de TGTrain bajo la cuenta de Google correspondiente. La versión actual usa el esquema 11 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.
@@ -86,7 +88,10 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.
 - `assets/js/storage.js`: migración, validación, persistencia local y eventos de sincronización.
 - `assets/js/cloud.js`: autenticación con Google y sincronización con Firestore.
+- `assets/js/ai.js`: conexión autenticada con las funciones inteligentes.
+- `assets/js/training-plan.js`: validación y normalización de planes importados.
 - `assets/js/firebase-config.js`: configuración pública del proyecto Firebase.
+- `functions/`: funciones privadas que llaman a OpenAI sin exponer la clave en GitHub Pages.
 - `assets/js/app.js`: interacción de la aplicación.
 - `service-worker.js`: funcionamiento offline y actualizaciones.
 - `tests/`: pruebas de semanas, datos, migración e integridad.

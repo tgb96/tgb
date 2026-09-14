@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=42">
+  <link rel="stylesheet" href="assets/css/styles.css?v=43">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -63,7 +63,10 @@
           <span class="coach-block-weeks">4<br><small>semanas</small></span>
         </div>
         <div id="coachTodayPlan" class="coach-today-plan"></div>
-        <button id="openCoachPlanButton" class="coach-plan-open" type="button">Ver planificación completa <span aria-hidden="true">→</span></button>
+        <div class="coach-plan-actions">
+          <button id="openCoachPlanButton" class="coach-plan-open" type="button">Ver planificación completa <span aria-hidden="true">→</span></button>
+          <button id="openAiPlanButton" class="coach-ai-open" type="button"><span aria-hidden="true">✦</span> Importar plan con GPT</button>
+        </div>
       </section>
 
       <div class="section-title-row">
@@ -285,6 +288,35 @@
     </section>
   </dialog>
 
+  <dialog id="aiPlanDialog" class="coach-plan-dialog ai-plan-dialog" aria-labelledby="aiPlanDialogTitle">
+    <div class="coach-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Planificación inteligente</p>
+        <h2 id="aiPlanDialogTitle">Importar un plan con GPT</h2>
+        <p>Pega el texto completo de tu entrenador. Nada se guardará hasta que revises y confirmes.</p>
+      </div>
+      <button id="aiPlanDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div id="aiPlanInputStep" class="ai-plan-step">
+      <label for="aiPlanText">Plan entregado por tu entrenador</label>
+      <textarea id="aiPlanText" rows="12" maxlength="50000" placeholder="Pega aquí la planificación completa: fechas, días, rutinas, cargas, series, cardio, tenis y reglas..."></textarea>
+      <p class="ai-privacy-note"><span aria-hidden="true">●</span> Solo se enviará este texto y el catálogo de ejercicios de TGTrain. No se enviará tu correo.</p>
+      <div id="aiPlanMessage" class="form-message hidden" role="status" aria-live="polite"></div>
+      <button id="analyzeAiPlanButton" class="save-button ai-action-button" type="button"><span aria-hidden="true">✦</span> Analizar y preparar vista previa</button>
+    </div>
+    <div id="aiPlanPreviewStep" class="ai-plan-step hidden" hidden>
+      <div class="ai-preview-heading">
+        <div><span>Vista previa</span><h3 id="aiPlanPreviewTitle"></h3><p id="aiPlanPreviewDates"></p></div>
+        <button id="editAiPlanButton" type="button">Editar texto</button>
+      </div>
+      <div id="aiPlanPreviewSummary" class="ai-plan-preview-summary"></div>
+      <div id="aiPlanPreviewWeeks" class="ai-plan-preview-weeks"></div>
+      <div id="aiPlanSaveMessage" class="form-message hidden" role="status" aria-live="polite"></div>
+      <button id="saveAiPlanButton" class="save-button ai-action-button" type="button">Usar esta planificación</button>
+      <small class="ai-confirm-note">Al confirmar, este plan aparecerá en Inicio y se sincronizará con tu nube de TGTrain.</small>
+    </div>
+  </dialog>
+
   <nav class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
       <span aria-hidden="true">⌂</span><small>Inicio</small>
@@ -302,6 +334,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=42"></script>
+  <script type="module" src="assets/js/app.js?v=43"></script>
 </body>
 </html>
