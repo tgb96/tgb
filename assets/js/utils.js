@@ -198,6 +198,11 @@ export function normalizeRecord(record) {
     routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
+    planBlockId: String(record?.planBlockId || "").slice(0, 200),
+    planWeekKey: String(record?.planWeekKey || "").slice(0, 20),
+    planSessionId: String(record?.planSessionId || "").slice(0, 100),
+    planOptionId: String(record?.planOptionId || "").slice(0, 100),
+    plannedTitle: String(record?.plannedTitle || "").slice(0, 500),
     createdAt: String(record?.createdAt || ""),
     updatedAt: String(record?.updatedAt || "")
   };
@@ -528,6 +533,7 @@ export function weeklyReport(records, week) {
     dayRecords.forEach((record, index) => {
       report += `${index + 1}. ${recordTitle(record)}\n`;
       report += `   Tipo: ${record.categoryName}\n`;
+      if (record.plannedTitle) report += `   Plan del entrenador: ${record.plannedTitle}\n`;
       if (record.category !== "rest") {
         report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: "hm" } : record)}\n`;
         report += `   Calorías: ${record.calories} kcal\n`;
@@ -582,6 +588,7 @@ export function recordsToCSV(records) {
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
     ["resumen_automatico", "routineSummary"], ["detalle_ejercicios", "routineExercisesExport"],
+    ["plan_entrenador", "plannedTitle"], ["plan_semana", "planWeekKey"], ["plan_sesion", "planSessionId"],
     ["sensaciones", "sensations"]
   ];
   const rows = [columns.map(([header]) => csvCell(header)).join(",")];

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=41">
+  <link rel="stylesheet" href="assets/css/styles.css?v=42">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -48,6 +48,23 @@
           <div><strong id="weekCalories">0</strong><span>kcal</span></div>
         </div>
       </div>
+
+      <section id="coachBlockCard" class="coach-block-card" aria-labelledby="coachBlockTitle">
+        <div class="coach-block-topline">
+          <span id="coachBlockPhase" class="coach-block-phase">Bloque del entrenador</span>
+          <span id="coachBlockProgress" class="coach-block-progress"></span>
+        </div>
+        <div class="coach-block-heading">
+          <div>
+            <p class="eyebrow">Plan activo</p>
+            <h2 id="coachBlockTitle">Rendimiento tenis</h2>
+            <p id="coachBlockContext"></p>
+          </div>
+          <span class="coach-block-weeks">4<br><small>semanas</small></span>
+        </div>
+        <div id="coachTodayPlan" class="coach-today-plan"></div>
+        <button id="openCoachPlanButton" class="coach-plan-open" type="button">Ver planificación completa <span aria-hidden="true">→</span></button>
+      </section>
 
       <div class="section-title-row">
         <div>
@@ -251,6 +268,23 @@
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
   </dialog>
 
+  <dialog id="coachPlanDialog" class="coach-plan-dialog" aria-labelledby="coachPlanDialogTitle">
+    <div class="coach-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Bloque activo del entrenador</p>
+        <h2 id="coachPlanDialogTitle">Rendimiento tenis · 4 semanas</h2>
+        <p>Del 14 de septiembre al 11 de octubre de 2026</p>
+      </div>
+      <button id="coachPlanDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div id="coachPlanWeeks" class="coach-plan-weeks"></div>
+    <section class="coach-plan-rules" aria-labelledby="coachRulesTitle">
+      <p class="eyebrow dark">Ajustes dinámicos</p>
+      <h3 id="coachRulesTitle">Reglas indicadas por tu entrenador</h3>
+      <ul id="coachPlanRules"></ul>
+    </section>
+  </dialog>
+
   <nav class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
       <span aria-hidden="true">⌂</span><small>Inicio</small>
@@ -268,6 +302,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=41"></script>
+  <script type="module" src="assets/js/app.js?v=42"></script>
 </body>
 </html>

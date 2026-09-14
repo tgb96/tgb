@@ -16,7 +16,13 @@ import {
   trekkingRoutes,
   trainingCategories
 } from "./data.js?v=38";
-import { createRepository } from "./storage.js?v=41";
+import {
+  coachOption,
+  coachSessionForDate,
+  coachTrainingBlock,
+  coachWeekForDate
+} from "./coach-plan.js?v=42";
+import { createRepository } from "./storage.js?v=42";
 import { createCloudSync } from "./cloud.js?v=40";
 import {
   dayIndexFromISO,
@@ -40,7 +46,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=41";
+} from "./utils.js?v=42";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -64,10 +70,12 @@ let timerLastCountdownSecond = null;
 let routineSessionTicker = null;
 let openRoutineId = "";
 let currentCloudStatus = { state: "unconfigured", user: null };
+let plannedRegistrationContext = null;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
+const PLANNED_ROUTINE_CONTEXT_KEY = "tgb-planned-routine-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
 const TIMER_REST_OPTIONS = [20, 30, 40, 50];
@@ -102,8 +110,267 @@ function showView(name) {
 }
 
 function openRegistration() {
+  clearPlannedRoutineContext({ restore: true });
   resetRegistration();
   showView("register");
+}
+
+function planRecordForSession(session, records = repository.list()) {
+  return records.find(record => record.planBlockId === coachTrainingBlock.id && record.planSessionId === session?.id) || null;
+}
+
+function loadPlannedRoutineContext() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PLANNED_ROUTINE_CONTEXT_KEY) || "null");
+    if (!parsed || parsed.blockId !== coachTrainingBlock.id || !physicalRoutineById(parsed.routineId)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePlannedRoutineContext(context) {
+  try {
+    if (context) window.localStorage.setItem(PLANNED_ROUTINE_CONTEXT_KEY, JSON.stringify(context));
+    else window.localStorage.removeItem(PLANNED_ROUTINE_CONTEXT_KEY);
+  } catch {
+    showToast("No se pudo conservar la sesión planificada.");
+  }
+}
+
+function restoreSettingsSnapshot(routineId, snapshot = {}) {
+  const routine = physicalRoutineById(routineId);
+  if (!routine) return;
+  const settings = loadRoutineSettings();
+  routine.exercises.forEach(exercise => {
+    const original = snapshot[exercise.id];
+    const key = routineSettingsKey(routine.id, exercise.id);
+    if (original) settings[key] = { ...original };
+    else delete settings[key];
+  });
+  saveRoutineSettings(settings);
+}
+
+function clearPlannedRoutineContext({ restore = false } = {}) {
+  const context = loadPlannedRoutineContext();
+  if (restore && context?.settingsBeforePlan && loadRoutineSession()?.status !== "active") {
+    restoreSettingsSnapshot(context.routineId, context.settingsBeforePlan);
+  }
+  savePlannedRoutineContext(null);
+}
+
+function planContextPayload(session, option) {
+  return {
+    blockId: coachTrainingBlock.id,
+    blockTitle: coachTrainingBlock.title,
+    weekKey: session.week.weekKey,
+    weekNumber: session.week.number,
+    sessionId: session.id,
+    optionId: option.id,
+    optionTitle: option.title,
+    plannedTitle: `${option.title} · ${option.summary}`,
+    dateISO: session.dateISO,
+    category: option.category
+  };
+}
+
+function plannedPrefill(option) {
+  const prefill = option.prefill || {};
+  return {
+    cardioTypeId: prefill.cardioTypeId || "",
+    tennisTypeId: prefill.tennisTypeId || "",
+    restTypeId: prefill.restTypeId || "planned",
+    distanceKm: prefill.distanceKm ?? "",
+    durationMinutes: "",
+    durationSeconds: "",
+    calories: "",
+    sensations: ""
+  };
+}
+
+function applyPlannedRoutineSettings(routine, option) {
+  const settings = loadRoutineSettings();
+  const before = routineSettingsSnapshot(routine, settings);
+  Object.entries(option.prefill?.settings || {}).forEach(([exerciseId, value]) => {
+    settings[routineSettingsKey(routine.id, exerciseId)] = { ...value };
+  });
+  saveRoutineSettings(settings);
+  return before;
+}
+
+function openPlannedOption(session, optionId) {
+  const option = coachOption(session, optionId);
+  if (!option) return;
+  const todayISO = getChileDateISO();
+  if (session.dateISO > todayISO) {
+    showToast(`Esta sesión estará disponible el ${formatShortDate(session.dateISO)}.`);
+    return;
+  }
+  if (planRecordForSession(session)) {
+    $("coachPlanDialog")?.close();
+    showView("history");
+    showToast("Esta sesión ya está registrada. Puedes revisarla en el historial.");
+    return;
+  }
+  const payload = planContextPayload(session, option);
+  $("coachPlanDialog")?.close();
+  if (option.category === "physical") {
+    const routine = physicalRoutineById(option.prefill?.routineId);
+    if (!routine) return showToast("No se encontró la rutina indicada por el plan.");
+    const active = loadRoutineSession();
+    if (active?.status === "active") {
+      openRoutineId = active.routineId;
+      showView("routines");
+      scrollToRoutineProgress(active.routineId);
+      showToast("Ya tienes una rutina en curso. Continúa o finalízala primero.");
+      return;
+    }
+    clearPlannedRoutineContext({ restore: true });
+    const settingsBeforePlan = applyPlannedRoutineSettings(routine, option);
+    savePlannedRoutineContext({
+      ...payload,
+      routineId: routine.id,
+      omitExerciseIds: option.prefill?.omitExerciseIds || [],
+      settingsBeforePlan,
+      planDetails: option.details || []
+    });
+    openRoutineId = routine.id;
+    showView("routines");
+    scrollToRoutine(routine.id);
+    showToast("Plan cargado. Revísalo y pulsa Iniciar cuando estés listo.");
+    return;
+  }
+
+  plannedRegistrationContext = payload;
+  resetRegistration({ keepPlan: true });
+  showView("register");
+  selectCategory(option.category, { ...plannedPrefill(option), ...option.prefill, dateISO: session.dateISO });
+}
+
+function createPlanOptionButton(session, option, records, { compact = false } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = compact ? "coach-option-button compact" : "coach-option-button";
+  const completed = planRecordForSession(session, records);
+  const future = session.dateISO > getChileDateISO();
+  button.disabled = future;
+  button.textContent = completed ? "Ver registro" : future ? `Disponible ${formatShortDate(session.dateISO)}` : `Elegir ${option.title}`;
+  button.addEventListener("click", () => openPlannedOption(session, option.id));
+  return button;
+}
+
+function renderCoachTodayPlan(records) {
+  const todayISO = getChileDateISO();
+  const exact = coachSessionForDate(todayISO);
+  const next = coachTrainingBlock.weeks.flatMap(week => week.sessions.map(session => ({ ...session, week })))
+    .find(session => session.dateISO >= todayISO && !planRecordForSession(session, records));
+  const session = exact || next;
+  const container = $("coachTodayPlan");
+  container.replaceChildren();
+  if (!session) {
+    const done = document.createElement("p");
+    done.className = "coach-plan-done";
+    done.textContent = "Bloque finalizado. Tu historial conserva todos los resultados.";
+    container.append(done);
+    return;
+  }
+  const copy = document.createElement("div");
+  const label = document.createElement("span");
+  label.textContent = exact ? "Plan de hoy" : `Próxima sesión · ${formatShortDate(session.dateISO)}`;
+  const title = document.createElement("strong");
+  const primary = coachOption(session, session.primaryOptionId) || session.options[0];
+  title.textContent = primary.title;
+  const summary = document.createElement("small");
+  summary.textContent = session.options.length > 1 ? `${primary.summary} · ${session.options.length} alternativas` : primary.summary;
+  copy.append(label, title, summary);
+  container.append(copy);
+  if (exact) container.append(createPlanOptionButton(session, primary, records, { compact: true }));
+}
+
+function renderCoachBlock(records = repository.list()) {
+  const todayISO = getChileDateISO();
+  const week = coachWeekForDate(todayISO)
+    || (todayISO < coachTrainingBlock.startISO ? coachTrainingBlock.weeks[0] : coachTrainingBlock.weeks.at(-1));
+  const sessions = coachTrainingBlock.weeks.flatMap(item => item.sessions);
+  const completed = sessions.filter(session => planRecordForSession(session, records)).length;
+  const phase = todayISO < coachTrainingBlock.startISO
+    ? `Comienza ${formatShortDate(coachTrainingBlock.startISO)}`
+    : todayISO > coachTrainingBlock.endISO ? "Bloque finalizado" : `Semana ${week.number} · ${week.label}`;
+  $("coachBlockPhase").textContent = phase;
+  $("coachBlockProgress").textContent = `${completed}/${sessions.length} días registrados`;
+  $("coachBlockContext").textContent = week.context;
+  renderCoachTodayPlan(records);
+}
+
+function renderCoachPlanDialog(records = repository.list()) {
+  const container = $("coachPlanWeeks");
+  container.replaceChildren();
+  coachTrainingBlock.weeks.forEach((week, weekIndex) => {
+    const weekCard = document.createElement("details");
+    weekCard.className = "coach-week-card";
+    const todayISO = getChileDateISO();
+    weekCard.open = coachWeekForDate(todayISO)?.weekKey === week.weekKey
+      || (todayISO < coachTrainingBlock.startISO && weekIndex === 0);
+    const completed = week.sessions.filter(session => planRecordForSession(session, records)).length;
+    const summary = document.createElement("summary");
+    const copy = document.createElement("div");
+    const eyebrow = document.createElement("span");
+    eyebrow.textContent = `Semana ${week.number} · ${formatShortDate(week.startISO)}–${formatShortDate(week.endISO)}`;
+    const title = document.createElement("strong");
+    title.textContent = week.label;
+    const objective = document.createElement("small");
+    objective.textContent = week.objective;
+    copy.append(eyebrow, title, objective);
+    const counter = document.createElement("b");
+    counter.textContent = `${completed}/7`;
+    summary.append(copy, counter);
+    const body = document.createElement("div");
+    body.className = "coach-week-body";
+    week.sessions.forEach(session => {
+      const day = document.createElement("article");
+      day.className = "coach-session-card";
+      if (session.dateISO === getChileDateISO()) day.classList.add("today");
+      if (planRecordForSession(session, records)) day.classList.add("complete");
+      const heading = document.createElement("div");
+      const date = document.createElement("span");
+      date.textContent = formatLongDate(session.dateISO);
+      const goal = document.createElement("p");
+      goal.textContent = session.objective;
+      heading.append(date, goal);
+      day.append(heading);
+      session.options.forEach(option => {
+        const optionCard = document.createElement("div");
+        optionCard.className = "coach-session-option";
+        const optionTitle = document.createElement("strong");
+        optionTitle.textContent = option.title;
+        const optionSummary = document.createElement("small");
+        optionSummary.textContent = option.summary;
+        const details = document.createElement("ul");
+        option.details.forEach(text => {
+          const item = document.createElement("li");
+          item.textContent = text;
+          details.append(item);
+        });
+        optionCard.append(optionTitle, optionSummary, details, createPlanOptionButton({ ...session, week }, option, records));
+        day.append(optionCard);
+      });
+      body.append(day);
+    });
+    weekCard.append(summary, body);
+    container.append(weekCard);
+  });
+  const rules = $("coachPlanRules");
+  rules.replaceChildren();
+  coachTrainingBlock.rules.forEach(text => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    rules.append(item);
+  });
+}
+
+function openCoachPlanDialog() {
+  renderCoachPlanDialog();
+  if (!$("coachPlanDialog").open) $("coachPlanDialog").showModal();
 }
 
 function updateCloudStatus(status) {
@@ -177,7 +444,8 @@ function openRegistrationOrActiveRoutine() {
 function renderHome() {
   const todayISO = getChileDateISO();
   const week = isoWeekInfo(todayISO);
-  const records = repository.list().filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
+  const allRecords = repository.list();
+  const records = allRecords.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const trainingRecords = records.filter(record => record.category !== "rest");
   const todayRecords = records.filter(record => record.dateISO === todayISO);
   const activeDays = new Set(records.map(record => record.dateISO)).size;
@@ -190,12 +458,14 @@ function renderHome() {
   $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
   $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
+  renderCoachBlock(allRecords);
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
   for (const dateISO of weekDays(todayISO)) {
     const day = dayIndexFromISO(dateISO);
     const dayRecords = records.filter(record => record.dateISO === dateISO);
+    const plannedSession = coachSessionForDate(dateISO);
     const row = document.createElement("article");
     row.className = "day-row";
     row.classList.toggle("today", dateISO === todayISO);
@@ -211,7 +481,7 @@ function renderHome() {
 
     const content = document.createElement("div");
     content.className = "day-content";
-    if (!dayRecords.length) {
+    if (!dayRecords.length && !plannedSession) {
       const empty = document.createElement("span");
       empty.className = "day-empty";
       empty.textContent = dateISO > todayISO ? "Aún sin actividad" : "Sin entrenamiento registrado";
@@ -219,6 +489,21 @@ function renderHome() {
     } else {
       const activities = document.createElement("div");
       activities.className = "day-activities";
+      if (plannedSession) {
+        const primary = coachOption(plannedSession, plannedSession.primaryOptionId) || plannedSession.options[0];
+        const planLine = document.createElement("div");
+        planLine.className = `planned-activity-line ${planRecordForSession(plannedSession, allRecords) ? "complete" : ""}`;
+        const planBadge = document.createElement("span");
+        planBadge.textContent = planRecordForSession(plannedSession, allRecords) ? "Hecho" : "Plan";
+        const planCopy = document.createElement("div");
+        const planTitle = document.createElement("strong");
+        planTitle.textContent = primary.title;
+        const planMeta = document.createElement("small");
+        planMeta.textContent = plannedSession.options.length > 1 ? `${primary.summary} · con alternativas` : primary.summary;
+        planCopy.append(planTitle, planMeta);
+        planLine.append(planBadge, planCopy);
+        activities.append(planLine);
+      }
       for (const record of dayRecords) {
         const line = document.createElement("div");
         line.className = "activity-line";
@@ -1141,7 +1426,8 @@ function selectCategory(categoryId, record = null) {
   $("registerHeading").focus({ preventScroll: true });
 }
 
-function resetRegistration() {
+function resetRegistration({ keepPlan = false } = {}) {
+  if (!keepPlan) plannedRegistrationContext = null;
   currentCategory = null;
   editingRecordId = null;
   $("trainingForm").reset();
@@ -1220,6 +1506,11 @@ function formRecord() {
     routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
+    planBlockId: plannedRegistrationContext?.blockId || existing?.planBlockId || "",
+    planWeekKey: plannedRegistrationContext?.weekKey || existing?.planWeekKey || "",
+    planSessionId: plannedRegistrationContext?.sessionId || existing?.planSessionId || "",
+    planOptionId: plannedRegistrationContext?.optionId || existing?.planOptionId || "",
+    plannedTitle: plannedRegistrationContext?.plannedTitle || existing?.plannedTitle || "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -1261,6 +1552,7 @@ function saveTraining(event) {
     : candidate.category === "rest" ? "Descanso registrado." : "Entrenamiento registrado.";
   resetRegistration();
   renderHome();
+  renderCoachPlanDialog();
   showView("home");
   showToast(message);
 }
@@ -1408,7 +1700,8 @@ function routineExerciseSnapshot(routine, exercise, progress, settings, dateISO)
 }
 
 function routineSessionSummary(routine, progress, settings, dateISO) {
-  const exercises = routine.exercises.map(exercise => routineExerciseSnapshot(routine, exercise, progress, settings, dateISO));
+  const relevantExercises = routineExercisesForDate(routine, dateISO);
+  const exercises = relevantExercises.map(exercise => routineExerciseSnapshot(routine, exercise, progress, settings, dateISO));
   const completedSets = exercises.reduce((total, exercise) => total + exercise.completedSets, 0);
   const plannedSets = exercises.reduce((total, exercise) => total + exercise.plannedSets, 0);
   const completedExercises = exercises.filter(exercise => exercise.completedSets === exercise.plannedSets).length;
@@ -1421,7 +1714,7 @@ function routineSessionSummary(routine, progress, settings, dateISO) {
     plannedSets,
     completedExercises,
     startedExercises,
-    totalExercises: routine.exercises.length,
+    totalExercises: relevantExercises.length,
     totalReps: Math.round(totalReps),
     volumeKg: Math.round(volumeKg * 100) / 100,
     exercises
@@ -1527,12 +1820,22 @@ function routineProgressKey(dateISO, routineId, exerciseId, setIndex) {
   return `${dateISO}:${routineId}:${exerciseId}:${setIndex}`;
 }
 
-function totalRoutineSets(routine, settings) {
-  return routine.exercises.reduce((total, exercise) => total + currentExerciseSettings(routine, exercise, settings).sets, 0);
+function routineExercisesForDate(routine, dateISO) {
+  const session = loadRoutineSession();
+  const planned = loadPlannedRoutineContext();
+  const context = session?.routineId === routine.id && session?.dateISO === dateISO
+    ? session
+    : planned?.routineId === routine.id && planned?.dateISO === dateISO ? planned : null;
+  const omitted = new Set(context?.planOmitExerciseIds || context?.omitExerciseIds || []);
+  return routine.exercises.filter(exercise => !omitted.has(exercise.id));
+}
+
+function totalRoutineSets(routine, settings, dateISO = getChileDateISO()) {
+  return routineExercisesForDate(routine, dateISO).reduce((total, exercise) => total + currentExerciseSettings(routine, exercise, settings).sets, 0);
 }
 
 function completedRoutineSets(routine, progress, settings, dateISO) {
-  return routine.exercises.reduce((total, exercise) => {
+  return routineExercisesForDate(routine, dateISO).reduce((total, exercise) => {
     const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
     return total + Array.from({ length: exerciseSettings.sets }, (_, index) => index)
       .filter(setIndex => progress[routineProgressKey(dateISO, routine.id, exercise.id, setIndex)]).length;
@@ -1549,7 +1852,9 @@ function startRoutineSession(routine) {
     return;
   }
 
-  const dateISO = getChileDateISO();
+  const planned = loadPlannedRoutineContext();
+  const plannedForRoutine = planned?.routineId === routine.id ? planned : null;
+  const dateISO = plannedForRoutine?.dateISO || getChileDateISO();
   const alreadyRecordedToday = repository.list().some(record =>
     record.dateISO === dateISO && record.routineId === routine.id && record.routinePlannedSets !== ""
   );
@@ -1566,12 +1871,20 @@ function startRoutineSession(routine) {
     endedAt: "",
     elapsedSeconds: 0,
     absCount: "",
-    settingsAtStart
+    settingsAtStart,
+    planBlockId: plannedForRoutine?.blockId || "",
+    planWeekKey: plannedForRoutine?.weekKey || "",
+    planSessionId: plannedForRoutine?.sessionId || "",
+    planOptionId: plannedForRoutine?.optionId || "",
+    plannedTitle: plannedForRoutine?.plannedTitle || "",
+    planDetails: plannedForRoutine?.planDetails || [],
+    planOmitExerciseIds: plannedForRoutine?.omitExerciseIds || [],
+    settingsBeforePlan: plannedForRoutine?.settingsBeforePlan || null
   });
   openRoutineId = routine.id;
   renderRoutines();
   ensureRoutineSessionTicker();
-  showToast("Rutina iniciada. El tiempo ya está corriendo.");
+  showToast(plannedForRoutine ? "Rutina planificada iniciada. El tiempo ya está corriendo." : "Rutina iniciada. El tiempo ya está corriendo.");
 }
 
 function scrollToRoutine(routineId) {
@@ -1618,6 +1931,7 @@ function launchRoutineFromRegistration(routine) {
       : `Ya tienes ${activeRoutine?.name || "otra rutina"} en curso. Continúa o finalízala primero.`);
     return;
   }
+  clearPlannedRoutineContext({ restore: true });
   openRoutineId = routine.id;
   showView("routines");
   scrollToRoutine(routine.id);
@@ -1696,6 +2010,11 @@ function finishRoutineSession(routine) {
     routineDefaultsSaved: saveSettingsForNextTime,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
+    planBlockId: session.planBlockId || "",
+    planWeekKey: session.planWeekKey || "",
+    planSessionId: session.planSessionId || "",
+    planOptionId: session.planOptionId || "",
+    plannedTitle: session.plannedTitle || "",
     createdAt: session.startedAt,
     updatedAt: endedAt
   };
@@ -1709,7 +2028,9 @@ function finishRoutineSession(routine) {
     return;
   }
 
-  if (settingsChangeCount > 0 && !saveSettingsForNextTime) {
+  if (session.planSessionId && !saveSettingsForNextTime && session.settingsBeforePlan) {
+    restoreSettingsSnapshot(routine.id, session.settingsBeforePlan);
+  } else if (settingsChangeCount > 0 && !saveSettingsForNextTime) {
     restoreRoutineSettings(routine, settings, session.settingsAtStart);
   }
 
@@ -1729,9 +2050,11 @@ function finishRoutineSession(routine) {
   });
   if (routineSessionTicker) clearInterval(routineSessionTicker);
   routineSessionTicker = null;
+  clearPlannedRoutineContext();
   openRoutineId = routine.id;
   renderRoutines();
   renderHome();
+  renderCoachPlanDialog();
   showToast(saveSettingsForNextTime
     ? "Rutina registrada y cambios guardados para la próxima vez."
     : settingsChangeCount > 0
@@ -1797,21 +2120,25 @@ function createRoutineSessionHeader(routine, session) {
   const isActive = session?.status === "active" && session.routineId === routine.id;
   const isComplete = session?.status === "complete" && session.routineId === routine.id;
   const anotherActive = session?.status === "active" && session.routineId !== routine.id;
+  const planned = !isActive && !isComplete ? loadPlannedRoutineContext() : session;
+  const plannedForRoutine = planned?.routineId === routine.id && (planned?.planSessionId || planned?.sessionId) ? planned : null;
 
   if (isActive) {
-    eyebrow.textContent = "En curso";
+    eyebrow.textContent = session.planSessionId ? "Plan del entrenador · En curso" : "En curso";
     title.textContent = "Tiempo de entrenamiento";
-    description.textContent = `Iniciada hoy a las ${new Date(session.startedAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`;
+    description.textContent = `${session.plannedTitle ? `${session.plannedTitle}. ` : ""}Iniciada a las ${new Date(session.startedAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`;
   } else if (isComplete) {
     eyebrow.textContent = "Registrada";
     title.textContent = "Última sesión finalizada";
     description.textContent = "El balance quedó guardado en tu historial.";
   } else {
-    eyebrow.textContent = anotherActive ? "Otra rutina en curso" : "Lista para comenzar";
-    title.textContent = "Revisa y prepara tu entrenamiento";
+    eyebrow.textContent = anotherActive ? "Otra rutina en curso" : plannedForRoutine ? `Plan del entrenador · Semana ${plannedForRoutine.weekNumber}` : "Lista para comenzar";
+    title.textContent = plannedForRoutine?.optionTitle || "Revisa y prepara tu entrenamiento";
     description.textContent = anotherActive
       ? "Puedes revisarla, pero primero debes finalizar la rutina que está en curso."
-      : "El cronómetro todavía no está corriendo. Puedes revisar los ejercicios y ajustar sus valores.";
+      : plannedForRoutine
+        ? `Programada para ${formatShortDate(plannedForRoutine.dateISO)}. El cronómetro comenzará solo cuando pulses Iniciar.`
+        : "El cronómetro todavía no está corriendo. Puedes revisar los ejercicios y ajustar sus valores.";
   }
   copy.append(eyebrow, title, description);
 
@@ -1833,6 +2160,16 @@ function createRoutineSessionHeader(routine, session) {
     action.append(start);
   }
   panel.append(copy, action);
+  if (plannedForRoutine?.planDetails?.length) {
+    const notes = document.createElement("ul");
+    notes.className = "routine-plan-details";
+    plannedForRoutine.planDetails.forEach(text => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      notes.append(item);
+    });
+    panel.append(notes);
+  }
   return panel;
 }
 
@@ -1899,7 +2236,7 @@ function createRoutineDurationBadge(routine, averages) {
   return badge;
 }
 
-function createRoutineAbsFinisher(routine, session) {
+function createRoutineAbsFinisher(routine, session, exerciseCount = routine.exercises.length) {
   const isCurrentRoutine = session?.routineId === routine.id;
   const isActive = isCurrentRoutine && session.status === "active";
   const card = document.createElement("article");
@@ -1912,7 +2249,7 @@ function createRoutineAbsFinisher(routine, session) {
   phase.className = "exercise-phase";
   phase.textContent = "Cierre · Récord personal";
   const title = document.createElement("h3");
-  title.textContent = `${routine.exercises.length + 1}. Abdominales`;
+  title.textContent = `${exerciseCount + 1}. Abdominales`;
   titleBox.append(phase, title);
   top.append(titleBox);
   const description = document.createElement("p");
@@ -2034,7 +2371,8 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
 function renderRoutines() {
   const container = $("routineLibrary");
   let session = loadRoutineSession();
-  const dateISO = session?.status === "active" ? session.dateISO : getChileDateISO();
+  const planned = loadPlannedRoutineContext();
+  const dateISO = session?.status === "active" ? session.dateISO : planned?.dateISO || getChileDateISO();
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
   if (session?.status === "active" && !session.settingsAtStart) {
@@ -2073,7 +2411,7 @@ function renderRoutines() {
     counter.className = "routine-progress";
     const updateCounter = () => {
       const completed = completedRoutineSets(routine, progress, settings, dateISO);
-      const total = totalRoutineSets(routine, settings);
+      const total = totalRoutineSets(routine, settings, dateISO);
       counter.textContent = `${completed}/${total} series`;
       counter.classList.toggle("complete", completed === total);
     };
@@ -2091,7 +2429,8 @@ function renderRoutines() {
     body.append(note, objective, createRoutineSessionHeader(routine, session));
     const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
-    routine.exercises.forEach((exercise, exerciseIndex) => {
+    const displayedExercises = routineExercisesForDate(routine, dateISO);
+    displayedExercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
       exerciseCard.className = "exercise-card";
       exerciseCard.dataset.exerciseId = exercise.id;
@@ -2223,7 +2562,7 @@ function renderRoutines() {
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
-    body.append(createRoutineAbsFinisher(routine, session));
+    body.append(createRoutineAbsFinisher(routine, session, displayedExercises.length));
     const finishPanel = createRoutineFinishPanel(routine, session, progress, settings, dateISO);
     if (finishPanel) body.append(finishPanel);
     card.append(summary, body);
@@ -2613,6 +2952,12 @@ function createHistoryEntry(sourceRecord) {
   const details = document.createElement("p");
   details.textContent = recordDetails(record);
   copy.append(title, details);
+  if (record.plannedTitle) {
+    const planned = document.createElement("p");
+    planned.className = "history-plan-link";
+    planned.textContent = `Plan del entrenador · ${record.plannedTitle}`;
+    copy.append(planned);
+  }
   if (record.sensations) {
     const sensations = document.createElement("p");
     sensations.textContent = record.sensations;
@@ -2772,6 +3117,8 @@ function bindEvents() {
     else showView(target);
   }));
   $("homeRegisterButton").addEventListener("click", openRegistrationOrActiveRoutine);
+  $("openCoachPlanButton").addEventListener("click", openCoachPlanDialog);
+  $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());
   $("registrationBackButton").addEventListener("click", () => {
     if (editingRecordId && !window.confirm("¿Cancelar la edición del entrenamiento?")) return;
     resetRegistration();
@@ -2810,6 +3157,13 @@ function initialize() {
     openRoutineId = activeSession.routineId;
     showView("routines");
     scrollToRoutineProgress(activeSession.routineId);
+  } else {
+    const planned = loadPlannedRoutineContext();
+    if (planned) {
+      openRoutineId = planned.routineId;
+      showView("routines");
+      scrollToRoutine(planned.routineId);
+    }
   }
   cloudSync.initialize();
   registerServiceWorker();

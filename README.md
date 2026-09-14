@@ -7,6 +7,8 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Inicio con la fecha actual y el número de semana del año.
 - Vista completa de lunes a domingo con las actividades realmente realizadas cada día.
 - Resumen semanal de sesiones, minutos y calorías.
+- Bloque activo de cuatro semanas creado por el entrenador, con objetivo semanal, actividad diaria, alternativas y acceso directo al registro correspondiente.
+- Inicio que diferencia lo planificado de lo realmente realizado y marca el cumplimiento del bloque sin alterar el historial.
 - Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
 - Al elegir entrenamiento físico y una rutina, se abre primero una vista previa completa; la sesión y su cronómetro solo comienzan al pulsar Iniciar entrenamiento.
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
@@ -40,7 +42,7 @@ Cada ejercicio permite elegir entre 1 y 10 series desde un desplegable, además 
 - Caminata.
 - Trekking.
 
-Todo el cardio registra duración mediante selectores HH:MM:SS. Las actividades al aire libre separan kilómetros y metros en formato `KK:MMM`. Trekking ofrece lugares frecuentes, opción personalizada y desnivel positivo en metros.
+Todo el cardio registra duración mediante selectores HH:MM. Las actividades al aire libre separan kilómetros y metros en formato `KK:MMM`. Trekking ofrece lugares frecuentes, opción personalizada y desnivel positivo en metros.
 
 Trekking incluye Cerro La Región, El Carbón, Manquehue y San Cristóbal. Para Cerro La Región se distingue entre Los Fresnos y Ruta 7 Canchas. Además de la duración total, cada salida registra el tiempo específico de subida y el historial mantiene una clasificación del intento más rápido al más lento por cerro y ruta.
 
@@ -58,7 +60,7 @@ Permite elegir intervalos de 20, 25, 30, 35, 40 o 45 segundos y descansos de 20,
 
 ## Semanas e informes
 
-TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. Cada grupo del historial permite copiar o descargar un informe para el entrenador con comparación respecto de la semana anterior, resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el resumen automático y el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
+TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. El bloque `Rendimiento tenis` cubre las semanas 38 a 41 de 2026. Cada sesión planificada conserva su variante elegida dentro del registro real, y las rutinas físicas cargan las series, repeticiones, pesos y omisiones prescritas sin modificar permanentemente la rutina base salvo que el usuario decida guardar sus cambios. Cada grupo del historial permite copiar o descargar un informe para el entrenador con comparación respecto de la semana anterior, resumen y detalle diario, incluidos los días sin actividad. Las rutinas físicas registradas incorporan además el resumen automático y el detalle completo por ejercicio: fase, series planificadas y realizadas, objetivo de repeticiones o tiempo, carga, repeticiones contabilizadas y volumen estimado. El mismo detalle puede desplegarse dentro de la entrada del historial y se incluye en el CSV y el respaldo JSON.
 
 ## Cuenta de Google y nube
 
@@ -68,7 +70,7 @@ Las reglas incluidas en `firestore.rules` limitan cada historial al identificado
 
 ## Datos y migración
 
-Los registros permanecen disponibles en el navegador y, al iniciar sesión, se sincronizan con la nube de TGTrain bajo la cuenta de Google correspondiente. La versión actual usa el esquema 8 y migra automáticamente:
+Los registros permanecen disponibles en el navegador y, al iniciar sesión, se sincronizan con la nube de TGTrain bajo la cuenta de Google correspondiente. La versión actual usa el esquema 10 y migra automáticamente:
 
 - `tgb-data-v2` de la versión anterior.
 - `history` de la primera versión.
@@ -80,6 +82,7 @@ Se mantienen respaldo JSON, importación y exportación CSV. Se recomienda desca
 - `index.html`: Inicio, registro, rutinas, Timer e historial.
 - `assets/css/styles.css`: diseño adaptable.
 - `assets/js/data.js`: categorías, rutinas y opciones.
+- `assets/js/coach-plan.js`: bloque de cuatro semanas, sesiones, alternativas y ajustes prescritos.
 - `assets/js/utils.js`: fechas, semanas ISO, informes y CSV.
 - `assets/js/storage.js`: migración, validación, persistencia local y eventos de sincronización.
 - `assets/js/cloud.js`: autenticación con Google y sincronización con Firestore.

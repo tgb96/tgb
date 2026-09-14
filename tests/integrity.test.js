@@ -107,12 +107,36 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
+test("integra el bloque de cuatro semanas del entrenador con sesiones y alternativas", async () => {
+  const { coachTrainingBlock, coachSessionForDate } = await import("../assets/js/coach-plan.js");
+  const { physicalRoutines, trainingCategories } = await import("../assets/js/data.js");
+  const sessions = coachTrainingBlock.weeks.flatMap(week => week.sessions);
+  assert.equal(coachTrainingBlock.weeks.length, 4);
+  assert.equal(sessions.length, 28);
+  assert.equal(new Set(sessions.map(session => session.dateISO)).size, 28);
+  assert.equal(coachTrainingBlock.startISO, "2026-09-14");
+  assert.equal(coachTrainingBlock.endISO, "2026-10-11");
+  assert.ok(sessions.some(session => session.options.length > 1));
+  assert.equal(coachSessionForDate("2026-09-14").options[0].prefill.routineId, "legs");
+  assert.equal(coachSessionForDate("2026-09-26").options[0].prefill.tennisTypeId, "match");
+  const categoryIds = new Set(trainingCategories.map(category => category.id));
+  const routines = new Map(physicalRoutines.map(routine => [routine.id, routine]));
+  sessions.flatMap(session => session.options).forEach(option => {
+    assert.ok(categoryIds.has(option.category));
+    if (option.category !== "physical") return;
+    const routine = routines.get(option.prefill.routineId);
+    assert.ok(routine);
+    const exerciseIds = new Set(routine.exercises.map(exercise => exercise.id));
+    [...Object.keys(option.prefill.settings), ...option.prefill.omitExerciseIds].forEach(id => assert.ok(exerciseIds.has(id), `${id} no pertenece a ${routine.id}`));
+  });
+});
+
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v41/);
+  assert.match(worker, /tgtrain-shell-v42/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {
