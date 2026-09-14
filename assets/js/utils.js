@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=47";
+} from "./data.js?v=48";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -386,6 +386,16 @@ export function physicalBestRecords(records) {
   return {
     abdominals: byHighestValue("routineAbsCount"),
     volume: byHighestValue("routineVolumeKg")
+  };
+}
+
+export function globalAbdominalRecord(records) {
+  const record = physicalBestRecords(records).abdominals[0] || null;
+  const count = record ? Number(record.routineAbsCount) || 0 : 0;
+  return {
+    count,
+    nextTarget: count + 1,
+    record
   };
 }
 

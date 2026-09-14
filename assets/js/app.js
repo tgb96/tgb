@@ -15,23 +15,24 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=47";
+} from "./data.js?v=48";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=47";
-import { createRepository } from "./storage.js?v=47";
-import { createCloudSync } from "./cloud.js?v=47";
-import { createAiClient } from "./ai.js?v=47";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=47";
+} from "./coach-plan.js?v=48";
+import { createRepository } from "./storage.js?v=48";
+import { createCloudSync } from "./cloud.js?v=48";
+import { createAiClient } from "./ai.js?v=48";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=48";
 import {
   dayIndexFromISO,
   exerciseProgress,
   formatLongDate,
   formatShortDate,
   getChileDateISO,
+  globalAbdominalRecord,
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
@@ -48,7 +49,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=47";
+} from "./utils.js?v=48";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -2481,7 +2482,17 @@ function createRoutineDurationBadge(routine, averages) {
   return badge;
 }
 
-function createRoutineAbsFinisher(routine, session, exerciseCount = routine.exercises.length) {
+function createRoutineAbsRecordBadge(record) {
+  const badge = document.createElement("span");
+  badge.className = "routine-abs-record";
+  badge.textContent = record.count > 0
+    ? `Récord abs. ${record.count} · meta ${record.nextTarget}`
+    : "Abs. · crea tu primera marca";
+  badge.title = "Este récord es único y se comparte entre las cuatro rutinas";
+  return badge;
+}
+
+function createRoutineAbsFinisher(routine, session, record, exerciseCount = routine.exercises.length) {
   const isCurrentRoutine = session?.routineId === routine.id;
   const isActive = isCurrentRoutine && session.status === "active";
   const card = document.createElement("article");
@@ -2492,18 +2503,35 @@ function createRoutineAbsFinisher(routine, session, exerciseCount = routine.exer
   const titleBox = document.createElement("div");
   const phase = document.createElement("span");
   phase.className = "exercise-phase";
-  phase.textContent = "Cierre · Récord personal";
+  phase.textContent = record.count > 0 ? `Récord global · ${record.count}` : "Cierre · Primera marca";
   const title = document.createElement("h3");
   title.textContent = `${exerciseCount + 1}. Abdominales`;
   titleBox.append(phase, title);
   top.append(titleBox);
   const description = document.createElement("p");
-  description.textContent = "Termina la rutina con abdominales y anota el total realizado para seguir superando tu mejor marca.";
+  description.textContent = record.count > 0
+    ? `Tu marca vigente para todas las rutinas es ${record.count}. Hoy intenta completar al menos ${record.nextTarget} abdominales.`
+    : "Termina la rutina con abdominales para establecer una primera marca global que deberás superar en cualquier día.";
   const benefit = document.createElement("p");
   benefit.className = "tennis-benefit";
   const benefitLabel = document.createElement("strong");
   benefitLabel.textContent = "Para el tenis: ";
   benefit.append(benefitLabel, "refuerza el core para estabilizar golpes, frenadas y cambios de dirección.");
+  const target = document.createElement("div");
+  target.className = "abdominal-record-target";
+  const currentMark = document.createElement("div");
+  const currentValue = document.createElement("strong");
+  currentValue.textContent = record.count > 0 ? String(record.count) : "—";
+  const currentLabel = document.createElement("span");
+  currentLabel.textContent = "Marca global actual";
+  currentMark.append(currentValue, currentLabel);
+  const nextMark = document.createElement("div");
+  const nextValue = document.createElement("strong");
+  nextValue.textContent = `${record.nextTarget}+`;
+  const nextLabel = document.createElement("span");
+  nextLabel.textContent = "Objetivo de hoy";
+  nextMark.append(nextValue, nextLabel);
+  target.append(currentMark, nextMark);
   const control = document.createElement("label");
   control.className = "abdominal-count-control";
   control.htmlFor = `routineAbsCount-${routine.id}`;
@@ -2516,20 +2544,41 @@ function createRoutineAbsFinisher(routine, session, exerciseCount = routine.exer
   input.min = "0";
   input.max = "10000";
   input.step = "1";
-  input.placeholder = isActive ? "Ej: 50" : "Disponible al iniciar";
+  input.placeholder = isActive ? `Meta: ${record.nextTarget}` : "Disponible al iniciar";
   input.value = isCurrentRoutine && session.absCount !== undefined ? session.absCount : "";
   input.disabled = !isActive;
+  const feedback = document.createElement("small");
+  feedback.className = "abdominal-record-feedback";
+  const updateFeedback = value => {
+    if (value === "") {
+      feedback.textContent = "El resultado se comparará con la misma marca global sin importar qué rutina realices.";
+      feedback.classList.remove("record-beaten");
+      return;
+    }
+    if (Number(value) > record.count) {
+      feedback.textContent = `¡Nuevo récord global: ${value}! La siguiente meta será ${Number(value) + 1}.`;
+      feedback.classList.add("record-beaten");
+      return;
+    }
+    const remaining = Math.max(1, record.nextTarget - Number(value));
+    feedback.textContent = Number(value) === record.count
+      ? `Igualas la marca. Necesitas ${record.nextTarget} para superarla.`
+      : `Te ${remaining === 1 ? "falta" : "faltan"} ${remaining} para alcanzar la meta de ${record.nextTarget}.`;
+    feedback.classList.remove("record-beaten");
+  };
   input.addEventListener("input", () => {
     const current = loadRoutineSession();
     if (!current || current.status !== "active" || current.routineId !== routine.id) return;
     const value = input.value === "" ? "" : Math.max(0, Math.floor(Number(input.value) || 0));
     if (input.value !== "") input.value = String(value);
     saveRoutineSession({ ...current, absCount: value });
+    updateFeedback(value);
     const preview = $("routinePreview-abdominals")?.querySelector("strong");
     if (preview) preview.textContent = value === "" ? "—" : String(value);
   });
-  control.append(caption, input);
-  card.append(top, description, benefit, control);
+  updateFeedback(input.value);
+  control.append(caption, input, feedback);
+  card.append(top, description, benefit, target, control);
   return card;
 }
 
@@ -2630,6 +2679,7 @@ function renderRoutines() {
     }
   }
   const durationAverages = physicalRoutineDurationAverages(repository.list());
+  const abdominalRecord = globalAbdominalRecord(repository.list());
   container.replaceChildren();
 
   physicalRoutines.forEach((routine, routineIndex) => {
@@ -2650,7 +2700,7 @@ function renderRoutines() {
     titleLine.className = "routine-name-line";
     const title = document.createElement("h2");
     title.textContent = routine.name;
-    titleLine.append(title, createRoutineDurationBadge(routine, durationAverages));
+    titleLine.append(title, createRoutineDurationBadge(routine, durationAverages), createRoutineAbsRecordBadge(abdominalRecord));
     const focus = document.createElement("p");
     focus.textContent = routine.focus;
     summaryCopy.append(titleLine, focus);
@@ -2809,7 +2859,7 @@ function renderRoutines() {
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
-    body.append(createRoutineAbsFinisher(routine, session, displayedExercises.length));
+    body.append(createRoutineAbsFinisher(routine, session, abdominalRecord, displayedExercises.length));
     const finishPanel = createRoutineFinishPanel(routine, session, progress, settings, dateISO);
     if (finishPanel) body.append(finishPanel);
     card.append(summary, body);
@@ -2829,6 +2879,30 @@ function renderPhysicalRankings(records) {
     container.append(empty);
     return;
   }
+
+  const addCurrentAbdominalRecord = attempt => {
+    if (!attempt) return;
+    const card = document.createElement("div");
+    card.className = "physical-current-record";
+    const copy = document.createElement("div");
+    const label = document.createElement("span");
+    label.textContent = "Récord global único";
+    const title = document.createElement("h3");
+    title.textContent = "Abdominales finales";
+    const meta = document.createElement("p");
+    meta.textContent = `${formatShortDate(attempt.dateISO)} · ${attempt.routineName || "Entrenamiento físico"}`;
+    copy.append(label, title, meta);
+    const mark = document.createElement("div");
+    const markLabel = document.createElement("span");
+    markLabel.textContent = "Marca actual";
+    const markValue = document.createElement("strong");
+    markValue.textContent = `${attempt.routineAbsCount}`;
+    const next = document.createElement("small");
+    next.textContent = `Próxima meta: ${Number(attempt.routineAbsCount) + 1}`;
+    mark.append(markLabel, markValue, next);
+    card.append(copy, mark);
+    container.append(card);
+  };
 
   const addRanking = ({ titleText, attempts, valueFor }) => {
     if (!attempts.length) return;
@@ -2869,11 +2943,7 @@ function renderPhysicalRankings(records) {
     container.append(details);
   };
 
-  addRanking({
-    titleText: "Abdominales finales",
-    attempts: rankings.abdominals,
-    valueFor: record => `${record.routineAbsCount} abdominales`
-  });
+  addCurrentAbdominalRecord(rankings.abdominals[0]);
   addRanking({
     titleText: "Volumen total levantado",
     attempts: rankings.volume,

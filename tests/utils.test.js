@@ -4,6 +4,7 @@ import {
   formatDistance,
   formatDuration,
   exerciseProgress,
+  globalAbdominalRecord,
   groupRecordsByWeek,
   isoWeekInfo,
   normalizeRecord,
@@ -181,6 +182,11 @@ test("ordena los récords físicos de abdominales y volumen", () => {
   const rankings = physicalBestRecords(records);
   assert.deepEqual(rankings.abdominals.map(record => record.id), ["second", "third", "first"]);
   assert.deepEqual(rankings.volume.map(record => record.id), ["third", "first", "second"]);
+  assert.deepEqual(globalAbdominalRecord(records), {
+    count: 55,
+    nextTarget: 56,
+    record: rankings.abdominals[0]
+  });
 });
 
 test("calcula la duración promedio de cada rutina física", () => {
