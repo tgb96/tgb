@@ -15,17 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=48";
+} from "./data.js?v=49";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=48";
-import { createRepository } from "./storage.js?v=48";
-import { createCloudSync } from "./cloud.js?v=48";
-import { createAiClient } from "./ai.js?v=48";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=48";
+} from "./coach-plan.js?v=49";
+import { createRepository } from "./storage.js?v=49";
+import { createCloudSync } from "./cloud.js?v=49";
+import { createAiClient } from "./ai.js?v=49";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=49";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -49,7 +49,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=48";
+} from "./utils.js?v=49";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -713,7 +713,9 @@ function createChoice({ name, value, title, description, checked }) {
 
 function renderPhysicalFields(record = {}) {
   if (!editingRecordId) {
-    const durationAverages = physicalRoutineDurationAverages(repository.list());
+    const records = repository.list();
+    const durationAverages = physicalRoutineDurationAverages(records);
+    const abdominalRecord = globalAbdominalRecord(records);
     const heading = document.createElement("div");
     heading.className = "routine-launch-heading";
     const title = document.createElement("h2");
@@ -736,7 +738,11 @@ function renderPhysicalFields(record = {}) {
       nameLine.className = "routine-name-line";
       const name = document.createElement("strong");
       name.textContent = routine.name;
-      nameLine.append(name, createRoutineDurationBadge(routine, durationAverages));
+      nameLine.append(
+        name,
+        createRoutineDurationBadge(routine, durationAverages),
+        createRoutineAbsRecordBadge(abdominalRecord)
+      );
       const focus = document.createElement("small");
       focus.textContent = routine.focus;
       copy.append(nameLine, focus);
