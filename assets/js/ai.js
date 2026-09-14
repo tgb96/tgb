@@ -1,5 +1,5 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=45";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=46";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -129,7 +129,7 @@ export function createAiClient() {
     return ai;
   }
 
-  async function generateJson({ instructions, input, schema, maxOutputTokens }) {
+  async function generateJson({ instructions, input, schema, maxOutputTokens, useResponseSchema = true }) {
     try {
       await initialize();
       const auth = modules.authModule.getAuth();
@@ -140,12 +140,13 @@ export function createAiClient() {
         systemInstruction: instructions,
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: schema,
+          ...(useResponseSchema ? { responseSchema: schema } : {}),
           maxOutputTokens,
           temperature: 0.2
         }
       });
-      const result = await model.generateContent(input);
+      const schemaGuide = useResponseSchema ? "" : `\n\nFORMATO JSON OBLIGATORIO:\n${JSON.stringify(schema)}`;
+      const result = await model.generateContent(`${input}${schemaGuide}`);
       const text = result.response.text();
       if (!text) throw new Error("La IA no devolvió un resultado utilizable.");
       return JSON.parse(text);
@@ -177,6 +178,7 @@ export function createAiClient() {
       ].join("\n");
       const block = await generateJson({
         schema: planSchema,
+        useResponseSchema: false,
         maxOutputTokens: 20000,
         instructions,
         input: `FECHA ACTUAL EN CHILE: ${currentDate || "no indicada"}\n\nCATÁLOGO VÁLIDO DE TGTRAIN:\n${JSON.stringify(catalog)}\n\nPLAN DEL ENTRENADOR:\n${String(planText || "").slice(0, 50000)}`

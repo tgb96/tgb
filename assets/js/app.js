@@ -15,17 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=45";
+} from "./data.js?v=46";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=45";
-import { createRepository } from "./storage.js?v=45";
-import { createCloudSync } from "./cloud.js?v=45";
-import { createAiClient } from "./ai.js?v=45";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=45";
+} from "./coach-plan.js?v=46";
+import { createRepository } from "./storage.js?v=46";
+import { createCloudSync } from "./cloud.js?v=46";
+import { createAiClient } from "./ai.js?v=46";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=46";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -48,7 +48,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=45";
+} from "./utils.js?v=46";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
