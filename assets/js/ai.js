@@ -1,9 +1,9 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=46";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=47";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
-const MODEL_NAME = "gemini-3.8-flash";
+const MODEL_NAME = "gemini-3.5-flash-lite";
 const ALLOWED_UID = "X37HE24wq5bzbmU2tpowWZ4S7io1";
 const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9";
 
@@ -102,6 +102,7 @@ function friendlyError(error) {
   if (code.includes("unauthenticated")) return "Inicia sesión con Google para usar el análisis inteligente.";
   if (code.includes("permission") || code.includes("app-check")) return "La protección gratuita de la IA todavía no está activada para este dispositivo.";
   if (code.includes("quota") || code.includes("resource-exhausted") || code.includes("429")) return "Se alcanzó el límite gratuito temporal. Inténtalo más tarde.";
+  if (code.includes("fetch-error") && (message.includes("high demand") || message.includes("[500"))) return "Gemini está temporalmente saturado. Inténtalo nuevamente en unos minutos.";
   if (code.includes("not-found") || message.includes("not found")) return "El análisis inteligente todavía no está habilitado en Firebase.";
   return message || "No fue posible completar el análisis inteligente.";
 }

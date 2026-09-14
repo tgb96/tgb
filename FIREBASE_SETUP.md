@@ -16,7 +16,7 @@ La configuración web de Firebase identifica el proyecto, pero no reemplaza las 
 TGTrain importa planificaciones y analiza el cierre de las rutinas mediante Firebase AI Logic con Gemini Developer API. Esta modalidad funciona en el plan Spark gratuito, no requiere Cloud Functions, una clave guardada en el código ni una cuenta de facturación.
 
 - Proveedor: Gemini Developer API mediante Firebase AI Logic.
-- Modelo: `gemini-3.8-flash`, estable y disponible en el nivel gratuito.
+- Modelo: `gemini-3.5-flash-lite`, estable, rápido y disponible en el nivel gratuito.
 - Acceso normal de la interfaz: limitado al UID personal configurado en `assets/js/ai.js`.
 - Protección del servicio: Firebase App Check registrado con reCAPTCHA Enterprise y restringido a `tgb96.github.io`.
 - Persistencia: la IA nunca escribe directamente en Firestore; TGTrain valida el resultado, muestra una vista previa y solo guarda después de la confirmación del usuario.
