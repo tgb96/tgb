@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=49">
+  <link rel="stylesheet" href="assets/css/styles.css?v=50">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -204,12 +204,20 @@
         <div id="evolutionChart" class="evolution-chart" aria-label="Minutos entrenados durante las últimas seis semanas"></div>
       </section>
 
-      <section class="exercise-progress-card" aria-labelledby="exerciseProgressTitle">
-        <p class="eyebrow dark">Progreso por ejercicio</p>
-        <h2 id="exerciseProgressTitle">Cargas y volumen de cada movimiento</h2>
-        <p>Compara tu última ejecución con la anterior y revisa tus mejores marcas.</p>
-        <div id="exerciseProgress" class="exercise-progress-list"></div>
-      </section>
+      <details class="exercise-progress-card" aria-labelledby="exerciseProgressTitle">
+        <summary class="exercise-progress-card-summary">
+          <span class="exercise-progress-card-heading">
+            <span class="eyebrow dark">Progreso por ejercicio</span>
+            <strong id="exerciseProgressTitle" class="exercise-progress-card-title">Cargas y volumen de cada movimiento</strong>
+            <small>Solo ejercicios con peso registrado</small>
+          </span>
+          <span class="exercise-progress-card-toggle" aria-hidden="true"></span>
+        </summary>
+        <div class="exercise-progress-card-body">
+          <p>Compara tu última ejecución con la anterior y revisa tus mejores marcas.</p>
+          <div id="exerciseProgress" class="exercise-progress-list"></div>
+        </div>
+      </details>
 
       <section class="trekking-ranking-card physical-ranking-card" aria-labelledby="physicalRankingTitle">
         <p class="eyebrow dark">Progreso de fuerza</p>
@@ -334,6 +342,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=49"></script>
+  <script type="module" src="assets/js/app.js?v=50"></script>
 </body>
 </html>

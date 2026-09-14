@@ -219,7 +219,10 @@ test("calcula la evolución semanal y el progreso de cada ejercicio", () => {
     dateISO: "2026-08-31",
     routineVolumeKg: 240,
     routineAbsCount: 50,
-    routineExercises: [{ id: "row", name: "Remo", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3, totalReps: 30, volumeKg: 240 }]
+    routineExercises: [
+      { id: "row", name: "Remo", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3, totalReps: 30, volumeKg: 240 },
+      { id: "plank", name: "Plancha", target: "30 seg", weightKg: 0, plannedSets: 3, completedSets: 3, totalReps: 0, volumeKg: 0 }
+    ]
   };
   const evolution = weeklyEvolution([earlier, latest], "2026-09-02", 2);
   assert.deepEqual(evolution.map(week => week.volumeKg), [210, 240]);
@@ -229,6 +232,7 @@ test("calcula la evolución semanal y el progreso de cada ejercicio", () => {
   assert.equal(exercises[0].latest.weightKg, 8);
   assert.equal(exercises[0].previous.weightKg, 7);
   assert.equal(exercises[0].bestVolumeKg, 240);
+  assert.equal(exercises.length, 1);
   assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de volumen/);
   assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de abdominales/);
 });

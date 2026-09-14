@@ -29,6 +29,7 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.doesNotMatch(html, /weeklyPlan|Plan semanal/);
   assert.match(html, /id="evolutionMetrics"/);
   assert.match(html, /id="exerciseProgress"/);
+  assert.match(html, /<details class="exercise-progress-card"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
   assert.equal(new Set(ids).size, ids.length);
@@ -37,7 +38,11 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
 test("hay cuatro rutinas físicas completas y configurables", async () => {
   const data = await import("../assets/js/data.js");
   assert.equal(data.physicalRoutines.length, 4);
-  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [9, 12, 10, 11]);
+  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 13, 11, 12]);
+  assert.ok(data.physicalRoutines.every(routine => {
+    const warmup = routine.exercises[0];
+    return warmup.name === "Bicicleta estática" && warmup.sets === 1 && warmup.target === "10 min";
+  }));
   assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking", "padel"]);
   assert.deepEqual(data.cardioTypes.find(type => type.id === "padel"), {
@@ -140,7 +145,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v49/);
+  assert.match(worker, /tgtrain-shell-v50/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {

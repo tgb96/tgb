@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=49";
+} from "./data.js?v=50";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -447,7 +447,9 @@ export function exerciseProgress(records) {
       bestWeightKg: Math.max(0, ...attempts.map(attempt => Number(attempt.weightKg) || 0)),
       bestVolumeKg: Math.max(0, ...attempts.map(attempt => Number(attempt.volumeKg) || 0))
     };
-  }).sort((a, b) => b.latest.dateISO.localeCompare(a.latest.dateISO) || a.name.localeCompare(b.name, "es"));
+  })
+    .filter(group => group.bestWeightKg > 0)
+    .sort((a, b) => b.latest.dateISO.localeCompare(a.latest.dateISO) || a.name.localeCompare(b.name, "es"));
 }
 
 export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6) {

@@ -377,9 +377,10 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .series-checks.locked label { opacity: 0.48; cursor: default; }
 
 .trekking-ranking-card { margin: -5px 0 16px; padding: 18px; border-radius: 25px; background: var(--night); color: white; box-shadow: 0 18px 35px rgba(17, 21, 34, 0.16); }
-.evolution-card, .exercise-progress-card { margin: -5px 0 16px; padding: 18px; border: 1px solid var(--line); border-radius: 25px; background: white; }
-.evolution-card h2, .exercise-progress-card h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -0.6px; }
-.evolution-card > p:not(.eyebrow), .exercise-progress-card > p:not(.eyebrow) { margin: 6px 0 14px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.evolution-card, .exercise-progress-card { margin: -5px 0 16px; border: 1px solid var(--line); border-radius: 25px; background: white; }
+.evolution-card { padding: 18px; }
+.evolution-card h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -0.6px; }
+.evolution-card > p:not(.eyebrow) { margin: 6px 0 14px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .evolution-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .evolution-metric { min-width: 0; padding: 11px 9px; border-radius: 14px; background: var(--paper); }
 .evolution-metric strong, .evolution-metric span, .evolution-metric small { display: block; }
@@ -392,6 +393,19 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .evolution-bar-fill { width: min(26px, 75%); min-height: 4px; border-radius: 8px 8px 4px 4px; background: #667083; }
 .evolution-bar.current .evolution-bar-fill { background: var(--lime); }
 .evolution-bar small { overflow: hidden; color: rgba(255, 255, 255, 0.58); font-size: 7px; font-weight: 800; text-align: center; white-space: nowrap; }
+.exercise-progress-card { overflow: hidden; }
+.exercise-progress-card-summary { list-style: none; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; cursor: pointer; }
+.exercise-progress-card-summary::-webkit-details-marker { display: none; }
+.exercise-progress-card-heading, .exercise-progress-card-heading > span, .exercise-progress-card-heading > strong, .exercise-progress-card-heading > small { display: block; }
+.exercise-progress-card-heading .eyebrow { margin: 0; }
+.exercise-progress-card-title { margin-top: 4px; font-size: 22px; letter-spacing: -0.6px; line-height: 1.08; }
+.exercise-progress-card-heading small { margin-top: 7px; color: var(--muted); font-size: 9px; font-weight: 800; }
+.exercise-progress-card-toggle { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--night); color: var(--lime); }
+.exercise-progress-card-toggle::before { content: "+"; font-size: 22px; font-weight: 700; line-height: 1; }
+.exercise-progress-card[open] .exercise-progress-card-toggle::before { content: "−"; }
+.exercise-progress-card[open] .exercise-progress-card-summary { border-bottom: 1px solid var(--line); }
+.exercise-progress-card-body { padding: 14px 18px 18px; }
+.exercise-progress-card-body > p { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .exercise-progress-list { display: grid; gap: 7px; }
 .exercise-progress-empty { padding: 16px; border: 1px dashed var(--line); border-radius: 15px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .exercise-progress-item { overflow: hidden; border-radius: 16px; background: var(--paper); }

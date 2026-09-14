@@ -15,17 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=49";
+} from "./data.js?v=50";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=49";
-import { createRepository } from "./storage.js?v=49";
-import { createCloudSync } from "./cloud.js?v=49";
-import { createAiClient } from "./ai.js?v=49";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=49";
+} from "./coach-plan.js?v=50";
+import { createRepository } from "./storage.js?v=50";
+import { createCloudSync } from "./cloud.js?v=50";
+import { createAiClient } from "./ai.js?v=50";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=50";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -49,7 +49,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=49";
+} from "./utils.js?v=50";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -3142,7 +3142,7 @@ function renderExerciseProgress(records) {
   if (!exercises.length) {
     const empty = document.createElement("div");
     empty.className = "exercise-progress-empty";
-    empty.textContent = "Cuando completes rutinas físicas, aquí verás la evolución de cada ejercicio.";
+    empty.textContent = "Cuando completes ejercicios con peso, aquí verás la evolución de tus cargas.";
     container.append(empty);
     return;
   }

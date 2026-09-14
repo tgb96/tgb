@@ -47,6 +47,7 @@ export const physicalRoutines = [
     focus: "Base obligatoria · fuerza, cadera y estabilidad",
     objective: "Fortalecer piernas, cadera, glúteos y core para arrancar, frenar y proteger las rodillas.",
     exercises: [
+      { id: "stationary-bike-warmup", phase: "Calentamiento", name: "Bicicleta estática", sets: 1, target: "10 min", weightKg: "", description: "Pedalea 10 minutos a intensidad suave o moderada antes de comenzar la rutina.", benefit: "Eleva la temperatura corporal y prepara las piernas sin impacto." },
       { id: "bodyweight-squat", phase: "Calentamiento", name: "Sentadilla sin peso", sets: 2, target: "12", weightKg: "", description: "Baja controlado, con las rodillas alineadas y la espalda firme.", benefit: "Prepara piernas y cadera para posiciones bajas." },
       { id: "soft-split-step", phase: "Calentamiento", name: "Split step suave", sets: 3, target: "20 seg", weightKg: "", description: "Haz un pequeño salto y cae activo sobre ambos pies.", benefit: "Mejora la reacción antes de desplazarte." },
       { id: "unilateral-loaded-squat", phase: "Fuerza principal", name: "Sentadilla con carga unilateral", sets: 4, target: "10", weightKg: 8, description: "Sostén la carga de un lado y mantén el tronco estable durante la sentadilla.", benefit: "Fortalece piernas y la estabilidad del core para transferir fuerza.", weightSuggestion: "Peso sugerido inicial: 8 kg." },
@@ -64,6 +65,7 @@ export const physicalRoutines = [
     focus: "Base obligatoria · hombro, espalda, pecho y brazo",
     objective: "Fortalecer el tren superior y el core con intensidad moderada, buena técnica y sin llegar al fallo.",
     exercises: [
+      { id: "stationary-bike-warmup", phase: "Calentamiento", name: "Bicicleta estática", sets: 1, target: "10 min", weightKg: "", description: "Pedalea 10 minutos a intensidad suave o moderada antes de comenzar la rutina.", benefit: "Activa la circulación y prepara el cuerpo para el trabajo de fuerza." },
       { id: "shoulder-mobility", phase: "Calentamiento", name: "Movilidad de hombro sin peso", sets: 1, target: "3 min", weightKg: "", description: "Haz círculos suaves, elevaciones controladas y aperturas de brazos.", benefit: "Prepara hombro y escápula para golpes y saque." },
       { id: "one-arm-row", phase: "Espalda", name: "Remo a una mano", sets: 4, target: "10", weightKg: 7, description: "Con el torso inclinado, lleva la mancuerna hacia la cadera.", benefit: "Mejora la tracción y la estabilidad escapular.", weightSuggestion: "Peso sugerido inicial: 7 kg." },
       { id: "unsupported-row", phase: "Espalda", name: "Remo inclinado unilateral", sets: 3, target: "10", weightKg: 7, description: "Inclina el torso sin apoyo y lleva la mancuerna hacia el cuerpo.", benefit: "Suma trabajo de equilibrio y estabilización del core.", weightSuggestion: "Peso sugerido inicial: 7 kg." },
@@ -84,6 +86,7 @@ export const physicalRoutines = [
     focus: "Base obligatoria · reacción y tenis específico",
     objective: "Mejorar aceleración, reacción, recuperación al centro y potencia de piernas sin buscar fatiga de hipertrofia.",
     exercises: [
+      { id: "stationary-bike-warmup", phase: "Calentamiento", name: "Bicicleta estática", sets: 1, target: "10 min", weightKg: "", description: "Pedalea 10 minutos a intensidad suave o moderada antes de comenzar la rutina.", benefit: "Prepara piernas y articulaciones para los movimientos explosivos posteriores." },
       { id: "soft-shadow-tennis", phase: "Calentamiento", name: "Shadow tennis suave", sets: 3, target: "45 seg", weightKg: "", description: "Simula derechas, reveses y preparación sin pelota.", benefit: "Practica técnica, transferencia de peso y coordinación." },
       { id: "split-step", phase: "Calentamiento", name: "Split step", sets: 4, target: "20 seg", weightKg: "", description: "Haz un pequeño salto y aterriza activo antes de desplazarte.", benefit: "Mejora la reacción y la salida hacia cualquier dirección." },
       { id: "jump-squat", phase: "Potencia", name: "Sentadilla con salto", sets: 3, target: "6", weightKg: "", description: "Desde la sentadilla, impulsa el cuerpo en un salto vertical y aterriza con control.", benefit: "Desarrolla potencia para arrancadas y recuperación.", caution: "Hazla solo si rodilla y Aquiles están bien; si molesta, usa sentadilla rápida sin salto." },
@@ -102,6 +105,7 @@ export const physicalRoutines = [
     focus: "Opcional · muñeca, core y estabilidad",
     objective: "Complementar agarre, antebrazo, muñeca, core y técnica sin cargar demasiado las piernas.",
     exercises: [
+      { id: "stationary-bike-warmup", phase: "Calentamiento", name: "Bicicleta estática", sets: 1, target: "10 min", weightKg: "", description: "Pedalea 10 minutos a intensidad suave o moderada antes de comenzar la rutina.", benefit: "Activa el cuerpo completo antes del trabajo técnico y de estabilidad." },
       { id: "shadow-tennis", phase: "Técnica", name: "Shadow tennis", sets: 4, target: "45 seg", weightKg: "", description: "Simula derechas, reveses, saques y otros golpes sin pelota.", benefit: "Practica técnica, transferencia de peso y coordinación." },
       { id: "split-step-short", phase: "Técnica", name: "Split step + salida corta", sets: 4, target: "20 seg", weightKg: "", description: "Haz split step y una salida corta a derecha o izquierda.", benefit: "Mejora reacción inicial y preparación antes del golpe." },
       { id: "wrist-curl", phase: "Antebrazo y muñeca", name: "Curl de muñeca", sets: 3, target: "15", weightKg: "", description: "Apoya el antebrazo y flexiona la muñeca con control.", benefit: "Fortalece flexores y resistencia del agarre.", weightSuggestion: "Carga muy liviana: 1–3 kg. No usar 7 kg." },
