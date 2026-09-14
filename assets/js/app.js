@@ -15,17 +15,17 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=50";
+} from "./data.js?v=51";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=50";
-import { createRepository } from "./storage.js?v=50";
-import { createCloudSync } from "./cloud.js?v=50";
-import { createAiClient } from "./ai.js?v=50";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=50";
+} from "./coach-plan.js?v=51";
+import { createRepository } from "./storage.js?v=51";
+import { createCloudSync } from "./cloud.js?v=51";
+import { createAiClient } from "./ai.js?v=51";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=51";
 import {
   dayIndexFromISO,
   exerciseProgress,
@@ -49,7 +49,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=50";
+} from "./utils.js?v=51";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -113,7 +113,7 @@ function showView(name) {
   if (name === "home") renderHome();
   if (name === "routines") renderRoutines();
   if (name === "history") renderHistory();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: name === "routines" ? "auto" : "smooth" });
 }
 
 function openRegistration() {
@@ -2019,7 +2019,9 @@ function startRoutineSession(routine) {
 
 function scrollToRoutine(routineId) {
   requestAnimationFrame(() => {
-    document.querySelector(`[data-routine-id="${routineId}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-routine-id="${routineId}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 }
 
@@ -2029,23 +2031,33 @@ function scrollToRoutineProgress(routineId) {
   if (!routine || session?.status !== "active" || session.routineId !== routineId) return scrollToRoutine(routineId);
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
-  const exerciseStates = routine.exercises.map(exercise => {
+  const exerciseStates = routineExercisesForDate(routine, session.dateISO).map(exercise => {
     const setCount = currentExerciseSettings(routine, exercise, settings).sets;
     const completedSets = Array.from({ length: setCount }, (_, index) => index)
       .filter(setIndex => progress[routineProgressKey(session.dateISO, routine.id, exercise.id, setIndex)]).length;
     return { exercise, setCount, completedSets };
   });
-  const targetState = exerciseStates.find(state => state.completedSets > 0 && state.completedSets < state.setCount)
+  const partialState = exerciseStates.find(state => state.completedSets > 0 && state.completedSets < state.setCount);
+  const lastCompletedIndex = exerciseStates.reduce((latestIndex, state, index) => (
+    state.completedSets === state.setCount && state.setCount > 0 ? index : latestIndex
+  ), -1);
+  const nextAfterCompleted = lastCompletedIndex >= 0
+    ? exerciseStates.slice(lastCompletedIndex + 1).find(state => state.completedSets < state.setCount)
+    : null;
+  const targetState = partialState
+    || nextAfterCompleted
     || exerciseStates.find(state => state.completedSets < state.setCount);
 
   requestAnimationFrame(() => {
-    const routineCard = [...document.querySelectorAll("[data-routine-id]")]
-      .find(card => card.dataset.routineId === routineId);
-    const target = targetState
-      ? [...(routineCard?.querySelectorAll("[data-exercise-id]") || [])]
-        .find(card => card.dataset.exerciseId === targetState.exercise.id)
-      : routineCard?.querySelector(".abdominal-finisher") || routineCard?.querySelector(".routine-finish-card");
-    (target || routineCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(() => {
+      const routineCard = [...document.querySelectorAll("[data-routine-id]")]
+        .find(card => card.dataset.routineId === routineId);
+      const target = targetState
+        ? [...(routineCard?.querySelectorAll("[data-exercise-id]") || [])]
+          .find(card => card.dataset.exerciseId === targetState.exercise.id)
+        : routineCard?.querySelector(".abdominal-finisher") || routineCard?.querySelector(".routine-finish-card");
+      (target || routineCard)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 }
 
