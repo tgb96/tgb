@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=51">
+  <link rel="stylesheet" href="assets/css/styles.css?v=52">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -274,9 +274,30 @@
     <div class="cloud-actions">
       <button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button>
       <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
+      <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
+  </dialog>
+
+  <dialog id="coachProfileDialog" class="coach-plan-dialog coach-profile-dialog" aria-labelledby="coachProfileDialogTitle">
+    <div class="coach-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Contexto privado</p>
+        <h2 id="coachProfileDialogTitle">Perfil del entrenador IA</h2>
+        <p>Estas instrucciones guían cada recomendación de progresión y se sincronizan únicamente con tu cuenta.</p>
+      </div>
+      <button id="coachProfileDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <form id="coachProfileForm" class="coach-profile-form">
+      <label for="coachProfileText">Perfil, objetivo, limitaciones y reglas del entrenador</label>
+      <textarea id="coachProfileText" rows="13" maxlength="40000" placeholder="Pega aquí la instrucción maestra que preparó tu entrenador."></textarea>
+      <label for="coachProfileEquipment">Equipamiento disponible</label>
+      <textarea id="coachProfileEquipment" rows="6" maxlength="5000"></textarea>
+      <p class="ai-privacy-note"><span aria-hidden="true">●</span> Al analizar una rutina, este perfil privado se envía a Gemini junto con tus datos de entrenamiento. No se incluye en el código público de TGTrain.</p>
+      <div id="coachProfileMessage" class="form-message hidden" role="status" aria-live="polite"></div>
+      <button id="saveCoachProfileButton" class="save-button ai-action-button" type="submit">Guardar perfil privado</button>
+    </form>
   </dialog>
 
   <dialog id="coachPlanDialog" class="coach-plan-dialog" aria-labelledby="coachPlanDialogTitle">
@@ -342,6 +363,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=51"></script>
+  <script type="module" src="assets/js/app.js?v=52"></script>
 </body>
 </html>

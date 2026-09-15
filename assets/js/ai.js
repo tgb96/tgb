@@ -1,11 +1,19 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=51";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=52";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
 const MODEL_NAME = "gemini-3.5-flash-lite";
 const ALLOWED_UID = "X37HE24wq5bzbmU2tpowWZ4S7io1";
 const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9";
+export const COACH_PROFILE_VERSION = "tennis-v1";
+export const DEFAULT_COACH_EQUIPMENT = [
+  "Mancuernas ajustables con una capacidad máxima de 40 kg.",
+  "Kettlebell de 8 kg.",
+  "Kettlebell de 4,5 kg.",
+  "Bicicleta estática.",
+  "Espacio para shadow tennis, split step, desplazamientos y pliometría."
+].join("\n");
 
 const stringSchema = { type: "string" };
 const nullableNumberSchema = { type: "number", nullable: true };
@@ -83,17 +91,37 @@ const planSchema = {
   required: ["title", "subtitle", "source", "rules", "priority", "weeks"]
 };
 
+const progressionChangeSchema = {
+  type: "object",
+  properties: {
+    exerciseId: stringSchema,
+    exerciseName: stringSchema,
+    action: { type: "string", enum: ["increase", "maintain", "reduce", "substitute"] },
+    currentSets: { type: "integer" },
+    proposedSets: { type: "integer" },
+    currentTarget: stringSchema,
+    proposedTarget: stringSchema,
+    currentWeightKg: nullableNumberSchema,
+    proposedWeightKg: nullableNumberSchema,
+    reason: stringSchema
+  },
+  required: ["exerciseId", "exerciseName", "action", "currentSets", "proposedSets", "currentTarget", "proposedTarget", "currentWeightKg", "proposedWeightKg", "reason"]
+};
+
 const analysisSchema = {
   type: "object",
   properties: {
+    decision: { type: "string", enum: ["progress", "maintain", "reduce", "recover"] },
     headline: stringSchema,
     summary: stringSchema,
     highlights: { type: "array", items: stringSchema, maxItems: 6 },
     progress: { type: "array", items: stringSchema, maxItems: 6 },
     nextSession: { type: "array", items: stringSchema, maxItems: 6 },
-    cautions: { type: "array", items: stringSchema, maxItems: 6 }
+    cautions: { type: "array", items: stringSchema, maxItems: 6 },
+    changes: { type: "array", items: progressionChangeSchema, maxItems: 12 },
+    goal: stringSchema
   },
-  required: ["headline", "summary", "highlights", "progress", "nextSession", "cautions"]
+  required: ["decision", "headline", "summary", "highlights", "progress", "nextSession", "cautions", "changes", "goal"]
 };
 
 function friendlyError(error) {
@@ -187,22 +215,38 @@ export function createAiClient() {
       return { block, model: MODEL_NAME };
     },
 
-    async analyzeRoutine(record, recentRecords = [], planDetails = []) {
+    async analyzeRoutine(record, recentRecords = [], planDetails = [], context = {}) {
       const instructions = [
-        "Eres el analista de entrenamiento personal de TGTrain.",
-        "Analiza solo los datos entregados y compara únicamente con sesiones anteriores de la misma rutina.",
-        "Distingue datos objetivos de interpretaciones. No inventes cargas, repeticiones, molestias ni récords.",
-        "Entrega una síntesis breve, alentadora y útil, con recomendaciones prudentes para la próxima sesión.",
-        "No diagnostiques lesiones. Si las sensaciones mencionan dolor o una molestia relevante, incluye una cautela conservadora y sugiere detener o consultar a un profesional si persiste o empeora.",
-        "No cambies registros ni afirmes que una recomendación es una orden médica. Responde en español chileno neutro."
+        "Eres la IA entrenadora personal de TGTrain, especializada en rendimiento físico para tenis.",
+        "Tu prioridad es mejorar desplazamientos, split step, frenadas, recuperación al centro, fuerza funcional, potencia limpia, estabilidad y tolerancia a la carga de tenis; no optimices para hipertrofia por sí sola.",
+        "Analiza solo los datos entregados. No inventes cargas, repeticiones, dolor, calendario, equipamiento ni récords.",
+        "Elige exactamente una decisión general: progress, maintain, reduce o recover.",
+        "Propón cambios solo para exerciseId presentes en la sesión actual. Los valores deben ser concretos y aplicables en TGTrain.",
+        "En una sesión aumenta como máximo una variable principal. No subas simultáneamente carga, repeticiones y series. El volumen total no debe subir más de 5–10% respecto de una sesión comparable.",
+        "Carga: aumenta como máximo 1–2 kg cuando esa configuración exista. Repeticiones: +1–2 por serie. Series: +1 serie en un solo ejercicio. Planchas/carries: +5–10 segundos. Desplazamientos: +5 segundos. Nunca agregues carga a pliometría.",
+        "Solo progresa si se completó al menos 90%, la técnica y energía fueron adecuadas, el esfuerzo fue controlado, el dolor fue 0–2/10 y no hay tenis o partido exigente en las próximas 48 horas.",
+        "Con esfuerzo alto, mala técnica, poca energía o rutina parcial, mantén o reduce. Con dolor 3–4/10 no progreses y reduce 20–30%. Con dolor 5/10 o más, o molestia repetida, prioriza recuperar y recomienda detener el ejercicio problemático y consultar si persiste.",
+        "Para piernas prioriza técnica, estabilidad, rango, repeticiones, tempo y al final carga. Para tren superior protege el lado de raqueta y no aumentes más de un empuje y una tracción. Para potencia prioriza calidad, descansos y aterrizaje. Para core aumenta tiempo o control antes que carga.",
+        "El perfil privado del usuario prevalece sobre las reglas generales. El inventario entregado es el único equipamiento permitido.",
+        "changes debe contener solo ajustes relevantes. Si recomiendas mantener sin cambios, puede quedar vacío. Nunca apliques nada: la aplicación pedirá confirmación al usuario.",
+        "No diagnostiques lesiones ni presentes una recomendación como orden médica. Responde en español chileno neutro."
       ].join("\n");
       const analysis = await generateJson({
         schema: analysisSchema,
-        maxOutputTokens: 1800,
+        maxOutputTokens: 4000,
         instructions,
-        input: JSON.stringify({ current: record, previousSameRoutine: recentRecords.slice(-8), planDetails: planDetails.slice(0, 20) })
+        input: JSON.stringify({
+          coachProfileVersion: COACH_PROFILE_VERSION,
+          privateCoachProfile: String(context.coachProfile?.profileText || "").slice(0, 40000),
+          availableEquipment: String(context.coachProfile?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 5000),
+          current: record,
+          previousSameRoutine: recentRecords.slice(-8),
+          recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
+          next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
+          planDetails: planDetails.slice(0, 20)
+        })
       });
-      return { analysis, model: MODEL_NAME };
+      return { analysis: { ...analysis, profileVersion: COACH_PROFILE_VERSION }, model: MODEL_NAME };
     }
   };
 }

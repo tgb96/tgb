@@ -40,6 +40,7 @@ export function createCloudSync({
   let unsubscribeRecords = null;
   let unsubscribePlans = null;
   let unsubscribeTrainingBlocks = null;
+  let unsubscribeCoachProfile = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
 
@@ -62,6 +63,7 @@ export function createCloudSync({
   const planDocumentReference = weekKey => modules.firestoreModule.doc(database, "users", user.uid, "plans", String(weekKey));
   const trainingBlocksCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "trainingBlocks");
   const trainingBlockDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "trainingBlocks", String(id));
+  const coachProfileDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "settings", "coachProfile");
 
   async function writeChange(change) {
     if (!user) return;
@@ -71,6 +73,10 @@ export function createCloudSync({
     }
     if (change.type === "training-block-upsert") {
       await modules.firestoreModule.setDoc(trainingBlockDocumentReference(change.block.id), change.block);
+      return;
+    }
+    if (change.type === "coach-profile-upsert") {
+      await modules.firestoreModule.setDoc(coachProfileDocumentReference(), change.profile);
       return;
     }
     if (change.type === "remove") {
@@ -161,6 +167,14 @@ export function createCloudSync({
       if (!remoteBlocks.has(id)) uploads.push({ type: "training-block-upsert", block: localBlock });
     });
     for (const change of uploads.filter(change => change.type === "training-block-upsert")) await writeChange(change);
+    const profileSnapshot = await modules.firestoreModule.getDoc(coachProfileDocumentReference());
+    const remoteProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+    const localProfile = repository.getCoachProfile();
+    if (remoteProfile && (!localProfile || recordTimestamp(remoteProfile) >= recordTimestamp(localProfile))) {
+      if (repository.applyCloudCoachProfile(remoteProfile)) localChanged = true;
+    } else if (localProfile) {
+      await writeChange({ type: "coach-profile-upsert", profile: localProfile });
+    }
     if (localChanged) onDataChanged();
   }
 
@@ -203,6 +217,14 @@ export function createCloudSync({
     }, () => emit("offline", "Sin conexión con la nube. Tus datos locales permanecen seguros."));
   }
 
+  function observeCloudCoachProfile() {
+    unsubscribeCoachProfile?.();
+    unsubscribeCoachProfile = modules.firestoreModule.onSnapshot(coachProfileDocumentReference(), snapshot => {
+      if (!snapshot.exists()) return;
+      if (repository.applyCloudCoachProfile(snapshot.data())) onDataChanged();
+    }, () => emit("offline", "Sin conexión con la nube. Tu perfil del entrenador permanece guardado localmente."));
+  }
+
   async function connect(currentUser) {
     user = currentUser;
     unsubscribeRepository?.();
@@ -213,6 +235,8 @@ export function createCloudSync({
     unsubscribePlans = null;
     unsubscribeTrainingBlocks?.();
     unsubscribeTrainingBlocks = null;
+    unsubscribeCoachProfile?.();
+    unsubscribeCoachProfile = null;
     if (!user) {
       emit("signed-out", "Inicia sesión para guardar tus entrenamientos en la nube.");
       return;
@@ -229,6 +253,7 @@ export function createCloudSync({
       observeCloudRecords();
       observeCloudPlans();
       observeCloudTrainingBlocks();
+      observeCloudCoachProfile();
       emit("synced", "Todos tus cambios están guardados en la nube.");
     } catch {
       unsubscribeRepository = repository.subscribe(queueChange);
@@ -279,6 +304,7 @@ export function createCloudSync({
       unsubscribeRecords?.();
       unsubscribePlans?.();
       unsubscribeTrainingBlocks?.();
+      unsubscribeCoachProfile?.();
       unsubscribeRepository?.();
     }
   };

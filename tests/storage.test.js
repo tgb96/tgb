@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 11/);
+  assert.match(repository.backup(), /"schemaVersion": 12/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -127,4 +127,25 @@ test("guarda y respalda bloques completos importados para el entrenador", () => 
   assert.equal(repository.listTrainingBlocks().length, 1);
   assert.equal(changes.at(-1).type, "training-block-upsert");
   assert.match(repository.backup(), /bloque-octubre/);
+});
+
+test("guarda, respalda y sincroniza el perfil privado del entrenador", () => {
+  const repository = createRepository(new FakeStorage());
+  const changes = [];
+  repository.subscribe(change => changes.push(change));
+  repository.saveCoachProfile({
+    profileText: "Objetivo: rendimiento para tenis.",
+    equipment: "Mancuernas ajustables hasta 40 kg.\nKettlebell de 4,5 kg.",
+    version: "tennis-v1",
+    updatedAt: "2026-09-14T18:00:00.000Z"
+  });
+  assert.match(repository.getCoachProfile().equipment, /4,5 kg/);
+  assert.equal(changes.at(-1).type, "coach-profile-upsert");
+  assert.match(repository.backup(), /Objetivo: rendimiento para tenis/);
+  assert.equal(repository.applyCloudCoachProfile({
+    profileText: "Perfil actualizado.",
+    equipment: "Mancuernas ajustables hasta 40 kg.",
+    updatedAt: "2026-09-14T19:00:00.000Z"
+  }), true);
+  assert.equal(repository.getCoachProfile().profileText, "Perfil actualizado.");
 });

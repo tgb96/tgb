@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=51";
+} from "./data.js?v=52";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -193,6 +193,9 @@ export function normalizeRecord(record) {
     routineTotalReps: optionalNumber(record?.routineTotalReps, { min: 0 }),
     routineVolumeKg: optionalNumber(record?.routineVolumeKg, { min: 0 }),
     routineAbsCount: optionalNumber(record?.routineAbsCount, { min: 0 }),
+    routineEffort: optionalNumber(record?.routineEffort, { min: 1 }),
+    routinePain: optionalNumber(record?.routinePain, { min: 0 }),
+    routinePainDetail: String(record?.routinePainDetail || "").slice(0, 2000),
     routineExercises: normalizeRoutineExercises(record?.routineExercises),
     routineSummary: String(record?.routineSummary || "").slice(0, 3000),
     routineAiAnalysis: normalizeRoutineAiAnalysis(record?.routineAiAnalysis),
@@ -243,6 +246,8 @@ export function validateRecord(record) {
   if (normalized.elevationGainM === null) errors.push("El desnivel debe ser un número igual o mayor que cero.");
   if (normalized.ascentDurationSeconds === null) errors.push("El tiempo de subida debe ser válido.");
   if (normalized.routineAbsCount === null) errors.push("La cantidad de abdominales debe ser un número igual o mayor que cero.");
+  if (normalized.routineEffort === null || (normalized.routineEffort !== "" && normalized.routineEffort > 10)) errors.push("El esfuerzo debe estar entre 1 y 10.");
+  if (normalized.routinePain === null || (normalized.routinePain !== "" && normalized.routinePain > 10)) errors.push("El dolor debe estar entre 0 y 10.");
   return { valid: errors.length === 0, errors, record: normalized };
 }
 
@@ -277,6 +282,8 @@ export function recordDetails(record) {
     details.push(`${normalized.routineCompletedSets}/${normalized.routinePlannedSets} series`);
     details.push(`${Number(normalized.routineVolumeKg || 0).toLocaleString("es-CL")} kg volumen`);
     if (normalized.routineAbsCount !== "") details.push(`${normalized.routineAbsCount} abdominales`);
+    if (normalized.routineEffort !== "") details.push(`esfuerzo ${normalized.routineEffort}/10`);
+    if (normalized.routinePain !== "") details.push(`dolor ${normalized.routinePain}/10`);
   }
   return details.join(" · ");
 }
@@ -480,13 +487,39 @@ function normalizeRoutineAiAnalysis(value) {
   const headline = String(value.headline || "").trim().slice(0, 300);
   const summary = String(value.summary || "").trim().slice(0, 2000);
   if (!headline && !summary) return null;
+  const decisions = new Set(["progress", "maintain", "reduce", "recover"]);
+  const actions = new Set(["increase", "maintain", "reduce", "substitute"]);
+  const statuses = new Set(["pending", "applied", "discarded"]);
+  const changes = Array.isArray(value.changes) ? value.changes.slice(0, 12).map((change, index) => {
+    const currentWeightKg = optionalNumber(change?.currentWeightKg, { min: 0 });
+    const proposedWeightKg = optionalNumber(change?.proposedWeightKg, { min: 0 });
+    return {
+      exerciseId: String(change?.exerciseId || "").slice(0, 100),
+      exerciseName: String(change?.exerciseName || `Ejercicio ${index + 1}`).slice(0, 300),
+      action: actions.has(change?.action) ? change.action : "maintain",
+      currentSets: Math.min(10, Math.max(1, Math.floor(Number(change?.currentSets) || 1))),
+      proposedSets: Math.min(10, Math.max(1, Math.floor(Number(change?.proposedSets) || 1))),
+      currentTarget: String(change?.currentTarget || "").slice(0, 100),
+      proposedTarget: String(change?.proposedTarget || "").slice(0, 100),
+      currentWeightKg: currentWeightKg === null ? "" : currentWeightKg,
+      proposedWeightKg: proposedWeightKg === null ? "" : proposedWeightKg,
+      reason: String(change?.reason || "").slice(0, 1000)
+    };
+  }).filter(change => change.exerciseId) : [];
   return {
+    decision: decisions.has(value.decision) ? value.decision : "",
     headline,
     summary,
     highlights: cleanList(value.highlights),
     progress: cleanList(value.progress),
     nextSession: cleanList(value.nextSession),
     cautions: cleanList(value.cautions),
+    changes,
+    goal: String(value.goal || "").trim().slice(0, 1000),
+    status: statuses.has(value.status) ? value.status : (changes.length || value.decision ? "pending" : ""),
+    appliedAt: String(value.appliedAt || "").slice(0, 40),
+    appliedChanges: Array.isArray(value.appliedChanges) ? value.appliedChanges.slice(0, 12).map(change => ({ ...change })) : [],
+    profileVersion: String(value.profileVersion || "").slice(0, 100),
     generatedAt: String(value.generatedAt || "").slice(0, 40),
     model: String(value.model || "").slice(0, 100)
   };
@@ -586,14 +619,24 @@ export function weeklyReport(records, week) {
         report += `   Repeticiones contabilizadas: ${record.routineTotalReps}\n`;
         report += `   Volumen estimado: ${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg\n`;
         if (record.routineAbsCount !== "") report += `   Abdominales finales: ${record.routineAbsCount}\n`;
+        if (record.routineEffort !== "") report += `   Esfuerzo percibido (RPE): ${record.routineEffort}/10\n`;
+        if (record.routinePain !== "") report += `   Dolor o molestia: ${record.routinePain}/10\n`;
+        if (record.routinePainDetail) report += `   Detalle de dolor o molestia: ${record.routinePainDetail}\n`;
         if (record.routineSummary) report += `   Resumen automático: ${record.routineSummary}\n`;
         if (record.routineAiAnalysis) {
           report += `   Análisis inteligente: ${record.routineAiAnalysis.headline || record.routineAiAnalysis.summary}\n`;
+          if (record.routineAiAnalysis.decision) report += `   Decisión IA: ${record.routineAiAnalysis.decision}\n`;
           if (record.routineAiAnalysis.summary && record.routineAiAnalysis.headline) report += `   Lectura: ${record.routineAiAnalysis.summary}\n`;
           record.routineAiAnalysis.highlights.forEach(item => { report += `   Punto destacado: ${item}\n`; });
           record.routineAiAnalysis.progress.forEach(item => { report += `   Progreso: ${item}\n`; });
           record.routineAiAnalysis.nextSession.forEach(item => { report += `   Próxima sesión: ${item}\n`; });
           record.routineAiAnalysis.cautions.forEach(item => { report += `   Atención: ${item}\n`; });
+          record.routineAiAnalysis.changes.forEach(item => {
+            const weight = item.proposedWeightKg === "" ? "sin carga" : `${item.proposedWeightKg} kg`;
+            report += `   Ajuste propuesto (${item.exerciseName}): ${item.proposedSets} series · ${item.proposedTarget || "sin objetivo"} · ${weight}. ${item.reason}\n`;
+          });
+          if (record.routineAiAnalysis.goal) report += `   Meta propuesta: ${record.routineAiAnalysis.goal}\n`;
+          if (record.routineAiAnalysis.status) report += `   Estado de la propuesta: ${record.routineAiAnalysis.status}\n`;
         }
       }
       if (record.category === "physical" && record.routineExercises.length) {
@@ -627,7 +670,7 @@ export function recordsToCSV(records) {
     ["series_completadas", "routineCompletedSets"], ["series_planificadas", "routinePlannedSets"],
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
-    ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
+    ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["esfuerzo_rpe", "routineEffort"], ["dolor_0_10", "routinePain"], ["detalle_dolor", "routinePainDetail"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
     ["resumen_automatico", "routineSummary"], ["analisis_gpt", "routineAiAnalysisExport"], ["detalle_ejercicios", "routineExercisesExport"],
     ["plan_entrenador", "plannedTitle"], ["plan_semana", "planWeekKey"], ["plan_sesion", "planSessionId"],
     ["sensaciones", "sensations"]
@@ -640,7 +683,18 @@ export function recordsToCSV(records) {
         .map((exercise, index) => `${index + 1}. ${exercise.name}: ${routineExerciseLine(exercise)}`)
         .join(" | "),
       routineAiAnalysisExport: record.routineAiAnalysis
-        ? [record.routineAiAnalysis.headline, record.routineAiAnalysis.summary, ...record.routineAiAnalysis.highlights, ...record.routineAiAnalysis.progress, ...record.routineAiAnalysis.nextSession, ...record.routineAiAnalysis.cautions].filter(Boolean).join(" | ")
+        ? [
+          record.routineAiAnalysis.headline,
+          record.routineAiAnalysis.summary,
+          record.routineAiAnalysis.decision ? `Decisión: ${record.routineAiAnalysis.decision}` : "",
+          ...record.routineAiAnalysis.highlights,
+          ...record.routineAiAnalysis.progress,
+          ...record.routineAiAnalysis.nextSession,
+          ...record.routineAiAnalysis.cautions,
+          ...record.routineAiAnalysis.changes.map(change => `${change.exerciseName}: ${change.proposedSets} series, ${change.proposedTarget}, ${change.proposedWeightKg === "" ? "sin carga" : `${change.proposedWeightKg} kg`} (${change.reason})`),
+          record.routineAiAnalysis.goal ? `Meta: ${record.routineAiAnalysis.goal}` : "",
+          record.routineAiAnalysis.status ? `Estado: ${record.routineAiAnalysis.status}` : ""
+        ].filter(Boolean).join(" | ")
         : ""
     };
     rows.push(columns.map(([, key]) => csvCell(csvRecord[key])).join(","));

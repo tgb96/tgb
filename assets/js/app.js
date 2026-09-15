@@ -15,19 +15,20 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=51";
+} from "./data.js?v=52";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=51";
-import { createRepository } from "./storage.js?v=51";
-import { createCloudSync } from "./cloud.js?v=51";
-import { createAiClient } from "./ai.js?v=51";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=51";
+} from "./coach-plan.js?v=52";
+import { createRepository } from "./storage.js?v=52";
+import { createCloudSync } from "./cloud.js?v=52";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=52";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=52";
 import {
   dayIndexFromISO,
+  addDaysISO,
   exerciseProgress,
   formatLongDate,
   formatShortDate,
@@ -49,7 +50,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=51";
+} from "./utils.js?v=52";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -62,6 +63,7 @@ const cloudSync = createCloudSync({
     renderHome();
     renderHistory();
     renderCoachPlanDialog();
+    updateCoachProfileButton();
   }
 });
 
@@ -530,7 +532,57 @@ function updateCloudStatus(status) {
 
 function openCloudDialog() {
   updateCloudStatus(currentCloudStatus);
+  updateCoachProfileButton();
   if (!$("cloudDialog").open) $("cloudDialog").showModal();
+}
+
+function updateCoachProfileButton() {
+  const button = $("openCoachProfileButton");
+  if (!button) return;
+  button.textContent = repository.getCoachProfile()
+    ? "Perfil del entrenador IA · Configurado"
+    : "Configurar perfil del entrenador IA";
+}
+
+function setCoachProfileMessage(text = "", kind = "error") {
+  const message = $("coachProfileMessage");
+  message.textContent = text;
+  message.className = `form-message ${kind}${text ? "" : " hidden"}`;
+}
+
+function openCoachProfileDialog() {
+  const profile = repository.getCoachProfile();
+  $("coachProfileText").value = profile?.profileText || "";
+  $("coachProfileEquipment").value = profile?.equipment || DEFAULT_COACH_EQUIPMENT;
+  setCoachProfileMessage();
+  if ($("cloudDialog").open) $("cloudDialog").close();
+  if (!$("coachProfileDialog").open) $("coachProfileDialog").showModal();
+}
+
+function saveCoachProfile(event) {
+  event.preventDefault();
+  const profileText = $("coachProfileText").value.trim();
+  const equipment = $("coachProfileEquipment").value.trim();
+  if (!profileText) {
+    setCoachProfileMessage("Pega las instrucciones de tu entrenador para activar recomendaciones personalizadas.");
+    $("coachProfileText").focus();
+    return;
+  }
+  try {
+    repository.saveCoachProfile({
+      profileText,
+      equipment: equipment || DEFAULT_COACH_EQUIPMENT,
+      version: COACH_PROFILE_VERSION,
+      updatedAt: new Date().toISOString()
+    });
+    updateCoachProfileButton();
+    setCoachProfileMessage(cloudSync.currentUser
+      ? "Perfil guardado y preparado para sincronizarse con tu cuenta."
+      : "Perfil guardado en este dispositivo. Inicia sesión para sincronizarlo.", "success");
+    showToast("Perfil privado del entrenador guardado.");
+  } catch (error) {
+    setCoachProfileMessage(error.message);
+  }
 }
 
 async function signInToCloud() {
@@ -1631,6 +1683,9 @@ function formRecord() {
     routineTotalReps: preserveRoutineBalance ? existing.routineTotalReps : "",
     routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
     routineAbsCount: preserveRoutineBalance ? existing.routineAbsCount : "",
+    routineEffort: preserveRoutineBalance ? existing.routineEffort : "",
+    routinePain: preserveRoutineBalance ? existing.routinePain : "",
+    routinePainDetail: preserveRoutineBalance ? existing.routinePainDetail : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
     routineAiAnalysis: preserveRoutineBalance ? existing.routineAiAnalysis : null,
@@ -2001,6 +2056,11 @@ function startRoutineSession(routine) {
     endedAt: "",
     elapsedSeconds: 0,
     absCount: "",
+    calories: "",
+    sensations: "",
+    effort: "",
+    pain: 0,
+    painDetail: "",
     settingsAtStart,
     planBlockId: plannedForRoutine?.blockId || "",
     planWeekKey: plannedForRoutine?.weekKey || "",
@@ -2087,6 +2147,9 @@ function routineForAi(record) {
     durationMinutes: record.durationMinutes,
     calories: record.calories,
     sensations: record.sensations,
+    effortRpe: record.routineEffort,
+    painScore: record.routinePain,
+    painDetail: record.routinePainDetail,
     completedSets: record.routineCompletedSets,
     plannedSets: record.routinePlannedSets,
     completedExercises: record.routineCompletedExercises,
@@ -2095,24 +2158,69 @@ function routineForAi(record) {
     volumeKg: record.routineVolumeKg,
     abdominalCount: record.routineAbsCount,
     exercises: record.routineExercises.map(exercise => ({
+      id: exercise.id,
       name: exercise.name,
+      phase: exercise.phase,
       target: exercise.target,
       weightKg: exercise.weightKg,
       plannedSets: exercise.plannedSets,
       completedSets: exercise.completedSets,
+      completedSetNumbers: exercise.completedSetNumbers,
       totalReps: exercise.totalReps,
       volumeKg: exercise.volumeKg
     }))
   };
 }
 
-async function requestRoutineAiAnalysis(recordId, planDetails = []) {
+function routineAiContext(record) {
+  const records = repository.list();
+  const startISO = addDaysISO(record.dateISO, -14);
+  const endISO = addDaysISO(record.dateISO, 2);
+  const recentTrainingLoad = records
+    .filter(item => item.id !== record.id && item.dateISO >= startISO && item.dateISO <= record.dateISO)
+    .sort((a, b) => a.dateISO.localeCompare(b.dateISO))
+    .map(item => ({
+      dateISO: item.dateISO,
+      category: item.category,
+      title: recordTitle(item),
+      durationMinutes: Math.round(Number(item.durationMinutes) || 0),
+      calories: Number(item.calories) || 0,
+      sensations: item.sensations,
+      effortRpe: item.routineEffort,
+      painScore: item.routinePain,
+      painDetail: item.routinePainDetail,
+      volumeKg: Number(item.routineVolumeKg) || 0
+    }));
+  const block = activeTrainingBlock();
+  const next48Hours = (block?.weeks || []).flatMap(week => week.sessions || [])
+    .filter(session => session.dateISO > record.dateISO && session.dateISO <= endISO)
+    .map(session => {
+      const option = coachOption(session, session.primaryOptionId) || session.options?.[0];
+      return {
+        dateISO: session.dateISO,
+        objective: session.objective,
+        plannedTitle: option?.title || "",
+        category: option?.category || "",
+        summary: option?.summary || "",
+        alternatives: (session.options || []).map(item => item.title)
+      };
+    });
+  return { coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours };
+}
+
+async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactive = true } = {}) {
   if (aiAnalysisInFlight.has(recordId)) return;
   const record = repository.get(recordId);
   if (!record) return;
   if (!cloudSync.currentUser) {
-    openCloudDialog();
+    if (interactive) openCloudDialog();
     showToast("Inicia sesión con Google para generar el análisis inteligente.");
+    return;
+  }
+  const context = routineAiContext(record);
+  if (!context.coachProfile?.profileText) {
+    if (interactive) openCoachProfileDialog();
+    showToast("Configura primero el perfil privado de tu entrenador IA.");
     return;
   }
   aiAnalysisInFlight.add(recordId);
@@ -2123,12 +2231,13 @@ async function requestRoutineAiAnalysis(recordId, planDetails = []) {
       .slice(0, 8)
       .reverse()
       .map(routineForAi);
-    const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails);
+    const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails, context);
     const analysis = result?.analysis || result;
     repository.upsert({
       ...record,
       routineAiAnalysis: {
         ...analysis,
+        status: "pending",
         generatedAt: new Date().toISOString(),
         model: result?.model || analysis?.model || ""
       },
@@ -2150,10 +2259,16 @@ function finishRoutineSession(routine) {
   const caloriesInput = $(`routineCalories-${routine.id}`);
   const absInput = $(`routineAbsCount-${routine.id}`);
   const sensationsInput = $(`routineSensations-${routine.id}`);
+  const effortInput = $(`routineEffort-${routine.id}`);
+  const painInput = $(`routinePain-${routine.id}`);
+  const painDetailInput = $(`routinePainDetail-${routine.id}`);
   const message = $(`routineFinishMessage-${routine.id}`);
   const calories = caloriesInput?.value === "" ? null : Number(caloriesInput?.value);
   const absCount = absInput?.value === "" ? null : Number(absInput?.value);
   const sensations = sensationsInput?.value.trim() || "";
+  const effort = effortInput?.value === "" ? null : Number(effortInput?.value);
+  const pain = painInput?.value === "" ? null : Number(painInput?.value);
+  const painDetail = painDetailInput?.value.trim() || "";
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
   const summary = routineSessionSummary(routine, progress, settings, session.dateISO);
@@ -2181,6 +2296,24 @@ function finishRoutineSession(routine) {
     message.textContent = "Elige al menos una sensación o escribe cómo te sentiste.";
     message.classList.remove("hidden");
     sensationsInput?.focus();
+    return;
+  }
+  if (!Number.isFinite(effort) || effort < 1 || effort > 10) {
+    message.textContent = "Selecciona tu esfuerzo percibido entre 1 y 10.";
+    message.classList.remove("hidden");
+    effortInput?.focus();
+    return;
+  }
+  if (!Number.isFinite(pain) || pain < 0 || pain > 10) {
+    message.textContent = "Selecciona el nivel de dolor o molestia entre 0 y 10.";
+    message.classList.remove("hidden");
+    painInput?.focus();
+    return;
+  }
+  if (pain > 0 && !painDetail) {
+    message.textContent = "Describe dónde y cómo fue la molestia para que la recomendación sea segura.";
+    message.classList.remove("hidden");
+    painDetailInput?.focus();
     return;
   }
 
@@ -2212,6 +2345,9 @@ function finishRoutineSession(routine) {
     routineTotalReps: summary.totalReps,
     routineVolumeKg: summary.volumeKg,
     routineAbsCount: absCount,
+    routineEffort: effort,
+    routinePain: pain,
+    routinePainDetail: painDetail,
     routineExercises: summary.exercises,
     routineSummary: "",
     routineAiAnalysis: null,
@@ -2250,6 +2386,9 @@ function finishRoutineSession(routine) {
     calories,
     sensations,
     absCount,
+    effort,
+    pain,
+    painDetail,
     recordId: record.id,
     summary,
     routineSummary: record.routineSummary,
@@ -2263,7 +2402,7 @@ function finishRoutineSession(routine) {
   renderRoutines();
   renderHome();
   renderCoachPlanDialog();
-  if (cloudSync.currentUser) requestRoutineAiAnalysis(record.id, session.planDetails || []);
+  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(record.id, session.planDetails || [], { interactive: false });
   showToast(saveSettingsForNextTime
     ? "Rutina registrada y cambios guardados para la próxima vez."
     : settingsChangeCount > 0
@@ -2281,7 +2420,7 @@ function balanceMetric(label, value) {
   return metric;
 }
 
-function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", preview = false) {
+function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", preview = false, effort = "", pain = "") {
   const grid = document.createElement("div");
   grid.className = "routine-balance-grid";
   const metrics = [
@@ -2293,12 +2432,118 @@ function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", pr
     ["Volumen estimado", `${Number(summary.volumeKg).toLocaleString("es-CL")} kg`, "volume"],
     ["Abdominales", absCount === "" || absCount === null || absCount === undefined ? "—" : String(absCount), "abdominals"]
   ];
+  if (effort !== "" && effort !== null && effort !== undefined) metrics.push(["Esfuerzo", `${effort}/10`, "effort"]);
+  if (pain !== "" && pain !== null && pain !== undefined) metrics.push(["Dolor", `${pain}/10`, "pain"]);
   metrics.forEach(([label, value, key]) => {
     const metric = balanceMetric(label, value);
     if (preview) metric.id = `routinePreview-${key}`;
     grid.append(metric);
   });
   return grid;
+}
+
+function saveRoutineAiStatus(record, status, appliedChanges = []) {
+  repository.upsert({
+    ...record,
+    routineAiAnalysis: {
+      ...record.routineAiAnalysis,
+      status,
+      appliedAt: status === "applied" ? new Date().toISOString() : "",
+      appliedChanges: status === "applied" ? appliedChanges : []
+    },
+    updatedAt: new Date().toISOString()
+  });
+}
+
+function applyRoutineAiChanges(record, selectedChanges = record.routineAiAnalysis?.changes || []) {
+  const routine = physicalRoutineById(record.routineId);
+  if (!routine) return showToast("No se encontró la rutina vinculada a esta propuesta.");
+  const settings = loadRoutineSettings();
+  const allowedExercises = new Map(routine.exercises.map(exercise => [exercise.id, exercise]));
+  const applied = [];
+  selectedChanges.forEach(change => {
+    const exercise = allowedExercises.get(change.exerciseId);
+    if (!exercise) return;
+    const current = currentExerciseSettings(routine, exercise, settings);
+    const sets = Math.min(10, Math.max(1, Number.parseInt(change.proposedSets, 10) || current.sets));
+    const target = String(change.proposedTarget || current.target).trim().slice(0, 40) || current.target;
+    const requestedWeight = change.proposedWeightKg;
+    const weightKg = requestedWeight === "" || requestedWeight === null || requestedWeight === undefined
+      ? ""
+      : Math.min(40, Math.max(0, Number(requestedWeight) || 0));
+    const next = { ...change, proposedSets: sets, proposedTarget: target, proposedWeightKg: weightKg };
+    if (change.action !== "substitute") settings[routineSettingsKey(routine.id, exercise.id)] = { sets, target, weightKg };
+    applied.push(next);
+  });
+  saveRoutineSettings(settings);
+  saveRoutineAiStatus(record, "applied", applied);
+  renderRoutines();
+  renderHistory();
+  showToast(applied.length ? "Propuesta aplicada como base de la próxima rutina." : "Recomendación aceptada sin cambios de carga.");
+}
+
+function createRoutineAiEditor(record) {
+  const editor = document.createElement("div");
+  editor.className = "routine-ai-editor";
+  const intro = document.createElement("p");
+  intro.textContent = "Elige qué ajustes conservar y edita sus valores antes de aplicarlos.";
+  editor.append(intro);
+  (record.routineAiAnalysis?.changes || []).forEach((change, index) => {
+    const row = document.createElement("div");
+    row.className = "routine-ai-edit-row";
+    const enabled = document.createElement("input");
+    enabled.type = "checkbox";
+    enabled.checked = change.action !== "substitute";
+    enabled.setAttribute("aria-label", `Aplicar ajuste de ${change.exerciseName}`);
+    const name = document.createElement("strong");
+    name.textContent = change.exerciseName;
+    const sets = document.createElement("select");
+    sets.setAttribute("aria-label", `Series propuestas de ${change.exerciseName}`);
+    for (let number = 1; number <= 10; number += 1) {
+      const option = document.createElement("option");
+      option.value = String(number);
+      option.textContent = `${number} series`;
+      sets.append(option);
+    }
+    sets.value = String(change.proposedSets);
+    const target = document.createElement("input");
+    target.type = "text";
+    target.maxLength = 40;
+    target.value = change.proposedTarget;
+    target.setAttribute("aria-label", `Repeticiones o tiempo propuesto de ${change.exerciseName}`);
+    const weight = document.createElement("input");
+    weight.type = "number";
+    weight.inputMode = "decimal";
+    weight.min = "0";
+    weight.max = "40";
+    weight.step = "0.25";
+    weight.placeholder = "Sin carga";
+    weight.value = change.proposedWeightKg;
+    weight.setAttribute("aria-label", `Peso propuesto de ${change.exerciseName}`);
+    row.dataset.index = String(index);
+    row.append(enabled, name, sets, target, weight);
+    editor.append(row);
+  });
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.className = "routine-ai-apply";
+  apply.textContent = "Aplicar ajustes editados";
+  apply.addEventListener("click", () => {
+    const selected = [...editor.querySelectorAll(".routine-ai-edit-row")].flatMap(row => {
+      const [enabled, , sets, target, weight] = row.children;
+      if (!enabled.checked) return [];
+      const original = record.routineAiAnalysis.changes[Number(row.dataset.index)];
+      return [{
+        ...original,
+        proposedSets: Number(sets.value),
+        proposedTarget: target.value.trim(),
+        proposedWeightKg: weight.value === "" ? "" : Number(weight.value)
+      }];
+    });
+    applyRoutineAiChanges(record, selected);
+  });
+  editor.append(apply);
+  return editor;
 }
 
 function createRoutineAiCard(record, { compact = false } = {}) {
@@ -2310,6 +2555,18 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const loading = aiAnalysisInFlight.has(record?.id);
   const analysis = record?.routineAiAnalysis;
   if (analysis) {
+    const decisionLabels = {
+      progress: "Progresar",
+      maintain: "Mantener",
+      reduce: "Reducir carga",
+      recover: "Priorizar recuperación"
+    };
+    if (analysis.decision) {
+      const decision = document.createElement("span");
+      decision.className = `routine-ai-decision ${analysis.decision}`;
+      decision.textContent = decisionLabels[analysis.decision] || analysis.decision;
+      card.append(decision);
+    }
     const heading = document.createElement("h4");
     heading.textContent = analysis.headline || "Lectura de tu entrenamiento";
     const summary = document.createElement("p");
@@ -2338,6 +2595,63 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       groups.append(group);
     });
     if (groups.childElementCount) card.append(groups);
+    if (analysis.changes?.length) {
+      const changes = document.createElement("div");
+      changes.className = "routine-ai-changes";
+      analysis.changes.forEach(change => {
+        const row = document.createElement("article");
+        const title = document.createElement("strong");
+        title.textContent = change.exerciseName;
+        const values = document.createElement("p");
+        const currentWeight = change.currentWeightKg === "" ? "sin carga" : `${change.currentWeightKg} kg`;
+        const proposedWeight = change.proposedWeightKg === "" ? "sin carga" : `${change.proposedWeightKg} kg`;
+        values.textContent = `${change.currentSets} × ${change.currentTarget || "—"} · ${currentWeight} → ${change.proposedSets} × ${change.proposedTarget || "—"} · ${proposedWeight}`;
+        const reason = document.createElement("small");
+        reason.textContent = change.reason;
+        row.append(title, values, reason);
+        changes.append(row);
+      });
+      card.append(changes);
+    }
+    if (analysis.goal) {
+      const goal = document.createElement("p");
+      goal.className = "routine-ai-goal";
+      goal.textContent = `Meta de la próxima sesión: ${analysis.goal}`;
+      card.append(goal);
+    }
+    if (analysis.status === "pending") {
+      const actions = document.createElement("div");
+      actions.className = "routine-ai-actions";
+      const apply = document.createElement("button");
+      apply.type = "button";
+      apply.className = "routine-ai-apply";
+      apply.textContent = "Aplicar propuesta";
+      apply.addEventListener("click", () => applyRoutineAiChanges(record));
+      const modify = document.createElement("button");
+      modify.type = "button";
+      modify.textContent = "Modificar";
+      modify.addEventListener("click", () => {
+        const existing = card.querySelector(".routine-ai-editor");
+        if (existing) existing.remove();
+        else card.append(createRoutineAiEditor(record));
+      });
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.textContent = "Descartar";
+      discard.addEventListener("click", () => {
+        saveRoutineAiStatus(record, "discarded");
+        renderRoutines();
+        renderHistory();
+        showToast("Propuesta descartada. La rutina no cambió.");
+      });
+      actions.append(apply, modify, discard);
+      card.append(actions);
+    } else if (analysis.status) {
+      const status = document.createElement("p");
+      status.className = `routine-ai-status ${analysis.status}`;
+      status.textContent = analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
+      card.append(status);
+    }
     return card;
   }
   const heading = document.createElement("h4");
@@ -2345,13 +2659,15 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const summary = document.createElement("p");
   summary.textContent = loading
     ? "La IA está comparando esta rutina con tus sesiones anteriores. El entrenamiento ya quedó guardado."
-    : "Compara cargas, volumen, cumplimiento, abdominales y sensaciones con tus registros anteriores.";
+    : repository.getCoachProfile()
+      ? "Compara cargas, esfuerzo, dolor, volumen, historial y tus próximas 48 horas para proponer ajustes concretos."
+      : "Configura el perfil privado de tu entrenador para recibir recomendaciones enfocadas en tenis y tus limitaciones.";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "routine-ai-button";
   button.disabled = loading;
-  button.textContent = loading ? "Preparando análisis…" : cloudSync.currentUser ? "Analizar con IA" : "Iniciar sesión para analizar";
-  button.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
+  button.textContent = loading ? "Preparando análisis…" : !repository.getCoachProfile() ? "Configurar perfil" : cloudSync.currentUser ? "Analizar con IA" : "Iniciar sesión para analizar";
+  button.addEventListener("click", () => repository.getCoachProfile() ? requestRoutineAiAnalysis(record.id) : openCoachProfileDialog());
   card.append(heading, summary, button);
   return card;
 }
@@ -2437,7 +2753,7 @@ function createRoutineSessionHeader(routine, session) {
   return panel;
 }
 
-function createRoutineSensationPicker(routine) {
+function createRoutineSensationPicker(routine, session) {
   const box = document.createElement("div");
   box.className = "routine-sensation-box";
   const label = document.createElement("label");
@@ -2458,6 +2774,13 @@ function createRoutineSensationPicker(routine) {
   textarea.rows = 4;
   textarea.maxLength = 5000;
   textarea.placeholder = "Selecciona sensaciones o escribe cómo terminaste la rutina.";
+  textarea.value = session?.sensations || "";
+  const persist = () => {
+    const current = loadRoutineSession();
+    if (current?.status === "active" && current.routineId === routine.id) {
+      saveRoutineSession({ ...current, sensations: textarea.value });
+    }
+  };
   const values = () => textarea.value.split(" · ").map(value => value.trim()).filter(Boolean);
   const sync = () => {
     const selected = new Set(values());
@@ -2481,10 +2804,15 @@ function createRoutineSensationPicker(routine) {
       else selected.push(suggestion);
       textarea.value = selected.join(" · ");
       sync();
+      persist();
     });
     chips.append(button);
   });
-  textarea.addEventListener("input", sync);
+  textarea.addEventListener("input", () => {
+    sync();
+    persist();
+  });
+  sync();
   box.append(label, heading, chips, textarea);
   return box;
 }
@@ -2613,7 +2941,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     eyebrow.textContent = "Balance final";
     heading.textContent = "Entrenamiento registrado";
     copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
-    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount));
+    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount, false, session.effort, session.pain));
     const automaticSummary = document.createElement("p");
     automaticSummary.className = "routine-auto-summary";
     automaticSummary.textContent = session.routineSummary || "Tu balance completo quedó guardado para comparar la próxima sesión.";
@@ -2649,7 +2977,71 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   calories.min = "0";
   calories.step = "1";
   calories.placeholder = "Ej: 420";
-  const sensations = createRoutineSensationPicker(routine);
+  calories.value = session.calories ?? "";
+  calories.addEventListener("input", () => {
+    const current = loadRoutineSession();
+    if (current?.status === "active" && current.routineId === routine.id) saveRoutineSession({ ...current, calories: calories.value });
+  });
+  const loadSelect = ({ id, label, min, max, blank = false, value }) => {
+    const wrapper = document.createElement("label");
+    wrapper.className = "routine-rating-control";
+    wrapper.htmlFor = id;
+    const caption = document.createElement("span");
+    caption.textContent = label;
+    const select = document.createElement("select");
+    select.id = id;
+    if (blank) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "Seleccionar";
+      select.append(option);
+    }
+    for (let number = min; number <= max; number += 1) {
+      const option = document.createElement("option");
+      option.value = String(number);
+      option.textContent = `${number}/10`;
+      select.append(option);
+    }
+    select.value = value === undefined || value === null ? "" : String(value);
+    wrapper.append(caption, select);
+    return { wrapper, select };
+  };
+  const ratings = document.createElement("div");
+  ratings.className = "routine-ratings";
+  const effortControl = loadSelect({ id: `routineEffort-${routine.id}`, label: "Esfuerzo percibido (RPE)", min: 1, max: 10, blank: true, value: session.effort });
+  const painControl = loadSelect({ id: `routinePain-${routine.id}`, label: "Dolor o molestia", min: 0, max: 10, value: session.pain ?? 0 });
+  ratings.append(effortControl.wrapper, painControl.wrapper);
+  const painDetailWrap = document.createElement("label");
+  painDetailWrap.className = "routine-pain-detail";
+  painDetailWrap.htmlFor = `routinePainDetail-${routine.id}`;
+  const painCaption = document.createElement("span");
+  painCaption.textContent = "¿Dónde y cómo fue la molestia?";
+  const painDetail = document.createElement("textarea");
+  painDetail.id = `routinePainDetail-${routine.id}`;
+  painDetail.rows = 3;
+  painDetail.maxLength = 2000;
+  painDetail.placeholder = "Ej: molestia leve en el antebrazo durante el remo.";
+  painDetail.value = session.painDetail || "";
+  painDetailWrap.append(painCaption, painDetail);
+  const syncPainVisibility = () => {
+    const hasPain = Number(painControl.select.value) > 0;
+    painDetailWrap.classList.toggle("hidden", !hasPain);
+    painDetail.required = hasPain;
+  };
+  const persistRatings = () => {
+    const current = loadRoutineSession();
+    if (current?.status !== "active" || current.routineId !== routine.id) return;
+    saveRoutineSession({ ...current, effort: effortControl.select.value, pain: Number(painControl.select.value), painDetail: painDetail.value });
+    const effortPreview = $("routinePreview-effort")?.querySelector("strong");
+    const painPreview = $("routinePreview-pain")?.querySelector("strong");
+    if (effortPreview) effortPreview.textContent = effortControl.select.value ? `${effortControl.select.value}/10` : "—";
+    if (painPreview) painPreview.textContent = `${painControl.select.value}/10`;
+  };
+  effortControl.select.addEventListener("change", persistRatings);
+  painControl.select.addEventListener("change", () => { syncPainVisibility(); persistRatings(); });
+  painDetail.addEventListener("input", persistRatings);
+  syncPainVisibility();
+  const sensations = createRoutineSensationPicker(routine, session);
   const defaultsOption = document.createElement("label");
   defaultsOption.className = "routine-defaults-option";
   defaultsOption.htmlFor = `routineSaveDefaults-${routine.id}`;
@@ -2674,7 +3066,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   finish.id = `routineFinishButton-${routine.id}`;
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true), caloriesLabel, calories, sensations, defaultsOption, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), session.calories || "", session.absCount, true, session.effort, session.pain), caloriesLabel, calories, ratings, painDetailWrap, sensations, defaultsOption, message, finish);
   const note = document.createElement("small");
   note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
   panel.append(note);
@@ -3306,9 +3698,17 @@ function createHistoryEntry(sourceRecord) {
       ["Ejercicios", `${record.routineStartedExercises}/${record.routineTotalExercises}`],
       ["Reps", String(record.routineTotalReps || 0)],
       ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`],
-      ["Abdominales", record.routineAbsCount === "" ? "—" : String(record.routineAbsCount)]
+      ["Abdominales", record.routineAbsCount === "" ? "—" : String(record.routineAbsCount)],
+      ["Esfuerzo", record.routineEffort === "" ? "—" : `${record.routineEffort}/10`],
+      ["Dolor", record.routinePain === "" ? "—" : `${record.routinePain}/10`]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
     copy.append(balance);
+    if (record.routinePainDetail) {
+      const painDetail = document.createElement("p");
+      painDetail.className = "history-pain-detail";
+      painDetail.textContent = `Molestia: ${record.routinePainDetail}`;
+      copy.append(painDetail);
+    }
     if (record.routineSummary) {
       const automaticSummary = document.createElement("p");
       automaticSummary.className = "history-auto-summary";
@@ -3477,6 +3877,9 @@ function bindEvents() {
   $("updateButton").addEventListener("click", () => waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" }));
   $("cloudStatusButton").addEventListener("click", openCloudDialog);
   $("cloudDialogClose").addEventListener("click", () => $("cloudDialog").close());
+  $("openCoachProfileButton").addEventListener("click", openCoachProfileDialog);
+  $("coachProfileDialogClose").addEventListener("click", () => $("coachProfileDialog").close());
+  $("coachProfileForm").addEventListener("submit", saveCoachProfile);
   $("cloudSignInButton").addEventListener("click", signInToCloud);
   $("cloudSyncButton").addEventListener("click", syncCloudNow);
   $("cloudSignOutButton").addEventListener("click", async () => {
@@ -3495,6 +3898,7 @@ function initialize() {
   renderHome();
   renderRoutines();
   renderHistory();
+  updateCoachProfileButton();
   const activeSession = loadRoutineSession();
   if (activeSession?.status === "active") {
     openRoutineId = activeSession.routineId;

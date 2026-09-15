@@ -22,6 +22,8 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /TGTrain/);
   assert.match(html, /id="cloudStatusButton"/);
   assert.match(html, /id="cloudDialog"/);
+  assert.match(html, /id="coachProfileDialog"/);
+  assert.match(html, /id="coachProfileText"/);
   assert.match(html, /id="runningRankings"/);
   assert.match(html, /id="physicalRankings"/);
   assert.match(html, /id="openAiPlanButton"/);
@@ -115,6 +117,13 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /Duración aprox\./);
   assert.match(app, /requestRoutineAiAnalysis/);
   assert.match(app, /routineAiAnalysis/);
+  assert.match(app, /routineEffort-/);
+  assert.match(app, /routinePain-/);
+  assert.match(app, /Aplicar propuesta/);
+  assert.match(app, /Aplicar ajustes editados/);
+  assert.match(app, /Descartar/);
+  assert.match(app, /next48Hours/);
+  assert.match(app, /repository\.getCoachProfile/);
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
@@ -147,7 +156,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v51/);
+  assert.match(worker, /tgtrain-shell-v52/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
@@ -160,6 +169,10 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /useResponseSchema: false/);
   assert.match(ai, /GoogleAIBackend/);
   assert.match(ai, /gemini-3\.5-flash-lite/);
+  assert.match(ai, /Mancuernas ajustables con una capacidad máxima de 40 kg/);
+  assert.match(ai, /Kettlebell de 4,5 kg/);
+  assert.match(ai, /privateCoachProfile/);
+  assert.doesNotMatch(ai, /monoplegia|plexo braquial|menisco/i);
   assert.doesNotMatch(ai, /OPENAI_API_KEY|httpsCallable|firebase-functions/);
   assert.equal(firebase.functions, undefined);
 });

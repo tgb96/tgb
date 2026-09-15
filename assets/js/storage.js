@@ -1,10 +1,10 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=51";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=51";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=52";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=52";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 function parseJSON(value, fallback) {
   try {
@@ -46,6 +46,20 @@ function normalizePlans(value) {
   }));
 }
 
+export function normalizeCoachProfile(value) {
+  if (!value || typeof value !== "object") return null;
+  const profileText = String(value.profileText || "").trim().slice(0, 40000);
+  const equipment = String(value.equipment || "").trim().slice(0, 5000);
+  if (!profileText && !equipment) return null;
+  return {
+    id: "coach-profile",
+    profileText,
+    equipment,
+    version: String(value.version || "tennis-v1").slice(0, 40),
+    updatedAt: String(value.updatedAt || "")
+  };
+}
+
 export function loadData(storage) {
   const current = parseJSON(storage.getItem(DATA_KEY), null);
   if (current && Array.isArray(current.records)) return {
@@ -53,15 +67,16 @@ export function loadData(storage) {
     records: ensureIds(current.records),
     plans: normalizePlans(current.plans),
     trainingBlocks: normalizeTrainingBlocks(current.trainingBlocks),
+    coachProfile: normalizeCoachProfile(current.coachProfile),
     migrated: false,
     sourceKey: DATA_KEY
   };
 
   const previous = parseJSON(storage.getItem(PREVIOUS_DATA_KEY), null);
-  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
+  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, coachProfile: null, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
 
   const legacy = parseJSON(storage.getItem(LEGACY_HISTORY_KEY), []);
-  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
+  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, coachProfile: null, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
 }
 
 export function saveData(storage, data) {
@@ -69,7 +84,8 @@ export function saveData(storage, data) {
     schemaVersion: SCHEMA_VERSION,
     records: ensureIds(data.records || []),
     plans: normalizePlans(data.plans),
-    trainingBlocks: normalizeTrainingBlocks(data.trainingBlocks)
+    trainingBlocks: normalizeTrainingBlocks(data.trainingBlocks),
+    coachProfile: normalizeCoachProfile(data.coachProfile)
   };
   try {
     storage.setItem(DATA_KEY, JSON.stringify(payload));
@@ -104,8 +120,8 @@ export function createRepository(storage) {
     }
   }
 
-  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks } = {}) => {
-    state = { ...saveData(storage, { records, plans, trainingBlocks }), migrated: false, sourceKey: DATA_KEY };
+  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks, coachProfile = state.coachProfile } = {}) => {
+    state = { ...saveData(storage, { records, plans, trainingBlocks, coachProfile }), migrated: false, sourceKey: DATA_KEY };
     return state;
   };
 
@@ -149,6 +165,7 @@ export function createRepository(storage) {
       const backup = parseJSON(jsonText, null);
       const incomingPlans = normalizePlans(backup?.plans);
       const incomingBlocks = normalizeTrainingBlocks(backup?.trainingBlocks);
+      const incomingProfile = normalizeCoachProfile(backup?.coachProfile);
       const merged = new Map(state.records.map(record => [record.id, record]));
       incoming.forEach(record => merged.set(record.id, record));
       const plans = { ...state.plans };
@@ -169,10 +186,14 @@ export function createRepository(storage) {
           appliedBlocks.push(block);
         }
       });
-      persist({ records: [...merged.values()], plans, trainingBlocks });
+      const coachProfile = incomingProfile && (!state.coachProfile || recordTimestamp(incomingProfile) >= recordTimestamp(state.coachProfile))
+        ? incomingProfile
+        : state.coachProfile;
+      persist({ records: [...merged.values()], plans, trainingBlocks, coachProfile });
       incoming.forEach(record => notify({ type: "upsert", record }));
       appliedPlans.forEach(plan => notify({ type: "plan-upsert", plan }));
       appliedBlocks.forEach(block => notify({ type: "training-block-upsert", block }));
+      if (incomingProfile && coachProfile === incomingProfile) notify({ type: "coach-profile-upsert", profile: incomingProfile });
       return incoming.length;
     },
     applyCloudRecord(record) {
@@ -237,13 +258,30 @@ export function createRepository(storage) {
       persist({ trainingBlocks: { ...state.trainingBlocks, [next.id]: next } });
       return true;
     },
+    getCoachProfile() {
+      return state.coachProfile ? { ...state.coachProfile } : null;
+    },
+    saveCoachProfile(profile, { silent = false } = {}) {
+      const next = normalizeCoachProfile(profile);
+      if (!next) throw new Error("Completa el perfil o el equipamiento del entrenador.");
+      persist({ coachProfile: next });
+      if (!silent) notify({ type: "coach-profile-upsert", profile: next });
+      return next;
+    },
+    applyCloudCoachProfile(profile) {
+      const next = normalizeCoachProfile(profile);
+      if (!next) return false;
+      if (state.coachProfile && recordTimestamp(state.coachProfile) > recordTimestamp(next)) return false;
+      persist({ coachProfile: next });
+      return true;
+    },
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     backup() {
-      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks }, null, 2);
+      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks, coachProfile: state.coachProfile }, null, 2);
     }
   };
 }

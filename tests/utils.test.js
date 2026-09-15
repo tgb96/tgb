@@ -268,6 +268,28 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
     routineTotalReps: 210,
     routineVolumeKg: 1680,
     routineAbsCount: 60,
+    routineEffort: 7,
+    routinePain: 2,
+    routinePainDetail: "Molestia leve en el antebrazo.",
+    routineAiAnalysis: {
+      decision: "maintain",
+      headline: "Mantén la carga",
+      summary: "La sesión fue sólida.",
+      changes: [{
+        exerciseId: "unilateral-loaded-squat",
+        exerciseName: "Sentadilla con carga unilateral",
+        action: "maintain",
+        currentSets: 4,
+        proposedSets: 4,
+        currentTarget: "10",
+        proposedTarget: "10",
+        currentWeightKg: 8,
+        proposedWeightKg: 8,
+        reason: "Consolida la técnica."
+      }],
+      goal: "Completar las cuatro series con buena técnica.",
+      status: "pending"
+    },
     routineDefaultsSaved: true,
     routineExercises: [{
       id: "unilateral-loaded-squat",
@@ -288,6 +310,10 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
   assert.equal(record.routineVolumeKg, 1680);
   assert.equal(record.routineStartedExercises, 9);
   assert.equal(record.routineAbsCount, 60);
+  assert.equal(record.routineEffort, 7);
+  assert.equal(record.routinePain, 2);
+  assert.equal(record.routineAiAnalysis.decision, "maintain");
+  assert.equal(record.routineAiAnalysis.changes[0].proposedWeightKg, 8);
   assert.equal(record.routineDefaultsSaved, true);
   assert.equal(record.routineExercises[0].completedSetNumbers.join(","), "1,2,4");
   assert.match(routineExerciseLine(record.routineExercises[0]), /3\/4 series realizadas/);
@@ -295,11 +321,16 @@ test("conserva el balance de una rutina registrada desde el seguimiento", () => 
   assert.match(recordDetails(record), /24\/28 series/);
   assert.match(recordDetails(record), /1\.680 kg volumen/);
   assert.match(recordDetails(record), /60 abdominales/);
+  assert.match(recordDetails(record), /esfuerzo 7\/10/);
+  assert.match(recordDetails(record), /dolor 2\/10/);
   const report = weeklyReport([record], isoWeekInfo(record.dateISO));
   assert.match(report, /Ejercicios, cargas y repeticiones realizadas/);
   assert.match(report, /Sentadilla con carga unilateral/);
   assert.match(report, /series marcadas: 1, 2, 4/);
   assert.match(report, /Abdominales finales: 60/);
+  assert.match(report, /Esfuerzo percibido \(RPE\): 7\/10/);
+  assert.match(report, /Detalle de dolor o molestia: Molestia leve/);
+  assert.match(report, /Ajuste propuesto \(Sentadilla con carga unilateral\)/);
 });
 
 test("formatea duraciones exactas para trote, trekking y tenis", () => {
