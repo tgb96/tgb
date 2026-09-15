@@ -3,8 +3,8 @@ import {
   physicalRoutineById,
   restTypes,
   tennisTypeById
-} from "./data.js?v=53";
-import { isValidISODate, isoWeekInfo } from "./utils.js?v=53";
+} from "./data.js?v=54";
+import { isValidISODate, isoWeekInfo } from "./utils.js?v=54";
 
 const text = (value, max = 500) => String(value || "").trim().slice(0, max);
 const list = (value, maxItems = 20, maxLength = 500) => Array.isArray(value)

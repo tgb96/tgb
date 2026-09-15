@@ -126,6 +126,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .coach-block-weeks { width: 52px; height: 52px; flex: 0 0 auto; display: grid; place-content: center; border: 1px solid rgba(255,255,255,0.16); border-radius: 16px; color: var(--lime); font-size: 20px; font-weight: 950; line-height: 0.8; text-align: center; }
 .coach-block-weeks small { color: rgba(255,255,255,0.55); font-size: 7px; text-transform: uppercase; letter-spacing: 0.6px; }
 .coach-today-plan { margin-top: 15px; padding: 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 17px; background: rgba(255,255,255,0.07); }
+.coach-today-plan { flex-wrap: wrap; }
+.coach-today-plan > div:first-child { flex: 1; }
+.coach-today-plan > .plan-actual-feedback { order: 3; flex-basis: 100%; }
+.plan-actual-feedback:empty { display: none; }
 .coach-today-plan > div { min-width: 0; }
 .coach-today-plan span, .coach-today-plan strong, .coach-today-plan small { display: block; }
 .coach-today-plan span { color: var(--lime); font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.9px; }
@@ -143,6 +147,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .planned-activity-line { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 7px; padding-bottom: 6px; border-bottom: 1px dashed #d6d8d2; }
 .planned-activity-line > span { margin-top: 1px; padding: 3px 6px; border-radius: 999px; background: var(--night); color: var(--lime); font-size: 7px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.6px; }
 .planned-activity-line.complete > span { background: #e3f2ba; color: #426000; }
+.plan-actual-feedback p { margin: 8px 0; padding: 10px; border-left: 3px solid var(--lime); background: rgba(120, 130, 150, .1); border-radius: 8px; }
+.plan-actual-feedback strong, .plan-actual-feedback small { display: block; }
+.plan-actual-feedback small { margin-top: 5px; line-height: 1.5; }
+.routine-ai-plan-comparison { padding: 10px; border-left: 3px solid var(--blue); }
+.routine-ai-encouragement { padding: 12px; border-radius: 10px; background: #e3f2ba; color: #273b00; line-height: 1.5; }
 .planned-activity-line strong { display: block; font-size: 11px; line-height: 1.25; }
 .planned-activity-line small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; line-height: 1.3; }
 

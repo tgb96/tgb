@@ -1,5 +1,5 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=53";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=54";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -119,9 +119,18 @@ const analysisSchema = {
     nextSession: { type: "array", items: stringSchema, maxItems: 6 },
     cautions: { type: "array", items: stringSchema, maxItems: 6 },
     changes: { type: "array", items: progressionChangeSchema, maxItems: 12 },
-    goal: stringSchema
+    goal: stringSchema,
+    planComparison: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["completed", "partial", "adapted", "recovery", "different", "unknown"] },
+        reason: stringSchema
+      },
+      required: ["status", "reason"]
+    },
+    encouragement: stringSchema
   },
-  required: ["decision", "headline", "summary", "highlights", "progress", "nextSession", "cautions", "changes", "goal"]
+  required: ["decision", "headline", "summary", "highlights", "progress", "nextSession", "cautions", "changes", "goal", "planComparison", "encouragement"]
 };
 
 function friendlyError(error) {
@@ -221,6 +230,9 @@ export function createAiClient() {
         "Comenta cualquier actividad recibida: entrenamiento físico, cardio, trote, trekking, pádel, tenis o descanso. La ruta de registro no cambia el análisis.",
         "Lee todas las sensaciones y comentarios del registro actual. Explica qué implican para el avance, la recuperación y la siguiente sesión. Si falta RPE, dolor, técnica o energía, no los inventes ni asumas que están bien.",
         "Compara el resultado real con currentPlan cuando exista, incluso si se registró desde Registrar. Distingue entre objetivo planificado y actividad realizada; no afirmes cumplimiento total solo porque coincida el tipo de actividad.",
+        "Devuelve planComparison: completed solo si la actividad actual cubre el objetivo previsto con evidencia suficiente; partial si falta parte; adapted si se cambió la rutina, distancia, intensidad o carga y se explica su relación con el objetivo; recovery para descanso sustitutivo; different si no cubre el objetivo; unknown si no hay plan o faltan datos. No confundir descansar con incumplir: puede ser una adaptación responsable, sin afirmar que era el descanso planificado.",
+        "En planComparison.reason compara explícitamente plan y realidad: lo que sí se cubrió, qué cambió y qué queda pendiente o no se puede determinar. Considera alternativas y sameDayActivities, sin atribuir sus resultados a la actividad actual ni duplicarlos. Para otra rutina evalúa grupos musculares, habilidades de tenis y recuperación; explica si cubre el objetivo de otra forma, parcialmente o no. Más completa, más carga o más kilómetros no significa automáticamente mejor ni autorizado por el plan.",
+        "Para rutina física compara las cargas, series, objetivos de repeticiones/segundos y series realmente completadas por ejercicio con target.settings y las omisiones previstas. Si el plan no especifica una carga, no inventes una carga planificada ni la sustituyas por la sesión actual. Para describir aumentos o reducciones usa también ejecuciones anteriores comparables. No modifiques automáticamente el calendario ni el objetivo original.",
         "En trote analiza distancia, duración y ritmo calculado, compara solo marcas de la misma distancia y considera cansancio, molestias, terreno y comentarios. Respetar un máximo de distancia o intensidad indicado por el plan; no perseguir un récord a costa de la recuperación para tenis.",
         "Para cardio, tenis y descanso changes debe ser una lista vacía. Da recomendaciones concretas en nextSession y goal, sin proponer series, cargas ni ejercicios inventados. Las reglas físicas del perfil se adaptan a la categoría actual; las precauciones personales siempre se respetan.",
         "Tu prioridad es mejorar desplazamientos, split step, frenadas, recuperación al centro, fuerza funcional, potencia limpia, estabilidad y tolerancia a la carga de tenis; no optimices para hipertrofia por sí sola.",
@@ -234,7 +246,8 @@ export function createAiClient() {
         "Para piernas prioriza técnica, estabilidad, rango, repeticiones, tempo y al final carga. Para tren superior protege el lado de raqueta y no aumentes más de un empuje y una tracción. Para potencia prioriza calidad, descansos y aterrizaje. Para core aumenta tiempo o control antes que carga.",
         "El perfil privado del usuario prevalece sobre las reglas generales. El inventario entregado es el único equipamiento permitido.",
         "changes debe contener solo ajustes relevantes. Si recomiendas mantener sin cambios, puede quedar vacío. Nunca apliques nada: la aplicación pedirá confirmación al usuario.",
-        "No diagnostiques lesiones ni presentes una recomendación como orden médica. Responde en español chileno neutro."
+        "No diagnostiques lesiones ni presentes una recomendación como orden médica. Responde en español chileno neutro.",
+        "Termina el comentario con encouragement: una o dos frases positivas, sobrias y específicas, conectadas con el trabajo registrado y su posible aporte al tenis (resistencia entre puntos, desplazamientos o estabilidad) o a la resistencia cotidiana. No uses elogios exagerados, promesas ni frases vacías. Si hubo molestias, reconoce como avance observarlas y ajustar responsablemente, no el hecho de entrenar con dolor. Nunca digas que un trote doloroso fortalece o cura la rodilla; la mejora depende de una carga tolerable y de atender las molestias. El perfil privado puede orientar el contenido, pero este cierre prudente es obligatorio."
       ].join("\n");
       const analysis = await generateJson({
         schema: analysisSchema,

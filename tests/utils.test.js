@@ -410,11 +410,17 @@ test("conserva y exporta comentarios de la guía para cardio y sus sensaciones c
   const record = normalizeRecord({
     ...physicalRecord, category: "cardio", routineId: "", routineName: "", cardioTypeId: "running", cardioTypeName: "Trote",
     distanceKm: 5, sensations: "Buena energía · comentario específico del entrenamiento",
-    routineAiAnalysis: { headline: "Trote controlado", summary: "Consolidar el ritmo", decision: "maintain", status: "reviewed", changes: [], goal: "Mantener 5K" }
+    routineAiAnalysis: { headline: "Trote controlado", summary: "Consolidar el ritmo", decision: "maintain", status: "reviewed", changes: [], goal: "Mantener 5K",
+      planComparison: { status: "adapted", reason: "Objetivo cubierto con menor intensidad" }, encouragement: "Escuchar tus sensaciones ayuda a sostener tu progreso para el tenis." }
   });
   assert.equal(record.routineAiAnalysis.status, "reviewed");
   const report = weeklyReport([record], isoWeekInfo(record.dateISO));
   assert.match(report, /Análisis inteligente: Trote controlado/);
   assert.match(report, /comentario específico del entrenamiento/);
   assert.match(recordsToCSV([record]), /Mantener 5K/);
+  assert.equal(record.routineAiAnalysis.planComparison.status, "adapted");
+  for (const text of [report, recordsToCSV([record])]) {
+    assert.match(text, /Objetivo cubierto con menor intensidad/);
+    assert.match(text, /Escuchar tus sensaciones/);
+  }
 });

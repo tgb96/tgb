@@ -1,5 +1,5 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=53";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=53";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=54";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=54";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";

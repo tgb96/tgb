@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=53";
+} from "./data.js?v=54";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -516,6 +516,9 @@ function normalizeRoutineAiAnalysis(value) {
     cautions: cleanList(value.cautions),
     changes,
     goal: String(value.goal || "").trim().slice(0, 1000),
+    planComparison: ["completed", "partial", "adapted", "recovery", "different", "unknown"].includes(value.planComparison?.status)
+      ? { status: value.planComparison.status, reason: String(value.planComparison.reason || "").trim().slice(0, 2000) } : null,
+    encouragement: String(value.encouragement || "").trim().slice(0, 1000),
     status: statuses.has(value.status) ? value.status : (changes.length || value.decision ? "pending" : ""),
     appliedAt: String(value.appliedAt || "").slice(0, 40),
     appliedChanges: Array.isArray(value.appliedChanges) ? value.appliedChanges.slice(0, 12).map(change => ({ ...change })) : [],
@@ -638,6 +641,8 @@ export function weeklyReport(records, week) {
           });
           if (record.routineAiAnalysis.goal) report += `   Meta propuesta: ${record.routineAiAnalysis.goal}\n`;
           if (record.routineAiAnalysis.status) report += `   Estado de la propuesta: ${record.routineAiAnalysis.status}\n`;
+          if (record.routineAiAnalysis.planComparison) report += `   Plan y realidad (${record.routineAiAnalysis.planComparison.status}): ${record.routineAiAnalysis.planComparison.reason}\n`;
+          if (record.routineAiAnalysis.encouragement) report += `   Cierre de la guía: ${record.routineAiAnalysis.encouragement}\n`;
       }
       if (record.category === "physical" && record.routineExercises.length) {
         report += "   Ejercicios, cargas y repeticiones realizadas:\n";
@@ -693,6 +698,8 @@ export function recordsToCSV(records) {
           ...record.routineAiAnalysis.cautions,
           ...record.routineAiAnalysis.changes.map(change => `${change.exerciseName}: ${change.proposedSets} series, ${change.proposedTarget}, ${change.proposedWeightKg === "" ? "sin carga" : `${change.proposedWeightKg} kg`} (${change.reason})`),
           record.routineAiAnalysis.goal ? `Meta: ${record.routineAiAnalysis.goal}` : "",
+          record.routineAiAnalysis.planComparison ? `Plan y realidad (${record.routineAiAnalysis.planComparison.status}): ${record.routineAiAnalysis.planComparison.reason}` : "",
+          record.routineAiAnalysis.encouragement,
           record.routineAiAnalysis.status ? `Estado: ${record.routineAiAnalysis.status}` : ""
         ].filter(Boolean).join(" | ")
         : ""
