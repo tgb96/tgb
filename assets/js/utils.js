@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=52";
+} from "./data.js?v=53";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -489,7 +489,7 @@ function normalizeRoutineAiAnalysis(value) {
   if (!headline && !summary) return null;
   const decisions = new Set(["progress", "maintain", "reduce", "recover"]);
   const actions = new Set(["increase", "maintain", "reduce", "substitute"]);
-  const statuses = new Set(["pending", "applied", "discarded"]);
+  const statuses = new Set(["pending", "applied", "discarded", "reviewed"]);
   const changes = Array.isArray(value.changes) ? value.changes.slice(0, 12).map((change, index) => {
     const currentWeightKg = optionalNumber(change?.currentWeightKg, { min: 0 });
     const proposedWeightKg = optionalNumber(change?.proposedWeightKg, { min: 0 });
@@ -623,7 +623,8 @@ export function weeklyReport(records, week) {
         if (record.routinePain !== "") report += `   Dolor o molestia: ${record.routinePain}/10\n`;
         if (record.routinePainDetail) report += `   Detalle de dolor o molestia: ${record.routinePainDetail}\n`;
         if (record.routineSummary) report += `   Resumen automático: ${record.routineSummary}\n`;
-        if (record.routineAiAnalysis) {
+      }
+      if (record.routineAiAnalysis) {
           report += `   Análisis inteligente: ${record.routineAiAnalysis.headline || record.routineAiAnalysis.summary}\n`;
           if (record.routineAiAnalysis.decision) report += `   Decisión IA: ${record.routineAiAnalysis.decision}\n`;
           if (record.routineAiAnalysis.summary && record.routineAiAnalysis.headline) report += `   Lectura: ${record.routineAiAnalysis.summary}\n`;
@@ -637,7 +638,6 @@ export function weeklyReport(records, week) {
           });
           if (record.routineAiAnalysis.goal) report += `   Meta propuesta: ${record.routineAiAnalysis.goal}\n`;
           if (record.routineAiAnalysis.status) report += `   Estado de la propuesta: ${record.routineAiAnalysis.status}\n`;
-        }
       }
       if (record.category === "physical" && record.routineExercises.length) {
         report += "   Ejercicios, cargas y repeticiones realizadas:\n";

@@ -405,3 +405,16 @@ test("CSV conserva los campos nuevos, el detalle de ejercicios y neutraliza fór
   assert.match(csv, /Remo a una mano/);
   assert.match(csv, /'=SUM/);
 });
+
+test("conserva y exporta comentarios de la guía para cardio y sus sensaciones completas", () => {
+  const record = normalizeRecord({
+    ...physicalRecord, category: "cardio", routineId: "", routineName: "", cardioTypeId: "running", cardioTypeName: "Trote",
+    distanceKm: 5, sensations: "Buena energía · comentario específico del entrenamiento",
+    routineAiAnalysis: { headline: "Trote controlado", summary: "Consolidar el ritmo", decision: "maintain", status: "reviewed", changes: [], goal: "Mantener 5K" }
+  });
+  assert.equal(record.routineAiAnalysis.status, "reviewed");
+  const report = weeklyReport([record], isoWeekInfo(record.dateISO));
+  assert.match(report, /Análisis inteligente: Trote controlado/);
+  assert.match(report, /comentario específico del entrenamiento/);
+  assert.match(recordsToCSV([record]), /Mantener 5K/);
+});

@@ -1,5 +1,5 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=52";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=53";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -218,6 +218,11 @@ export function createAiClient() {
     async analyzeRoutine(record, recentRecords = [], planDetails = [], context = {}) {
       const instructions = [
         "Eres la IA entrenadora personal de TGTrain, especializada en rendimiento físico para tenis.",
+        "Comenta cualquier actividad recibida: entrenamiento físico, cardio, trote, trekking, pádel, tenis o descanso. La ruta de registro no cambia el análisis.",
+        "Lee todas las sensaciones y comentarios del registro actual. Explica qué implican para el avance, la recuperación y la siguiente sesión. Si falta RPE, dolor, técnica o energía, no los inventes ni asumas que están bien.",
+        "Compara el resultado real con currentPlan cuando exista, incluso si se registró desde Registrar. Distingue entre objetivo planificado y actividad realizada; no afirmes cumplimiento total solo porque coincida el tipo de actividad.",
+        "En trote analiza distancia, duración y ritmo calculado, compara solo marcas de la misma distancia y considera cansancio, molestias, terreno y comentarios. Respetar un máximo de distancia o intensidad indicado por el plan; no perseguir un récord a costa de la recuperación para tenis.",
+        "Para cardio, tenis y descanso changes debe ser una lista vacía. Da recomendaciones concretas en nextSession y goal, sin proponer series, cargas ni ejercicios inventados. Las reglas físicas del perfil se adaptan a la categoría actual; las precauciones personales siempre se respetan.",
         "Tu prioridad es mejorar desplazamientos, split step, frenadas, recuperación al centro, fuerza funcional, potencia limpia, estabilidad y tolerancia a la carga de tenis; no optimices para hipertrofia por sí sola.",
         "Analiza solo los datos entregados. No inventes cargas, repeticiones, dolor, calendario, equipamiento ni récords.",
         "Elige exactamente una decisión general: progress, maintain, reduce o recover.",
@@ -240,7 +245,8 @@ export function createAiClient() {
           privateCoachProfile: String(context.coachProfile?.profileText || "").slice(0, 40000),
           availableEquipment: String(context.coachProfile?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 5000),
           current: record,
-          previousSameRoutine: recentRecords.slice(-8),
+          previousComparableActivities: recentRecords.slice(-8),
+          currentPlan: context.currentPlan || null,
           recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
           planDetails: planDetails.slice(0, 20)

@@ -15,17 +15,18 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=52";
+} from "./data.js?v=53";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=52";
-import { createRepository } from "./storage.js?v=52";
-import { createCloudSync } from "./cloud.js?v=52";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=52";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=52";
+} from "./coach-plan.js?v=53";
+import { createRepository } from "./storage.js?v=53";
+import { createCloudSync } from "./cloud.js?v=53";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=53";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=53";
+import { comparableActivity, plannedMatchForRecord, recordMatchesPlanOption } from "./coach-tracking.js?v=53";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -50,7 +51,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=52";
+} from "./utils.js?v=53";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -129,7 +130,28 @@ function activeTrainingBlock() {
 }
 
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
-  return records.find(record => record.planBlockId === block.id && record.planSessionId === session?.id) || null;
+  return records.find(record => record.planBlockId === block.id && record.planSessionId === session?.id
+      && record.dateISO === session.dateISO && session.options?.some(option => recordMatchesPlanOption(record, option)))
+    || records.find(record => record.dateISO === session?.dateISO
+      && !record.planSessionId
+      && session.options?.some(option => recordMatchesPlanOption(record, option)))
+    || null;
+}
+
+function attachMatchingPlan(record) {
+  const block = activeTrainingBlock();
+  const match = plannedMatchForRecord(record, block);
+  if (!match) return record.planBlockId === block.id
+    ? { ...record, planBlockId: "", planWeekKey: "", planSessionId: "", planOptionId: "", plannedTitle: "" }
+    : record;
+  return {
+    ...record,
+    planBlockId: block.id,
+    planWeekKey: match.week.weekKey,
+    planSessionId: match.session.id,
+    planOptionId: match.option.id,
+    plannedTitle: `${match.option.title} · ${match.option.summary}`
+  };
 }
 
 function loadPlannedRoutineContext() {
@@ -634,6 +656,9 @@ function renderHome() {
   $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
   renderCoachBlock(allRecords);
+  const feedback = $("homeCoachFeedback");
+  feedback.replaceChildren();
+  if (todayRecords[0]) feedback.append(createRoutineAiCard(todayRecords[0], { compact: true }));
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
@@ -1688,7 +1713,7 @@ function formRecord() {
     routinePainDetail: preserveRoutineBalance ? existing.routinePainDetail : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
     routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
-    routineAiAnalysis: preserveRoutineBalance ? existing.routineAiAnalysis : null,
+    routineAiAnalysis: null,
     routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
     routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
     planBlockId: plannedRegistrationContext?.blockId || existing?.planBlockId || "",
@@ -1724,7 +1749,7 @@ function saveTraining(event) {
   event.preventDefault();
   if (!durationPartsAreValid()) return showFormError(`Revisa la duración: los minutos${durationMode() === "hms" ? " y segundos" : ""} deben estar entre 0 y 59.`);
   if (!distancePartsAreValid()) return showFormError("Revisa la distancia: usa kilómetros entre 0 y 999 y metros entre 0 y 999.");
-  const candidate = formRecord();
+  const candidate = attachMatchingPlan(formRecord());
   const validation = validateRecord(candidate);
   if (!validation.valid) return showFormError(validation.errors.join(" "));
   try {
@@ -1740,6 +1765,7 @@ function saveTraining(event) {
   renderCoachPlanDialog();
   showView("home");
   showToast(message);
+  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(candidate.id, [], { interactive: false });
 }
 
 function editRecord(id) {
@@ -2141,6 +2167,21 @@ function launchRoutineFromRegistration(routine) {
 
 function routineForAi(record) {
   return {
+    category: record.category,
+    activity: recordTitle(record),
+    cardioTypeId: record.cardioTypeId,
+    tennisTypeId: record.tennisTypeId,
+    restTypeId: record.restTypeId,
+    restDetail: record.restDetail,
+    distanceKm: record.distanceKm,
+    averagePaceSecondsPerKm: Number(record.distanceKm) > 0 && Number(record.durationSeconds) > 0
+      ? Math.round(Number(record.durationSeconds) / Number(record.distanceKm)) : null,
+    location: record.location,
+    surface: record.surface,
+    trekkingRoute: record.trekkingRoute,
+    elevationGainM: record.elevationGainM,
+    ascentDurationSeconds: record.ascentDurationSeconds,
+    durationSeconds: record.durationSeconds,
     dateISO: record.dateISO,
     routineId: record.routineId,
     routineName: record.routineName,
@@ -2185,6 +2226,7 @@ function routineAiContext(record) {
       title: recordTitle(item),
       durationMinutes: Math.round(Number(item.durationMinutes) || 0),
       calories: Number(item.calories) || 0,
+      distanceKm: item.distanceKm,
       sensations: item.sensations,
       effortRpe: item.routineEffort,
       painScore: item.routinePain,
@@ -2205,7 +2247,18 @@ function routineAiContext(record) {
         alternatives: (session.options || []).map(item => item.title)
       };
     });
-  return { coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours };
+  const match = plannedMatchForRecord(record, block);
+  const currentPlan = match ? {
+    title: match.option.title,
+    summary: match.option.summary,
+    objective: match.session.objective,
+    details: match.option.details || [],
+    target: match.option.prefill || {},
+    weekObjective: match.week.objective,
+    weekContext: match.week.context,
+    rules: block.rules || []
+  } : null;
+  return { coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan };
 }
 
 async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactive = true } = {}) {
@@ -2225,19 +2278,24 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
   }
   aiAnalysisInFlight.add(recordId);
   renderRoutines();
+  renderHistory();
+  renderHome();
   try {
     const recentRecords = repository.list()
-      .filter(item => item.id !== record.id && item.category === "physical" && (item.routineId === record.routineId || item.routineName === record.routineName))
+      .filter(item => item.id !== record.id && item.dateISO <= record.dateISO && comparableActivity(record, item))
       .slice(0, 8)
       .reverse()
       .map(routineForAi);
     const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails, context);
     const analysis = result?.analysis || result;
+    const latest = repository.get(record.id);
+    if (!latest || latest.updatedAt !== record.updatedAt) throw new Error("El registro cambió durante el análisis. Vuelve a analizarlo para incluir sus últimos comentarios.");
     repository.upsert({
-      ...record,
+      ...attachMatchingPlan(latest),
       routineAiAnalysis: {
         ...analysis,
-        status: "pending",
+        changes: record.category === "physical" ? analysis.changes : [],
+        status: record.category === "physical" ? "pending" : "reviewed",
         generatedAt: new Date().toISOString(),
         model: result?.model || analysis?.model || ""
       },
@@ -2250,6 +2308,7 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
     aiAnalysisInFlight.delete(recordId);
     renderRoutines();
     renderHistory();
+    renderHome();
   }
 }
 
@@ -2362,6 +2421,7 @@ function finishRoutineSession(routine) {
     createdAt: session.startedAt,
     updatedAt: endedAt
   };
+  Object.assign(record, attachMatchingPlan(record));
   record.routineSummary = routineCompletionSummary(record, repository.list());
 
   try {
@@ -2480,6 +2540,7 @@ function applyRoutineAiChanges(record, selectedChanges = record.routineAiAnalysi
   renderRoutines();
   renderHistory();
   showToast(applied.length ? "Propuesta aplicada como base de la próxima rutina." : "Recomendación aceptada sin cambios de carga.");
+  renderHome();
 }
 
 function createRoutineAiEditor(record) {
@@ -2550,7 +2611,7 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const card = document.createElement("section");
   card.className = `routine-ai-card${compact ? " compact" : ""}`;
   const eyebrow = document.createElement("span");
-  eyebrow.textContent = "✦ Análisis inteligente";
+  eyebrow.textContent = `✦ Guía del entrenador · ${recordTitle(record)}`;
   card.append(eyebrow);
   const loading = aiAnalysisInFlight.has(record?.id);
   const analysis = record?.routineAiAnalysis;
@@ -2619,7 +2680,7 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       goal.textContent = `Meta de la próxima sesión: ${analysis.goal}`;
       card.append(goal);
     }
-    if (analysis.status === "pending") {
+    if (analysis.status === "pending" && record.category === "physical") {
       const actions = document.createElement("div");
       actions.className = "routine-ai-actions";
       const apply = document.createElement("button");
@@ -2642,6 +2703,7 @@ function createRoutineAiCard(record, { compact = false } = {}) {
         saveRoutineAiStatus(record, "discarded");
         renderRoutines();
         renderHistory();
+        renderHome();
         showToast("Propuesta descartada. La rutina no cambió.");
       });
       actions.append(apply, modify, discard);
@@ -2649,18 +2711,26 @@ function createRoutineAiCard(record, { compact = false } = {}) {
     } else if (analysis.status) {
       const status = document.createElement("p");
       status.className = `routine-ai-status ${analysis.status}`;
-      status.textContent = analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
+      status.textContent = analysis.status === "reviewed" ? "Comentario guardado en tu historial."
+        : analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
       card.append(status);
     }
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "routine-ai-button";
+    refresh.disabled = loading;
+    refresh.textContent = loading ? "Actualizando comentario…" : "Actualizar comentario de la guía";
+    refresh.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
+    card.append(refresh);
     return card;
   }
   const heading = document.createElement("h4");
   heading.textContent = loading ? "Analizando tu entrenamiento…" : "Obtén una lectura más profunda";
   const summary = document.createElement("p");
   summary.textContent = loading
-    ? "La IA está comparando esta rutina con tus sesiones anteriores. El entrenamiento ya quedó guardado."
+    ? "La IA está leyendo tus comentarios y comparando esta actividad con el plan y tu historial. El registro ya quedó guardado."
     : repository.getCoachProfile()
-      ? "Compara cargas, esfuerzo, dolor, volumen, historial y tus próximas 48 horas para proponer ajustes concretos."
+      ? "La guía lee tus sensaciones y comentarios, compara esta actividad con el plan y tu historial y considera tus próximas 48 horas."
       : "Configura el perfil privado de tu entrenador para recibir recomendaciones enfocadas en tenis y tus limitaciones.";
   const button = document.createElement("button");
   button.type = "button";
@@ -3715,10 +3785,8 @@ function createHistoryEntry(sourceRecord) {
       automaticSummary.textContent = record.routineSummary;
       copy.append(automaticSummary);
     }
-    if (record.routineAiAnalysis || aiAnalysisInFlight.has(record.id)) {
-      copy.append(createRoutineAiCard(record, { compact: true }));
-    }
   }
+  copy.append(createRoutineAiCard(record, { compact: true }));
   if (record.category === "physical" && record.routineExercises.length) {
     const exerciseDisclosure = document.createElement("details");
     exerciseDisclosure.className = "history-exercise-details";
