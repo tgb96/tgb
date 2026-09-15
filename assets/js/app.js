@@ -15,18 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=54";
+} from "./data.js?v=55";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=54";
-import { createRepository } from "./storage.js?v=54";
-import { createCloudSync } from "./cloud.js?v=54";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=54";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=54";
-import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=54";
+} from "./coach-plan.js?v=55";
+import { createRepository } from "./storage.js?v=55";
+import { createCloudSync } from "./cloud.js?v=55";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=55";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=55";
+import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=55";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=55";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -51,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=54";
+} from "./utils.js?v=55";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1168,7 +1169,9 @@ function renderCardioFields(record = {}) {
       checked: record.cardioTypeId ? record.cardioTypeId === cardio.id : index === 0
     });
     choice.input.addEventListener("change", () => {
+      const duration = currentDurationValues();
       updateCardioExtraFields(currentCardioExtraValues());
+      renderDurationField(duration);
     });
     grid.append(choice.wrapper);
   });
@@ -1242,7 +1245,7 @@ function renderTennisFields(record = {}) {
 }
 
 function durationMode() {
-  return currentCategory === "cardio" ? "hm" : "hms";
+  return durationModeFor(currentCategory, document.querySelector('input[name="cardioTypeId"]:checked')?.value);
 }
 
 function currentDurationValues() {
@@ -2189,6 +2192,7 @@ function launchRoutineFromRegistration(routine) {
 }
 
 function routineForAi(record) {
+  const timing = activityTiming(record);
   return {
     category: record.category,
     activity: recordTitle(record),
@@ -2197,18 +2201,19 @@ function routineForAi(record) {
     restTypeId: record.restTypeId,
     restDetail: record.restDetail,
     distanceKm: record.distanceKm,
-    averagePaceSecondsPerKm: Number(record.distanceKm) > 0 && Number(record.durationSeconds) > 0
-      ? Math.round(Number(record.durationSeconds) / Number(record.distanceKm)) : null,
+    averagePaceSecondsPerKm: timing.averagePaceSecondsPerKm,
+    averagePaceFormatted: timing.averagePaceFormatted,
     location: record.location,
     surface: record.surface,
     trekkingRoute: record.trekkingRoute,
     elevationGainM: record.elevationGainM,
     ascentDurationSeconds: record.ascentDurationSeconds,
-    durationSeconds: record.durationSeconds,
+    durationSeconds: timing.durationSeconds,
+    durationHms: timing.durationHms,
     dateISO: record.dateISO,
     routineId: record.routineId,
     routineName: record.routineName,
-    durationMinutes: record.durationMinutes,
+    durationMinutes: timing.durationMinutes,
     calories: record.calories,
     sensations: record.sensations,
     effortRpe: record.routineEffort,

@@ -101,7 +101,7 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineSensations-/);
   assert.match(app, /Elige al menos una sensación/);
   assert.match(app, /runningDistanceSelect/);
-  assert.match(app, /currentCategory === "cardio" \? "hm" : "hms"/);
+  assert.match(app, /durationModeFor\(currentCategory/);
   assert.match(app, /Tiempo de subida \(HH:MM\)/);
   assert.doesNotMatch(app, /id: "ascentSeconds"/);
   assert.match(app, /renderRunningRankings/);
@@ -157,8 +157,8 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v54/);
-  assert.match(worker, /coach-tracking\.js\?v=54/);
+  assert.match(worker, /tgtrain-shell-v55/);
+  assert.match(worker, /coach-tracking\.js\?v=55/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
@@ -217,4 +217,14 @@ test("plan y realidad conservan alternativas, contexto del día y un cierre sobr
   assert.match(ai, /Más completa, más carga o más kilómetros no significa automáticamente mejor/);
   assert.match(ai, /Nunca digas que un trote doloroso fortalece o cura la rodilla/);
   assert.match(app, /closing\.textContent = analysis\.encouragement/);
+});
+
+test("la guía recibe métricas canónicas y valida ritmos antes de guardar su comentario", async () => {
+  const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.match(ai, /const current = withTiming\(record\)/);
+  assert.match(ai, /validateAnalysisPaces\(analysis, sourceActivities\)/);
+  assert.match(ai, /Ritmo conversable es una indicación de intensidad percibida/);
+  assert.match(app, /renderDurationField\(duration\)/);
+  assert.match(app, /durationHms: timing\.durationHms/);
 });

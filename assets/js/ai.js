@@ -1,5 +1,6 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=54";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=55";
+import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=55";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -225,6 +226,10 @@ export function createAiClient() {
     },
 
     async analyzeRoutine(record, recentRecords = [], planDetails = [], context = {}) {
+      const withTiming = item => ({ ...item, ...activityTiming(item) });
+      const current = withTiming(record);
+      const previousComparableActivities = recentRecords.slice(-8).map(withTiming);
+      const sameDayActivities = (context.currentPlan?.sameDayActivities || []).map(withTiming);
       const instructions = [
         "Eres la IA entrenadora personal de TGTrain, especializada en rendimiento físico para tenis.",
         "Comenta cualquier actividad recibida: entrenamiento físico, cardio, trote, trekking, pádel, tenis o descanso. La ruta de registro no cambia el análisis.",
@@ -234,6 +239,8 @@ export function createAiClient() {
         "En planComparison.reason compara explícitamente plan y realidad: lo que sí se cubrió, qué cambió y qué queda pendiente o no se puede determinar. Considera alternativas y sameDayActivities, sin atribuir sus resultados a la actividad actual ni duplicarlos. Para otra rutina evalúa grupos musculares, habilidades de tenis y recuperación; explica si cubre el objetivo de otra forma, parcialmente o no. Más completa, más carga o más kilómetros no significa automáticamente mejor ni autorizado por el plan.",
         "Para rutina física compara las cargas, series, objetivos de repeticiones/segundos y series realmente completadas por ejercicio con target.settings y las omisiones previstas. Si el plan no especifica una carga, no inventes una carga planificada ni la sustituyas por la sesión actual. Para describir aumentos o reducciones usa también ejecuciones anteriores comparables. No modifiques automáticamente el calendario ni el objetivo original.",
         "En trote analiza distancia, duración y ritmo calculado, compara solo marcas de la misma distancia y considera cansancio, molestias, terreno y comentarios. Respetar un máximo de distancia o intensidad indicado por el plan; no perseguir un récord a costa de la recuperación para tenis.",
+        "Los datos de tiempo y ritmo son cálculos de la aplicación: durationSeconds son segundos TOTALES, durationHms es HH:MM:SS y averagePaceFormatted es MINUTOS:SEGUNDOS por kilómetro. Copia exactamente averagePaceFormatted al citar un ritmo; no vuelvas a convertir averagePaceSecondsPerKm ni interpretes un decimal de minutos como segundos. Ejemplo: 5 km en 00:30:56 son 1856 segundos y 6:11 min/km redondeado, NO 3:12. No redondees 30:56 a 31 minutos al describir el registro exacto. No inventes ritmos numéricos previstos ni cites otros ritmos que no estén calculados en las actividades entregadas.",
+        "Ritmo conversable es una indicación de intensidad percibida, no un ritmo numérico fijo. Sin una referencia explícita no afirmes que el ritmo por km fue superior al plan; puedes señalar que el usuario reportó esfuerzo alto o molestias, distinguiendo su percepción del ritmo calculado. Si hubo pausas, durationSeconds representa el tiempo que registró el usuario; no inventes tiempo en movimiento, duración de las pausas ni ritmo sin pausas.",
         "Para cardio, tenis y descanso changes debe ser una lista vacía. Da recomendaciones concretas en nextSession y goal, sin proponer series, cargas ni ejercicios inventados. Las reglas físicas del perfil se adaptan a la categoría actual; las precauciones personales siempre se respetan.",
         "Tu prioridad es mejorar desplazamientos, split step, frenadas, recuperación al centro, fuerza funcional, potencia limpia, estabilidad y tolerancia a la carga de tenis; no optimices para hipertrofia por sí sola.",
         "Analiza solo los datos entregados. No inventes cargas, repeticiones, dolor, calendario, equipamiento ni récords.",
@@ -249,7 +256,7 @@ export function createAiClient() {
         "No diagnostiques lesiones ni presentes una recomendación como orden médica. Responde en español chileno neutro.",
         "Termina el comentario con encouragement: una o dos frases positivas, sobrias y específicas, conectadas con el trabajo registrado y su posible aporte al tenis (resistencia entre puntos, desplazamientos o estabilidad) o a la resistencia cotidiana. No uses elogios exagerados, promesas ni frases vacías. Si hubo molestias, reconoce como avance observarlas y ajustar responsablemente, no el hecho de entrenar con dolor. Nunca digas que un trote doloroso fortalece o cura la rodilla; la mejora depende de una carga tolerable y de atender las molestias. El perfil privado puede orientar el contenido, pero este cierre prudente es obligatorio."
       ].join("\n");
-      const analysis = await generateJson({
+      const request = {
         schema: analysisSchema,
         maxOutputTokens: 4000,
         instructions,
@@ -257,14 +264,22 @@ export function createAiClient() {
           coachProfileVersion: COACH_PROFILE_VERSION,
           privateCoachProfile: String(context.coachProfile?.profileText || "").slice(0, 40000),
           availableEquipment: String(context.coachProfile?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 5000),
-          current: record,
-          previousComparableActivities: recentRecords.slice(-8),
-          currentPlan: context.currentPlan || null,
+          current,
+          previousComparableActivities,
+          currentPlan: context.currentPlan ? { ...context.currentPlan, sameDayActivities } : null,
           recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
           planDetails: planDetails.slice(0, 20)
         })
-      });
+      };
+      let analysis = await generateJson(request);
+      const sourceActivities = [current, ...previousComparableActivities, ...sameDayActivities];
+      try {
+        validateAnalysisPaces(analysis, sourceActivities);
+      } catch (error) {
+        analysis = await generateJson({ ...request, instructions: `${instructions}\nCORRECCIÓN OBLIGATORIA: ${error.message} Ritmo actual exacto: ${current.averagePaceFormatted}. Tiempo actual exacto: ${current.durationHms}.` });
+        validateAnalysisPaces(analysis, sourceActivities);
+      }
       return { analysis: { ...analysis, profileVersion: COACH_PROFILE_VERSION }, model: MODEL_NAME };
     }
   };

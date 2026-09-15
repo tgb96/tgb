@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=54";
+} from "./data.js?v=55";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -269,7 +269,7 @@ export function recordDetails(record) {
     ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
     : "Recuperación planificada";
   const displayedDuration = normalized.category === "cardio"
-    ? formatDuration({ ...normalized, durationPrecision: "hm" })
+    ? formatDuration({ ...normalized, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
     : formatDuration(normalized);
   const details = [displayedDuration, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
   if (normalized.category === "tennis" && normalized.location) details.push(normalized.location);
@@ -604,7 +604,7 @@ export function weeklyReport(records, week) {
       report += `   Tipo: ${record.categoryName}\n`;
       if (record.plannedTitle) report += `   Plan del entrenador: ${record.plannedTitle}\n`;
       if (record.category !== "rest") {
-        report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: "hm" } : record)}\n`;
+        report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: record.cardioTypeId === "running" ? "hms" : "hm" } : record)}\n`;
         report += `   Calorías: ${record.calories} kcal\n`;
       }
       if (record.category === "tennis" && record.tennisTypeName) report += `   Tipo de tenis: ${record.tennisTypeName}\n`;

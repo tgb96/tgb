@@ -339,7 +339,7 @@ test("formatea duraciones exactas para trote, trekking y tenis", () => {
   assert.equal(formatDuration({ durationMinutes: 60, durationSeconds: 3600, durationPrecision: "minutes" }), "60 min");
 });
 
-test("oculta los segundos de los registros de cardio aunque sean antiguos", () => {
+test("muestra segundos en trote y mantiene HH:MM en el resto del cardio", () => {
   assert.equal(recordDetails({
     ...physicalRecord,
     category: "cardio",
@@ -351,7 +351,8 @@ test("oculta los segundos de los registros de cardio aunque sean antiguos", () =
     durationMinutes: 36 + (38 / 60),
     durationSeconds: 2198,
     durationPrecision: "hms"
-  }), "36 min · 420 kcal");
+  }), "36 min 38 s · 420 kcal");
+  assert.equal(recordDetails({ ...physicalRecord, category: "cardio", cardioTypeId: "padel", routineId: "", routineName: "", durationMinutes: 36 + 38 / 60, durationSeconds: 2198, durationPrecision: "hms" }), "36 min · 420 kcal");
 });
 
 test("formatea la distancia como marca de carrera legible", () => {
@@ -359,6 +360,13 @@ test("formatea la distancia como marca de carrera legible", () => {
   assert.equal(formatDistance(10), "10K");
   assert.equal(formatDistance(8.5), "8,5 km");
   assert.equal(formatDistance(12.045), "12,045 km");
+});
+
+test("el historial y el informe semanal conservan los segundos exactos del trote", () => {
+  const record = normalizeRecord({ ...physicalRecord, category: "cardio", routineId: "", routineName: "", cardioTypeId: "running", cardioTypeName: "Trote", durationSeconds: 1856, durationMinutes: 1856 / 60, durationPrecision: "hms", distanceKm: 5 });
+  assert.match(recordDetails(record), /30 min 56 s/);
+  assert.match(weeklyReport([record], isoWeekInfo(record.dateISO)), /Duración: 30 min 56 s/);
+  assert.match(recordsToCSV([record]), /1856/);
 });
 
 test("agrupa por semana y genera el informe completo de lunes a domingo", () => {
