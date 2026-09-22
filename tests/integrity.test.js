@@ -152,13 +152,21 @@ test("integra el bloque de cuatro semanas del entrenador con sesiones y alternat
   });
 });
 
+test("normaliza una respuesta compacta sin campos vacíos", async () => {
+  const { normalizeTrainingBlock } = await import("../assets/js/training-plan.js");
+  const block = normalizeTrainingBlock({ title: "Plan compacto", weeks: [{ weekKey: "2026-W39", sessions: [{ dateISO: "2026-09-22", options: [{ title: "Trote 5K", category: "cardio", cardioTypeId: "running", distanceKm: 5 }] }] }] });
+  assert.equal(block.title, "Plan compacto");
+  assert.equal(block.weeks[0].sessions[0].options[0].prefill.cardioTypeId, "running");
+  assert.equal(block.weeks[0].sessions[0].options[0].prefill.distanceKm, 5);
+});
+
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v56/);
-  assert.match(worker, /coach-tracking\.js\?v=56/);
+  assert.match(worker, /tgtrain-shell-v57/);
+  assert.match(worker, /coach-tracking\.js\?v=57/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
@@ -177,6 +185,16 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.doesNotMatch(ai, /monoplegia|plexo braquial|menisco/i);
   assert.doesNotMatch(ai, /OPENAI_API_KEY|httpsCallable|firebase-functions/);
   assert.equal(firebase.functions, undefined);
+});
+
+test("el importador compacta planes largos y reintenta respuestas JSON truncadas", async () => {
+  const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
+  assert.match(ai, /error\.code !== "invalid-json"/);
+  assert.match(ai, /REINTENTO COMPACTO OBLIGATORIO/);
+  assert.match(ai, /No repitas reglas generales/);
+  assert.match(ai, /Omite por completo los campos opcionales/);
+  assert.match(ai, /maxOutputTokens: 16000/);
+  assert.doesNotMatch(ai, /required: \["id", "title", "category", "summary"/);
 });
 
 test("el nombre y el logo corresponden a TGTrain", async () => {

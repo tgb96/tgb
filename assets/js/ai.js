@@ -1,6 +1,6 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=56";
-import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=56";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=57";
+import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=57";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -77,19 +77,19 @@ const planSchema = {
                       distanceKm: nullableNumberSchema,
                       exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 100 }
                     },
-                    required: ["id", "title", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "distanceKm", "exerciseSettings"]
+                    required: ["title", "category"]
                   }
                 }
               },
-              required: ["id", "dateISO", "objective", "primaryOptionId", "options"]
+              required: ["dateISO", "options"]
             }
           }
         },
-        required: ["weekKey", "label", "context", "objective", "sessions"]
+        required: ["weekKey", "sessions"]
       }
     }
   },
-  required: ["title", "subtitle", "source", "rules", "priority", "weeks"]
+  required: ["title", "weeks"]
 };
 
 const progressionChangeSchema = {
@@ -142,6 +142,7 @@ function friendlyError(error) {
   if (code.includes("quota") || code.includes("resource-exhausted") || code.includes("429")) return "Se alcanzó el límite gratuito temporal. Inténtalo más tarde.";
   if (code.includes("fetch-error") && (message.includes("high demand") || message.includes("[500"))) return "Gemini está temporalmente saturado. Inténtalo nuevamente en unos minutos.";
   if (code.includes("not-found") || message.includes("not found")) return "El análisis inteligente todavía no está habilitado en Firebase.";
+  if (code.includes("invalid-json")) return "La respuesta de Gemini quedó incompleta. Vuelve a intentarlo; TGTrain solicitará automáticamente una versión compacta del plan.";
   return message || "No fue posible completar el análisis inteligente.";
 }
 
@@ -190,7 +191,10 @@ export function createAiClient() {
       if (!text) throw new Error("La IA no devolvió un resultado utilizable.");
       return JSON.parse(text);
     } catch (error) {
-      throw new Error(friendlyError(error));
+      const wrapped = new Error(friendlyError(error));
+      wrapped.code = error instanceof SyntaxError ? "invalid-json" : String(error?.code || "");
+      if (error instanceof SyntaxError) wrapped.message = friendlyError({ code: "invalid-json", message: error.message });
+      throw wrapped;
     }
   }
 
@@ -213,15 +217,29 @@ export function createAiClient() {
         "Usa fechas YYYY-MM-DD y semanas ISO YYYY-WNN. Conserva alternativas dentro de options y deja como primaria la primera o la indicada explícitamente.",
         "Para entrenamiento físico usa exclusivamente routineId y exerciseId existentes en el catálogo. Si el texto no modifica un ejercicio, omítelo de exerciseSettings.",
         "Para cardio, tenis y descanso usa exclusivamente los identificadores del catálogo. Los campos que no correspondan deben ir vacíos, las distancias desconocidas deben ser null y las listas pueden quedar vacías.",
-        "Escribe todo en español claro. No incluyas explicaciones fuera del JSON."
+        "Escribe todo en español claro. No incluyas explicaciones fuera del JSON.",
+        "La salida debe ser compacta y no debe copiar el texto completo: título máximo 100 caracteres; subtitle 180; máximo 10 rules y 6 priority; label 80, context y objective 180; summary 140; máximo 5 details de 140 caracteres por opción.",
+        "No repitas reglas generales dentro de semanas, sesiones ni opciones. Pon cada regla transversal una sola vez en rules y conserva en details únicamente la indicación específica necesaria para ejecutar ese día.",
+        "Omite por completo los campos opcionales que no correspondan. No escribas cadenas vacías, null ni listas vacías salvo options, sessions y weeks. En exerciseSettings incluye solo ejercicios que el plan modifica u omite; no copies la rutina base completa."
       ].join("\n");
-      const block = await generateJson({
+      const request = {
         schema: planSchema,
         useResponseSchema: false,
         maxOutputTokens: 20000,
         instructions,
         input: `FECHA ACTUAL EN CHILE: ${currentDate || "no indicada"}\n\nCATÁLOGO VÁLIDO DE TGTRAIN:\n${JSON.stringify(catalog)}\n\nPLAN DEL ENTRENADOR:\n${String(planText || "").slice(0, 50000)}`
-      });
+      };
+      let block;
+      try {
+        block = await generateJson(request);
+      } catch (error) {
+        if (error.code !== "invalid-json") throw error;
+        block = await generateJson({
+          ...request,
+          maxOutputTokens: 16000,
+          instructions: `${instructions}\nREINTENTO COMPACTO OBLIGATORIO: la respuesta anterior quedó truncada. Reduce aún más el texto sin perder fechas, actividad, alternativas, cargas, series, repeticiones ni límites: máximo 8 reglas, 4 detalles por opción y una frase breve por resumen/objetivo. No repitas información y finaliza el JSON completo.`
+        });
+      }
       return { block, model: MODEL_NAME };
     },
 
