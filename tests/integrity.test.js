@@ -157,8 +157,8 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v55/);
-  assert.match(worker, /coach-tracking\.js\?v=55/);
+  assert.match(worker, /tgtrain-shell-v56/);
+  assert.match(worker, /coach-tracking\.js\?v=56/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
@@ -227,4 +227,13 @@ test("la guía recibe métricas canónicas y valida ritmos antes de guardar su c
   assert.match(ai, /Ritmo conversable es una indicación de intensidad percibida/);
   assert.match(app, /renderDurationField\(duration\)/);
   assert.match(app, /durationHms: timing\.durationHms/);
+});
+
+test("la tarjeta de la guía usa todo el ancho del historial y texto legible", async () => {
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  const css = await readFile(resolve(root, "assets/css/styles.css"), "utf8");
+  assert.match(app, /entry\.append\(top, aiCard\)/);
+  assert.match(css, /\.routine-ai-card \{ width: 100%/);
+  assert.match(css, /\.routine-ai-card p \{[^}]*font-size: 14px/);
+  assert.match(css, /\.routine-ai-group ul \{[^}]*font-size: 13px/);
 });

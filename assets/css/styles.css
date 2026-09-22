@@ -440,34 +440,35 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-attempts em { align-self: center; color: var(--blue-dark); font-size: 9px; font-style: normal; font-weight: 900; }
 .routine-auto-summary { margin: 12px 0 0; padding: 12px; border-left: 4px solid var(--lime); border-radius: 12px; background: var(--night); color: white; font-size: 10px; line-height: 1.5; }
 .history-auto-summary { margin-top: 9px !important; padding: 9px; border-radius: 11px; background: #eef7d7; color: #364115 !important; font-size: 10px !important; }
-.routine-ai-card { margin-top: 12px; padding: 14px; border: 1px solid rgba(59, 91, 255, 0.2); border-radius: 17px; background: linear-gradient(145deg, #f3f5ff, #fff); color: var(--ink); }
-.routine-ai-card > span { display: block; color: var(--blue); font-size: 9px; font-weight: 950; letter-spacing: .6px; text-transform: uppercase; }
+.routine-ai-card { width: 100%; min-width: 0; margin-top: 14px; padding: 17px; border: 1px solid rgba(59, 91, 255, 0.2); border-radius: 19px; background: linear-gradient(145deg, #f3f5ff, #fff); color: var(--ink); }
+.routine-ai-card > span { display: block; color: var(--blue); font-size: 11px; font-weight: 950; line-height: 1.35; letter-spacing: .6px; text-transform: uppercase; }
 .routine-ai-card > .routine-ai-decision { width: max-content; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--night); color: var(--lime); }
 .routine-ai-card > .routine-ai-decision.reduce, .routine-ai-card > .routine-ai-decision.recover { background: #fff0dd; color: #7a4a10; }
-.routine-ai-card h4 { margin: 5px 0 0; font-size: 16px; line-height: 1.2; }
-.routine-ai-card p { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-.routine-ai-groups { display: grid; gap: 8px; margin-top: 10px; }
-.routine-ai-group { padding: 10px; border-radius: 12px; background: white; }
-.routine-ai-group strong { display: block; font-size: 10px; }
-.routine-ai-group ul { margin: 6px 0 0; padding-left: 16px; color: var(--muted); font-size: 10px; line-height: 1.45; }
-.routine-ai-button { width: 100%; min-height: 46px; margin-top: 10px; border: 0; border-radius: 13px; background: var(--blue); color: white; font-size: 11px; font-weight: 900; }
+.routine-ai-card h4 { margin: 8px 0 0; font-size: 19px; line-height: 1.22; letter-spacing: -.2px; }
+.routine-ai-card p { margin: 9px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.routine-ai-groups { display: grid; gap: 10px; margin-top: 13px; }
+.routine-ai-group { padding: 13px; border-radius: 14px; background: white; }
+.routine-ai-group strong { display: block; font-size: 13px; }
+.routine-ai-group ul { margin: 8px 0 0; padding-left: 19px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.routine-ai-group li + li { margin-top: 5px; }
+.routine-ai-button { width: 100%; min-height: 49px; margin-top: 12px; border: 0; border-radius: 13px; background: var(--blue); color: white; font-size: 13px; font-weight: 900; }
 .routine-ai-button:disabled { opacity: .58; cursor: wait; }
 .routine-ai-changes { display: grid; gap: 7px; margin-top: 10px; }
 .routine-ai-changes article { padding: 10px; border-radius: 12px; background: white; }
 .routine-ai-changes strong, .routine-ai-changes small { display: block; }
-.routine-ai-changes small { margin-top: 5px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.routine-ai-changes small { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .routine-ai-goal { padding: 9px 10px; border-left: 4px solid var(--lime); border-radius: 10px; background: white; color: var(--ink) !important; font-weight: 800; }
 .routine-ai-actions { margin-top: 11px; display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 6px; }
-.routine-ai-actions button, .routine-ai-editor > button { min-height: 42px; padding: 7px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--ink); font-size: 9px; font-weight: 900; }
+.routine-ai-actions button, .routine-ai-editor > button { min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--ink); font-size: 11px; font-weight: 900; }
 .routine-ai-actions .routine-ai-apply, .routine-ai-editor > .routine-ai-apply { border: 0; background: var(--blue); color: white; }
 .routine-ai-status { padding: 8px 10px; border-radius: 10px; background: #eef7d7; color: #364115 !important; font-weight: 850; }
 .routine-ai-status.discarded { background: var(--paper); color: var(--muted) !important; }
 .routine-ai-editor { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; background: white; }
 .routine-ai-edit-row { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
 .routine-ai-edit-row:first-of-type { border-top: 0; }
-.routine-ai-edit-row strong { grid-column: 2 / -1; font-size: 10px; }
+.routine-ai-edit-row strong { grid-column: 2 / -1; font-size: 12px; }
 .routine-ai-edit-row input[type="checkbox"] { width: 20px; height: 20px; grid-row: 1 / 3; accent-color: var(--blue); }
-.routine-ai-edit-row select, .routine-ai-edit-row input:not([type="checkbox"]) { min-width: 0; min-height: 39px; padding: 7px; font-size: 10px; }
+.routine-ai-edit-row select, .routine-ai-edit-row input:not([type="checkbox"]) { min-width: 0; min-height: 41px; padding: 7px; font-size: 12px; }
 .routine-ai-editor > button { width: 100%; margin-top: 8px; }
 .history-pain-detail { padding: 8px 9px; border-radius: 10px; background: #fff0dd; color: #7a4a10 !important; font-weight: 750; }
 
@@ -550,6 +551,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .history-entry + .history-entry { margin-top: 7px; }
 .history-entry-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .history-entry-top > div:first-child { min-width: 0; flex: 1; }
+.history-entry > .routine-ai-card { width: 100%; }
 .history-entry h3 { margin: 0; font-size: 14px; }
 .history-entry p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .history-routine-balance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
