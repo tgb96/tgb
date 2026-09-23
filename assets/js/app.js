@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=57";
+} from "./data.js?v=58";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=57";
-import { createRepository } from "./storage.js?v=57";
-import { createCloudSync } from "./cloud.js?v=57";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=57";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=57";
-import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=57";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=57";
+} from "./coach-plan.js?v=58";
+import { createRepository } from "./storage.js?v=58";
+import { createCloudSync } from "./cloud.js?v=58";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=58";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=58";
+import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=58";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=58";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=57";
+} from "./utils.js?v=58";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -456,6 +456,7 @@ function openAiPlanDialog() {
   showAiPlanInput();
   setAiPlanMessage("");
   setAiPlanMessage("", "error", "aiPlanSaveMessage");
+  if ($("cloudDialog").open) $("cloudDialog").close();
   if (!$("aiPlanDialog").open) $("aiPlanDialog").showModal();
 }
 
@@ -677,7 +678,6 @@ function renderHome() {
   $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
   $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
   $("weekProgress").textContent = `${activeDays}/7 días`;
-  renderCoachBlock(allRecords);
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
   if (todayRecords[0]) feedback.append(createRoutineAiCard(todayRecords[0], { compact: true }));
@@ -3970,7 +3970,6 @@ function bindEvents() {
     else showView(target);
   }));
   $("homeRegisterButton").addEventListener("click", openRegistrationOrActiveRoutine);
-  $("openCoachPlanButton").addEventListener("click", openCoachPlanDialog);
   $("openAiPlanButton").addEventListener("click", openAiPlanDialog);
   $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());
   $("aiPlanDialogClose").addEventListener("click", () => $("aiPlanDialog").close());

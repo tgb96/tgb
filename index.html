@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=57">
+  <link rel="stylesheet" href="assets/css/styles.css?v=58">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -48,26 +48,6 @@
           <div><strong id="weekCalories">0</strong><span>kcal</span></div>
         </div>
       </div>
-
-      <section id="coachBlockCard" class="coach-block-card" aria-labelledby="coachBlockTitle">
-        <div class="coach-block-topline">
-          <span id="coachBlockPhase" class="coach-block-phase">Bloque del entrenador</span>
-          <span id="coachBlockProgress" class="coach-block-progress"></span>
-        </div>
-        <div class="coach-block-heading">
-          <div>
-            <p class="eyebrow">Plan activo</p>
-            <h2 id="coachBlockTitle">Rendimiento tenis</h2>
-            <p id="coachBlockContext"></p>
-          </div>
-          <span class="coach-block-weeks">4<br><small>semanas</small></span>
-        </div>
-        <div id="coachTodayPlan" class="coach-today-plan"></div>
-        <div class="coach-plan-actions">
-          <button id="openCoachPlanButton" class="coach-plan-open" type="button">Ver planificación completa <span aria-hidden="true">→</span></button>
-          <button id="openAiPlanButton" class="coach-ai-open" type="button"><span aria-hidden="true">✦</span> Importar plan con IA</button>
-        </div>
-      </section>
 
       <div class="section-title-row">
         <div>
@@ -276,6 +256,7 @@
       <button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button>
       <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
+      <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
@@ -364,6 +345,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=57"></script>
+  <script type="module" src="assets/js/app.js?v=58"></script>
 </body>
 </html>

@@ -128,6 +128,15 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
+test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", async () => {
+  const html = await readFile(resolve(root, "index.html"), "utf8");
+  const home = html.slice(html.indexOf('id="viewHome"'), html.indexOf('id="viewRegister"'));
+  const cloud = html.slice(html.indexOf('id="cloudDialog"'), html.indexOf('id="coachProfileDialog"'));
+  assert.doesNotMatch(home, /coachBlockCard|openAiPlanButton|Plan activo/);
+  assert.match(cloud, /id="openAiPlanButton"/);
+  assert.match(cloud, /Importar planificación con IA/);
+});
+
 test("integra el bloque de cuatro semanas del entrenador con sesiones y alternativas", async () => {
   const { coachTrainingBlock, coachSessionForDate } = await import("../assets/js/coach-plan.js");
   const { physicalRoutines, trainingCategories } = await import("../assets/js/data.js");
@@ -165,8 +174,8 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v57/);
-  assert.match(worker, /coach-tracking\.js\?v=57/);
+  assert.match(worker, /tgtrain-shell-v58/);
+  assert.match(worker, /coach-tracking\.js\?v=58/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
