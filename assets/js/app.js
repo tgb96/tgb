@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=62";
+} from "./data.js?v=63";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=62";
-import { createRepository } from "./storage.js?v=62";
-import { createCloudSync } from "./cloud.js?v=62";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=62";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=62";
-import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=62";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=62";
+} from "./coach-plan.js?v=63";
+import { createRepository } from "./storage.js?v=63";
+import { createCloudSync } from "./cloud.js?v=63";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=63";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=63";
+import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=63";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=62";
+} from "./utils.js?v=63";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -84,8 +84,12 @@ let plannedActivityTicker = null;
 let aiPlanCandidate = null;
 const aiAnalysisInFlight = new Set();
 let coachQuestionInFlight = false;
-let coachSpeechRecognition = null;
+let coachHistoryExpanded = false;
+let coachMediaRecorder = null;
+let coachMediaStream = null;
+let coachVoiceTimer = null;
 let coachVoiceActive = false;
+let coachVoiceBusy = false;
 let coachQuestionSource = "text";
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
@@ -808,7 +812,11 @@ function openRegistrationOrActiveRoutine() {
 function renderCoachQuestions() {
   const history = $("coachQuestionHistory");
   history.replaceChildren();
-  const questions = repository.listCoachQuestions().slice(0, 5).reverse();
+  const allQuestions = repository.listCoachQuestions();
+  const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 5)).reverse();
+  const toggle = $("coachHistoryToggle");
+  toggle.classList.toggle("hidden", allQuestions.length <= 5);
+  toggle.textContent = coachHistoryExpanded ? "Mostrar solo las 5 más recientes" : `Ver todas las preguntas (${allQuestions.length})`;
   if (!questions.length) {
     const hint = document.createElement("p");
     hint.className = "coach-question-hint";
@@ -909,45 +917,93 @@ async function submitCoachQuestion(existing = null) {
   }
 }
 
-function toggleCoachVoice() {
-  if (coachVoiceActive) { coachSpeechRecognition?.stop(); return; }
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    $("coachQuestionStatus").textContent = "Este navegador no admite dictado. Puedes escribir tu pregunta.";
+function coachAudioMimeType() {
+  if (!window.MediaRecorder?.isTypeSupported) return "";
+  return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function releaseCoachMicrophone() {
+  if (coachVoiceTimer) clearTimeout(coachVoiceTimer);
+  coachVoiceTimer = null;
+  coachMediaStream?.getTracks().forEach(track => track.stop());
+  coachMediaStream = null;
+  coachMediaRecorder = null;
+  coachVoiceActive = false;
+  $("coachVoiceButton").classList.remove("listening");
+}
+
+async function toggleCoachVoice() {
+  if (coachVoiceActive) {
+    if (coachMediaRecorder?.state === "recording") {
+      coachVoiceActive = false;
+      coachVoiceBusy = true;
+      $("coachVoiceButton").disabled = true;
+      coachMediaRecorder.stop();
+    }
     return;
   }
-  const recognition = new Recognition();
-  coachSpeechRecognition = recognition;
-  recognition.lang = "es-CL";
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = event => {
-    const transcript = event.results?.[0]?.[0]?.transcript?.trim();
-    if (!transcript) return;
-    const input = $("coachQuestionText");
-    input.value = [input.value.trim(), transcript].filter(Boolean).join(" ").slice(0, 1000);
-    coachQuestionSource = "voice";
-    $("coachQuestionStatus").textContent = "Dictado listo. Revisa el texto y pulsa Preguntar a la guía.";
-  };
-  recognition.onerror = event => {
-    $("coachQuestionStatus").textContent = event.error === "not-allowed"
-      ? "Permite el uso del micrófono en el navegador o escribe tu pregunta."
-      : "No se pudo reconocer la voz. Puedes intentarlo de nuevo o escribir.";
-  };
-  recognition.onend = () => {
-    coachVoiceActive = false;
-    $("coachVoiceButton").textContent = "🎙️ Dictar";
-    $("coachVoiceButton").classList.remove("listening");
-  };
+  if (coachVoiceBusy) return;
+  if (!cloudSync.currentUser) {
+    $("coachQuestionStatus").textContent = "Inicia sesión con Google para transcribir tu pregunta.";
+    openCloudDialog();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
+    $("coachQuestionStatus").textContent = "Esta PWA no puede grabar audio aquí. Usa el micrófono del teclado de Android para dictar.";
+    return;
+  }
+  const button = $("coachVoiceButton");
+  coachVoiceBusy = true;
+  button.disabled = true;
+  $("coachQuestionStatus").textContent = "Solicitando permiso para usar el micrófono…";
   try {
-    recognition.start();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    coachMediaStream = stream;
+    const format = coachAudioMimeType();
+    const recorder = new MediaRecorder(stream, { mimeType: format });
+    coachMediaRecorder = recorder;
+    const chunks = [];
+    let failed = false;
+    recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
+    recorder.onerror = () => { failed = true; $("coachQuestionStatus").textContent = "La grabación falló. Puedes usar el micrófono del teclado de Android."; };
+    recorder.onstop = async () => {
+      const mimeType = (recorder.mimeType || format).split(";")[0];
+      releaseCoachMicrophone();
+      button.textContent = "Transcribiendo…";
+      button.disabled = true;
+      if (failed) { coachVoiceBusy = false; button.textContent = "🎙️ Grabar"; button.disabled = false; return; }
+      try {
+        const audio = new Blob(chunks, { type: mimeType });
+        $("coachQuestionStatus").textContent = "Transcribiendo tu pregunta…";
+        const transcript = await aiClient.transcribeAudio(audio);
+        const input = $("coachQuestionText");
+        input.value = [input.value.trim(), transcript].filter(Boolean).join(" ").slice(0, 1000);
+        coachQuestionSource = "voice";
+        $("coachQuestionStatus").textContent = "Transcripción lista. Revísala y pulsa Preguntar a la guía.";
+      } catch (error) {
+        $("coachQuestionStatus").textContent = `${error.message} También puedes usar el micrófono del teclado de Android.`;
+      } finally {
+        coachVoiceBusy = false;
+        button.textContent = "🎙️ Grabar";
+        button.disabled = false;
+      }
+    };
+    recorder.start();
     coachVoiceActive = true;
-    $("coachVoiceButton").textContent = "■ Detener";
-    $("coachVoiceButton").classList.add("listening");
-    $("coachQuestionStatus").textContent = "Escuchando…";
-  } catch {
-    $("coachQuestionStatus").textContent = "No se pudo iniciar el micrófono. Puedes escribir tu pregunta.";
+    coachVoiceBusy = false;
+    button.disabled = false;
+    button.textContent = "■ Detener";
+    button.classList.add("listening");
+    $("coachQuestionStatus").textContent = "Grabando… Pulsa Detener al terminar (máximo 30 segundos).";
+    coachVoiceTimer = setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 30000);
+  } catch (error) {
+    releaseCoachMicrophone();
+    coachVoiceBusy = false;
+    button.disabled = false;
+    button.textContent = "🎙️ Grabar";
+    $("coachQuestionStatus").textContent = error.name === "NotAllowedError"
+      ? "Permite el micrófono para TGTrain en Android o usa el micrófono del teclado."
+      : "No se pudo abrir el micrófono. Puedes usar el micrófono del teclado de Android.";
   }
 }
 
@@ -4333,9 +4389,13 @@ function bindEvents() {
     submitCoachQuestion();
   });
   $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
-  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
-    $("coachVoiceButton").disabled = true;
-    $("coachVoiceButton").title = "El dictado no está disponible en este navegador.";
+  $("coachHistoryToggle").addEventListener("click", () => {
+    coachHistoryExpanded = !coachHistoryExpanded;
+    renderCoachQuestions();
+  });
+  if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
+    $("coachVoiceButton").classList.add("hidden");
+    $("coachVoiceHelp").textContent = "En este dispositivo, usa el micrófono del teclado de Android para dictar la pregunta y revisa el texto antes de enviarlo.";
   }
   document.querySelectorAll("[data-view-target]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.viewTarget;

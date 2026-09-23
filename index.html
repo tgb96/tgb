@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=62">
+  <link rel="stylesheet" href="assets/css/styles.css?v=63">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -77,15 +77,17 @@
         <p class="eyebrow dark">Conversa con tu guía</p>
         <h2 id="coachAskTitle">¿Qué quieres preguntarle?</h2>
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Preguntas y respuestas recientes"></div>
+        <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
+        <p class="coach-history-note">Tus preguntas no se borran automáticamente: quedan en este dispositivo y en tu cuenta cuando se sincronizan.</p>
         <form id="coachQuestionForm">
           <label for="coachQuestionText">Tu pregunta</label>
           <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: ¿cómo adapto la próxima sesión si la rodilla sigue molesta?"></textarea>
           <div class="coach-ask-actions">
-            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-label="Dictar pregunta con el micrófono">🎙️ Dictar</button>
+            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-label="Grabar y transcribir pregunta con el micrófono">🎙️ Grabar</button>
             <button id="coachAskButton" class="coach-ask-button" type="submit">Preguntar a la guía →</button>
           </div>
           <p id="coachQuestionStatus" class="coach-question-status" role="status"></p>
-          <small>Revisa el texto antes de enviarlo. El dictado puede usar el servicio de voz del navegador; TGTrain no guarda el audio. La pregunta y los datos relevantes se envían a la IA de Firebase.</small>
+          <small id="coachVoiceHelp">Graba hasta 30 segundos y revisa la transcripción antes de enviarla. El audio se envía a Firebase AI solo para transcribirlo; TGTrain no lo guarda. La pregunta y los datos relevantes se envían a la guía al pulsar Preguntar.</small>
         </form>
       </section>
 
@@ -380,6 +382,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=62"></script>
+  <script type="module" src="assets/js/app.js?v=63"></script>
 </body>
 </html>

@@ -481,6 +481,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-ask-card { margin: 16px 0 28px; padding: 18px; border-radius: 20px; background: white; border: 1px solid var(--line); color: var(--ink); }
 .coach-ask-card h2 { margin: 5px 0 15px; font-size: 21px; line-height: 1.2; }
 .coach-question-history { display: grid; gap: 12px; margin-bottom: 15px; }
+.coach-history-toggle { width: 100%; min-height: 42px; margin: -2px 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px; background: #f3f5ff; color: var(--blue-dark); font-size: 13px; font-weight: 900; }
+.coach-history-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .coach-question-hint { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .coach-exchange { display: grid; gap: 8px; }
 .coach-exchange p { margin: 0; padding: 11px 13px; border-radius: 13px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
