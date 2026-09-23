@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=60";
+} from "./data.js?v=61";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=60";
-import { createRepository } from "./storage.js?v=60";
-import { createCloudSync } from "./cloud.js?v=60";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=60";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=60";
-import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=60";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=60";
+} from "./coach-plan.js?v=61";
+import { createRepository } from "./storage.js?v=61";
+import { createCloudSync } from "./cloud.js?v=61";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=61";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=61";
+import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=61";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=61";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=60";
+} from "./utils.js?v=61";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -83,6 +83,10 @@ let plannedRegistrationContext = null;
 let plannedActivityTicker = null;
 let aiPlanCandidate = null;
 const aiAnalysisInFlight = new Set();
+let coachQuestionInFlight = false;
+let coachSpeechRecognition = null;
+let coachVoiceActive = false;
+let coachQuestionSource = "text";
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -801,6 +805,152 @@ function openRegistrationOrActiveRoutine() {
   openRegistration();
 }
 
+function renderCoachQuestions() {
+  const history = $("coachQuestionHistory");
+  history.replaceChildren();
+  const questions = repository.listCoachQuestions().slice(0, 5).reverse();
+  if (!questions.length) {
+    const hint = document.createElement("p");
+    hint.className = "coach-question-hint";
+    hint.textContent = "Puedes preguntar sobre tu último entrenamiento, el plan de hoy o cómo adaptar una sesión según tus sensaciones.";
+    history.append(hint);
+    return;
+  }
+  questions.forEach(item => {
+    const exchange = document.createElement("article");
+    exchange.className = "coach-exchange";
+    const question = document.createElement("p");
+    question.className = "coach-exchange-question";
+    question.textContent = item.question;
+    const answer = document.createElement("p");
+    answer.className = "coach-exchange-answer";
+    answer.textContent = item.answer || "Sin respuesta todavía. Pulsa Reintentar cuando tengas conexión.";
+    exchange.append(question, answer);
+    if (!item.answer) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Reintentar";
+      retry.disabled = coachQuestionInFlight;
+      retry.addEventListener("click", () => submitCoachQuestion(item));
+      exchange.append(retry);
+    }
+    history.append(exchange);
+  });
+}
+
+function coachQuestionContext() {
+  const records = repository.list();
+  const block = activeTrainingBlock();
+  const todayISO = getChileDateISO();
+  const todaySession = coachSessionForDate(todayISO, block);
+  const latest = records.filter(record => record.routineAiAnalysis)
+    .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
+      .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
+  return {
+    todayISO,
+    coachProfile: String(repository.getCoachProfile()?.profileText || "").slice(0, 14000),
+    equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
+    recentActivities: records.slice(0, 6).map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
+    latestAnalysis: latest ? {
+      activity: recordTitle(latest),
+      dateISO: latest.dateISO,
+      analysis: latest.routineAiAnalysis
+    } : null,
+    currentPlan: {
+      title: block.title,
+      week: coachWeekForDate(todayISO, block),
+      today: todaySession,
+      rules: (block.rules || []).slice(0, 12)
+    },
+    previousQuestions: repository.listCoachQuestions().filter(item => item.answer).slice(0, 4).reverse()
+      .map(item => ({ question: item.question, answer: item.answer }))
+  };
+}
+
+async function submitCoachQuestion(existing = null) {
+  if (coachQuestionInFlight) return;
+  const input = $("coachQuestionText");
+  const question = existing?.question || input.value.trim();
+  if (!question) { input.focus(); return; }
+  if (!cloudSync.currentUser) {
+    $("coachQuestionStatus").textContent = "Inicia sesión con Google para preguntar a la guía.";
+    openCloudDialog();
+    return;
+  }
+  if (!repository.getCoachProfile()?.profileText) {
+    $("coachQuestionStatus").textContent = "Configura primero el perfil de tu entrenador IA.";
+    openCoachProfileDialog();
+    return;
+  }
+  coachQuestionInFlight = true;
+  $("coachAskButton").disabled = true;
+  $("coachAskButton").textContent = "Consultando…";
+  $("coachQuestionStatus").textContent = "La guía está revisando tus registros y tu plan.";
+  const timestamp = new Date().toISOString();
+  let saved = existing;
+  try {
+    const context = coachQuestionContext();
+    if (!saved) saved = repository.saveCoachQuestion({
+      id: crypto.randomUUID(), question, answer: "", source: coachQuestionSource,
+      createdAt: timestamp, updatedAt: timestamp
+    });
+    renderCoachQuestions();
+    const result = await aiClient.askCoach(question, context);
+    repository.saveCoachQuestion({ ...saved, answer: result.answer, updatedAt: new Date().toISOString() });
+    if (!existing) { input.value = ""; coachQuestionSource = "text"; }
+    $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
+  } catch (error) {
+    $("coachQuestionStatus").textContent = error.message || "No se pudo obtener respuesta. Puedes reintentarlo.";
+  } finally {
+    coachQuestionInFlight = false;
+    $("coachAskButton").disabled = false;
+    $("coachAskButton").textContent = "Preguntar a la guía →";
+    renderCoachQuestions();
+  }
+}
+
+function toggleCoachVoice() {
+  if (coachVoiceActive) { coachSpeechRecognition?.stop(); return; }
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    $("coachQuestionStatus").textContent = "Este navegador no admite dictado. Puedes escribir tu pregunta.";
+    return;
+  }
+  const recognition = new Recognition();
+  coachSpeechRecognition = recognition;
+  recognition.lang = "es-CL";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = event => {
+    const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+    if (!transcript) return;
+    const input = $("coachQuestionText");
+    input.value = [input.value.trim(), transcript].filter(Boolean).join(" ").slice(0, 1000);
+    coachQuestionSource = "voice";
+    $("coachQuestionStatus").textContent = "Dictado listo. Revisa el texto y pulsa Preguntar a la guía.";
+  };
+  recognition.onerror = event => {
+    $("coachQuestionStatus").textContent = event.error === "not-allowed"
+      ? "Permite el uso del micrófono en el navegador o escribe tu pregunta."
+      : "No se pudo reconocer la voz. Puedes intentarlo de nuevo o escribir.";
+  };
+  recognition.onend = () => {
+    coachVoiceActive = false;
+    $("coachVoiceButton").textContent = "🎙️ Dictar";
+    $("coachVoiceButton").classList.remove("listening");
+  };
+  try {
+    recognition.start();
+    coachVoiceActive = true;
+    $("coachVoiceButton").textContent = "■ Detener";
+    $("coachVoiceButton").classList.add("listening");
+    $("coachQuestionStatus").textContent = "Escuchando…";
+  } catch {
+    $("coachQuestionStatus").textContent = "No se pudo iniciar el micrófono. Puedes escribir tu pregunta.";
+  }
+}
+
 function renderHome() {
   const todayISO = getChileDateISO();
   const block = activeTrainingBlock();
@@ -839,7 +989,22 @@ function renderHome() {
   $("weekProgress").textContent = `${activeDays}/7 días`;
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
-  if (todayRecords[0]) feedback.append(createRoutineAiCard(todayRecords[0], { compact: true }));
+  const lastAnalyzed = allRecords
+    .filter(record => record.routineAiAnalysis)
+    .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
+      .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
+  if (lastAnalyzed) {
+    const date = document.createElement("p");
+    date.className = "coach-home-date";
+    date.textContent = `Comentario del ${formatShortDate(lastAnalyzed.dateISO)} · ${recordTitle(lastAnalyzed)}`;
+    feedback.append(date, createRoutineAiCard(lastAnalyzed));
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "coach-home-empty";
+    empty.textContent = "Tu último comentario de la guía aparecerá aquí cuando analices un entrenamiento. Puedes hacerle una pregunta mientras tanto.";
+    feedback.append(empty);
+  }
+  renderCoachQuestions();
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
@@ -4163,6 +4328,15 @@ async function registerServiceWorker() {
 }
 
 function bindEvents() {
+  $("coachQuestionForm").addEventListener("submit", event => {
+    event.preventDefault();
+    submitCoachQuestion();
+  });
+  $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+    $("coachVoiceButton").disabled = true;
+    $("coachVoiceButton").title = "El dictado no está disponible en este navegador.";
+  }
   document.querySelectorAll("[data-view-target]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.viewTarget;
     if (target === "register") openRegistrationOrActiveRoutine();

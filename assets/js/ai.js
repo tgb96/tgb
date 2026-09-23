@@ -1,6 +1,6 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=60";
-import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=60";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=61";
+import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=61";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -199,6 +199,24 @@ export function createAiClient() {
   }
 
   return {
+    async askCoach(question, context = {}) {
+      const instructions = [
+        "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
+        "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
+        "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
+        "No modifiques registros, rutinas ni planificación. La respuesta es una orientación, no una orden médica. Si el usuario pide cambiar el plan, explica la propuesta y que debe confirmarla por separado.",
+        "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
+      ].join("\n");
+      const response = await generateJson({
+        instructions,
+        input: JSON.stringify({ question: String(question || "").trim().slice(0, 1000), context }),
+        schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
+        maxOutputTokens: 900
+      });
+      const answer = String(response.answer || "").trim();
+      if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
+      return { answer, model: MODEL_NAME };
+    },
     async importTrainingPlan(planText, currentDate = "") {
       const catalog = {
         routines: physicalRoutines.map(routine => ({

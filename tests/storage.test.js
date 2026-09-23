@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 12/);
+  assert.match(repository.backup(), /"schemaVersion": 13/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -148,4 +148,20 @@ test("guarda, respalda y sincroniza el perfil privado del entrenador", () => {
     updatedAt: "2026-09-14T19:00:00.000Z"
   }), true);
   assert.equal(repository.getCoachProfile().profileText, "Perfil actualizado.");
+});
+
+test("guarda preguntas de la guía, permite reintentar y las incluye en el respaldo", () => {
+  const storage = new FakeStorage();
+  const repository = createRepository(storage);
+  const createdAt = "2026-09-23T12:00:00.000Z";
+  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", createdAt, updatedAt: createdAt });
+  assert.equal(repository.listCoachQuestions()[0].answer, "");
+  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Descansa si persiste el dolor.", createdAt, updatedAt: "2026-09-23T12:01:00.000Z" });
+  assert.equal(repository.listCoachQuestions().length, 1);
+  assert.match(repository.backup(), /Descansa si persiste el dolor/);
+  assert.equal(createRepository(storage).listCoachQuestions()[0].answer, "Descansa si persiste el dolor.");
+  assert.equal(repository.applyCloudCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Respuesta anterior", createdAt, updatedAt: createdAt }), false);
+  const restored = createRepository(new FakeStorage());
+  restored.importMerge(repository.backup());
+  assert.equal(restored.listCoachQuestions()[0].answer, "Descansa si persiste el dolor.");
 });

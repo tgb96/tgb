@@ -474,6 +474,32 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-auto-summary { margin: 12px 0 0; padding: 12px; border-left: 4px solid var(--lime); border-radius: 12px; background: var(--night); color: white; font-size: 10px; line-height: 1.5; }
 .history-auto-summary { margin-top: 9px !important; padding: 9px; border-radius: 11px; background: #eef7d7; color: #364115 !important; font-size: 10px !important; }
 .routine-ai-card { width: 100%; min-width: 0; margin-top: 14px; padding: 17px; border: 1px solid rgba(59, 91, 255, 0.2); border-radius: 19px; background: linear-gradient(145deg, #f3f5ff, #fff); color: var(--ink); }
+.coach-home-title { margin-top: 30px; }
+.coach-home-date { margin: 0 2px 9px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.coach-home-empty { margin: 0; padding: 17px; border-radius: 17px; background: #f3f5ff; color: var(--muted); font-size: 14px; line-height: 1.5; }
+#homeCoachFeedback > .routine-ai-card { margin-top: 0; }
+.coach-ask-card { margin: 16px 0 28px; padding: 18px; border-radius: 20px; background: white; border: 1px solid var(--line); color: var(--ink); }
+.coach-ask-card h2 { margin: 5px 0 15px; font-size: 21px; line-height: 1.2; }
+.coach-question-history { display: grid; gap: 12px; margin-bottom: 15px; }
+.coach-question-hint { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.coach-exchange { display: grid; gap: 8px; }
+.coach-exchange p { margin: 0; padding: 11px 13px; border-radius: 13px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.coach-exchange-question { justify-self: end; max-width: 93%; background: var(--night); color: white; font-weight: 700; }
+.coach-exchange-answer { background: #f3f5ff; color: var(--ink); }
+.coach-exchange button { justify-self: start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; font-weight: 800; }
+.coach-ask-card form { display: grid; gap: 8px; }
+.coach-ask-card label { font-size: 13px; font-weight: 850; }
+.coach-ask-card textarea { width: 100%; min-height: 86px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fbfbf9; color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
+.coach-ask-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+.coach-ask-actions button { min-height: 48px; padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 900; }
+.coach-voice-button { border: 1px solid var(--line); background: white; color: var(--ink); }
+.coach-voice-button.listening { border-color: #a51627; background: #fff0f1; color: #a51627; }
+.coach-voice-button:disabled { opacity: .5; }
+.coach-ask-button { border: 0; background: var(--blue); color: white; }
+.coach-ask-button:disabled { opacity: .6; }
+.coach-question-status { margin: 0; color: var(--blue-dark); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.coach-question-status:empty { display: none; }
+.coach-ask-card form small { color: var(--muted); font-size: 11px; line-height: 1.4; }
 .routine-ai-card > span { display: block; color: var(--blue); font-size: 11px; font-weight: 950; line-height: 1.35; letter-spacing: .6px; text-transform: uppercase; }
 .routine-ai-card > .routine-ai-decision { width: max-content; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--night); color: var(--lime); }
 .routine-ai-card > .routine-ai-decision.reduce, .routine-ai-card > .routine-ai-decision.recover { background: #fff0dd; color: #7a4a10; }

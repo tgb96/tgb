@@ -42,6 +42,7 @@ export function createCloudSync({
   let unsubscribePlans = null;
   let unsubscribeTrainingBlocks = null;
   let unsubscribeCoachProfile = null;
+  let unsubscribeCoachQuestions = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
   let mergePromise = null;
@@ -77,6 +78,7 @@ export function createCloudSync({
         observeCloudPlans();
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
+        observeCloudCoachQuestions();
         emit("synced", "Entrenamientos y planificación sincronizados con Google.");
       } catch {
         syncError = true;
@@ -105,6 +107,8 @@ export function createCloudSync({
   const trainingBlocksCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "trainingBlocks");
   const trainingBlockDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "trainingBlocks", String(id));
   const coachProfileDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "settings", "coachProfile");
+  const coachQuestionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "coachQuestions");
+  const coachQuestionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "coachQuestions", cloudDocumentId(id));
 
   async function writeChange(change) {
     if (!user) return;
@@ -118,6 +122,10 @@ export function createCloudSync({
     }
     if (change.type === "coach-profile-upsert") {
       await awaitServer(modules.firestoreModule.setDoc(coachProfileDocumentReference(), change.profile));
+      return;
+    }
+    if (change.type === "coach-question-upsert") {
+      await awaitServer(modules.firestoreModule.setDoc(coachQuestionDocumentReference(change.question.id), change.question));
       return;
     }
     if (change.type === "remove") {
@@ -226,6 +234,24 @@ export function createCloudSync({
     } else if (localProfile) {
       await writeChange({ type: "coach-profile-upsert", profile: localProfile });
     }
+    const questionsSnapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(coachQuestionsCollectionReference()));
+    const remoteQuestions = new Map();
+    questionsSnapshot.forEach(item => {
+      const value = item.data();
+      if (value?.id) remoteQuestions.set(String(value.id), value);
+    });
+    const localQuestions = new Map(repository.listCoachQuestions().map(question => [question.id, question]));
+    const questionUploads = [];
+    remoteQuestions.forEach((cloudQuestion, id) => {
+      const localQuestion = localQuestions.get(id);
+      if (!localQuestion || recordTimestamp(cloudQuestion) >= recordTimestamp(localQuestion)) {
+        if (repository.applyCloudCoachQuestion(cloudQuestion)) localChanged = true;
+      } else questionUploads.push({ type: "coach-question-upsert", question: localQuestion });
+    });
+    localQuestions.forEach((localQuestion, id) => {
+      if (!remoteQuestions.has(id)) questionUploads.push({ type: "coach-question-upsert", question: localQuestion });
+    });
+    for (const change of questionUploads) await writeChange(change);
     await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
     if (localChanged) onDataChanged();
   }
@@ -294,6 +320,22 @@ export function createCloudSync({
     });
   }
 
+  function observeCloudCoachQuestions() {
+    unsubscribeCoachQuestions?.();
+    unsubscribeCoachQuestions = modules.firestoreModule.onSnapshot(coachQuestionsCollectionReference(), snapshot => {
+      let changed = false;
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") return;
+        changed = repository.applyCloudCoachQuestion(change.doc.data()) || changed;
+      });
+      if (changed) onDataChanged();
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudieron actualizar las preguntas de la guía. Se intentará otra vez.");
+      scheduleRetry();
+    });
+  }
+
   async function connect(currentUser) {
     user = currentUser;
     if (retryTimer) clearTimeout(retryTimer);
@@ -308,6 +350,8 @@ export function createCloudSync({
     unsubscribeTrainingBlocks = null;
     unsubscribeCoachProfile?.();
     unsubscribeCoachProfile = null;
+    unsubscribeCoachQuestions?.();
+    unsubscribeCoachQuestions = null;
     if (!user) {
       emit("signed-out", "Inicia sesión para guardar tus entrenamientos en la nube.");
       return;
@@ -329,6 +373,7 @@ export function createCloudSync({
       observeCloudPlans();
       observeCloudTrainingBlocks();
       observeCloudCoachProfile();
+      observeCloudCoachQuestions();
       emit("synced", "Entrenamientos y planificación sincronizados con Google.");
     } catch {
       syncError = true;
@@ -384,6 +429,7 @@ export function createCloudSync({
         observeCloudPlans();
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
+        observeCloudCoachQuestions();
         emit("synced", "Entrenamientos y planificación sincronizados con Google.");
       } catch (error) {
         syncError = true;
@@ -399,6 +445,7 @@ export function createCloudSync({
       unsubscribePlans?.();
       unsubscribeTrainingBlocks?.();
       unsubscribeCoachProfile?.();
+      unsubscribeCoachQuestions?.();
       unsubscribeRepository?.();
     }
   };
