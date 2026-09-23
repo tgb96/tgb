@@ -69,3 +69,17 @@ test("no asigna otra actividad a una sesión arbitraria si hay varias posibles",
   const block = { id: "b", weeks: [{ sessions: ["a", "b"].map(id => ({ id, dateISO: run.dateISO, options: [{ category: "physical", prefill: { routineId: id } }] })) }] };
   assert.equal(plannedContextForRecord(run, block), null);
 });
+
+test("relaciona una sesión física propia del plan sin confundirla con una rutina base", async () => {
+  const { normalizeTrainingBlock, weekDisplayTitle } = await import("../assets/js/training-plan.js");
+  const block = normalizeTrainingBlock({ title: "Plan propio", weeks: [{ weekKey: "2026-W39", context: "Partido de tenis el sábado", sessions: [{
+    dateISO: "2026-09-22", options: [{ title: "Activación de cancha", category: "physical", details: ["Dos series de desplazamientos laterales" ] }]
+  }] }] });
+  const option = block.weeks[0].sessions[0].options[0];
+  assert.equal(option.prefill.routineId, "");
+  assert.deepEqual(option.details, ["Dos series de desplazamientos laterales"]);
+  assert.equal(weekDisplayTitle(block.weeks[0]), "Semana de partido");
+  const actual = { category: "physical", routineId: "", routineName: "Activación de cancha", dateISO: "2026-09-22" };
+  assert.equal(plannedMatchForRecord(actual, block)?.option.id, option.id);
+  assert.equal(planAssessment(actual, plannedContextForRecord(actual, block)).status, "unknown");
+});

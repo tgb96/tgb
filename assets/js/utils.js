@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=58";
+} from "./data.js?v=59";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -627,6 +627,7 @@ export function weeklyReport(records, week) {
         if (record.routinePainDetail) report += `   Detalle de dolor o molestia: ${record.routinePainDetail}\n`;
         if (record.routineSummary) report += `   Resumen automático: ${record.routineSummary}\n`;
       }
+      if (record.category === "physical" && record.routinePlannedSets === "" && record.routineSummary) report += `   Ejercicios y cargas realizados: ${record.routineSummary}\n`;
       if (record.routineAiAnalysis) {
           report += `   Análisis inteligente: ${record.routineAiAnalysis.headline || record.routineAiAnalysis.summary}\n`;
           if (record.routineAiAnalysis.decision) report += `   Decisión IA: ${record.routineAiAnalysis.decision}\n`;

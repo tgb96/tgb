@@ -41,7 +41,7 @@ export const coachTrainingBlock = {
       number: 38,
       startISO: "2026-09-14",
       endISO: "2026-09-20",
-      label: "Fiestas Patrias / mantenimiento",
+      label: "Semana de mantenimiento",
       context: "Semana especial: mantener el ritmo sin obsesionarse con cumplir el 100%.",
       objective: "Sostener la fuerza base, sumar cardio controlado y llegar recuperado.",
       sessions: [
@@ -139,7 +139,7 @@ export const coachTrainingBlock = {
       number: 39,
       startISO: "2026-09-21",
       endISO: "2026-09-27",
-      label: "Preparación para partido",
+      label: "Semana de partido",
       context: "Posible partido de escalerilla el sábado 26. Esta semana no busca récords.",
       objective: "Llegar fresco, rápido y con buen timing competitivo.",
       sessions: [
@@ -168,7 +168,7 @@ export const coachTrainingBlock = {
       number: 40,
       startISO: "2026-09-28",
       endISO: "2026-10-04",
-      label: "Vuelta a entrenamientos grupales",
+      label: "Semana de regreso al tenis",
       context: "El tenis gana protagonismo con clases martes y jueves.",
       objective: "Adaptar el cuerpo a más tenis sin perder fuerza.",
       sessions: [
@@ -193,7 +193,7 @@ export const coachTrainingBlock = {
       number: 41,
       startISO: "2026-10-05",
       endISO: "2026-10-11",
-      label: "Consolidación rendimiento tenis",
+      label: "Semana de fortalecimiento",
       context: "Segunda semana con entrenamientos grupales.",
       objective: "Consolidar fuerza, tenis y recuperación con carga controlada.",
       sessions: [

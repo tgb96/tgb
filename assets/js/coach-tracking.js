@@ -2,7 +2,9 @@
 export function recordMatchesPlanOption(record, option) {
   if (!record || !option || record.category !== option.category) return false;
   const prefill = option.prefill || {};
-  if (record.category === "physical") return Boolean(prefill.routineId) && record.routineId === prefill.routineId;
+  if (record.category === "physical") return prefill.routineId
+    ? record.routineId === prefill.routineId
+    : !record.routineId && record.routineName === option.title;
   if (record.category === "cardio") return Boolean(prefill.cardioTypeId) && record.cardioTypeId === prefill.cardioTypeId;
   if (record.category === "tennis") return !prefill.tennisTypeId || record.tennisTypeId === prefill.tennisTypeId;
   if (record.category === "rest") return !prefill.restTypeId || record.restTypeId === prefill.restTypeId;

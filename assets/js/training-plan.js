@@ -3,8 +3,8 @@ import {
   physicalRoutineById,
   restTypes,
   tennisTypeById
-} from "./data.js?v=58";
-import { isValidISODate, isoWeekInfo } from "./utils.js?v=58";
+} from "./data.js?v=59";
+import { isValidISODate, isoWeekInfo } from "./utils.js?v=59";
 
 const text = (value, max = 500) => String(value || "").trim().slice(0, max);
 const list = (value, maxItems = 20, maxLength = 500) => Array.isArray(value)
@@ -75,7 +75,6 @@ function normalizeOption(raw, index, sessionId) {
     restTypeId: restTypes.some(type => type.id === restTypeId) ? restTypeId : category === "rest" ? "planned" : "",
     distanceKm: Number.isFinite(distanceKm) && distanceKm >= 0 ? distanceKm : ""
   };
-  if (category === "physical" && !prefill.routineId) return null;
   if (category === "cardio" && !prefill.cardioTypeId) return null;
   if (category === "tennis" && !prefill.tennisTypeId) prefill.tennisTypeId = "group-training";
   return {
@@ -169,6 +168,18 @@ export function newestTrainingBlock(blocks) {
     const updated = String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
     return updated || b.startISO.localeCompare(a.startISO);
   })[0] || null;
+}
+
+export function weekDisplayTitle(week) {
+  const label = text(week?.label, 100);
+  if (label && !/^semana(?:\s+(?:n[°º.]?\s*)?\d+)?(?:\s*[-–:]\s*\d+)?$/i.test(label)) return label;
+  const options = (week?.sessions || []).flatMap(session => session.options || []);
+  const description = [week?.context, week?.objective, ...options.flatMap(option => [option.title, option.summary])].join(" ").toLocaleLowerCase("es");
+  if (options.some(option => option.prefill?.tennisTypeId === "match") || /\bpartidos?\b/.test(description)) return "Semana de partido";
+  if (/recuperaci[oó]n|descarga|semana reducida/.test(description)) return "Semana de recuperación";
+  if (/fortalecimiento|fuerza|piernas|tren superior/.test(description) || options.filter(option => option.category === "physical").length >= 2) return "Semana de fortalecimiento";
+  if (/tenis|peloteo|front[oó]n/.test(description)) return "Semana de tenis";
+  return "Semana de entrenamiento";
 }
 
 export function summarizeTrainingBlock(block) {

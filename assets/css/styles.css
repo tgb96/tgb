@@ -37,9 +37,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand { min-height: 48px; border: 0; background: transparent; padding: 0; display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-align: left; }
 .brand-mark { width: 46px; height: 46px; border-radius: 50%; display: block; filter: drop-shadow(0 7px 10px rgba(4, 35, 78, 0.24)); }
 .brand-copy { display: block; }
-.brand-name { position: relative; display: inline-block; color: var(--night); font-family: "Avenir Next", "Segoe UI Variable Display", "Trebuchet MS", sans-serif; font-size: 21px; font-style: italic; font-weight: 900; line-height: 1; letter-spacing: -1.15px; }
+.brand-name { display: inline-block; color: var(--night); font-family: "Arial Rounded MT Bold", "Trebuchet MS", Inter, sans-serif; font-size: 24px; font-style: normal; font-weight: 900; line-height: 1; letter-spacing: -1.4px; }
 .brand-name span { color: var(--blue); }
-.brand-name::after { content: ""; position: absolute; right: -1px; bottom: -4px; width: 23px; height: 3px; border-radius: 999px; background: var(--lime); transform: skewX(-28deg); }
+.brand-name::after { content: none; }
 .brand small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1.25px; font-weight: 850; }
 .cloud-status-button { min-height: 34px; padding: 7px 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255, 255, 255, 0.72); font-size: 10px; font-weight: 850; }
 .cloud-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #a0a5ae; box-shadow: 0 0 0 3px rgba(160, 165, 174, 0.14); }
@@ -80,6 +80,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hero-stats div { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 17px; background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(8px); }
 .hero-stats strong { display: block; font-size: 23px; letter-spacing: -0.8px; }
 .hero-stats span { display: block; color: rgba(255, 255, 255, 0.6); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 750; }
+.hero-week-theme { display: block; width: fit-content; margin: -8px 0 17px; padding: 0; border: 0; background: transparent; color: var(--lime); font-size: 16px; font-weight: 850; line-height: 1.3; text-align: left; }
+.hero-week-theme:empty { display: none; }
+.hero-week-theme::after { content: "  ↗"; }
+.hero-stats div { min-width: 0; }
+.hero-stats strong { overflow-wrap: anywhere; font-size: clamp(18px, 5vw, 23px); }
+.hero-stats small { display: block; margin-top: 8px; color: var(--lime); font-size: 10px; font-weight: 750; line-height: 1.25; }
+.hero-planned-activity { display: grid; gap: 12px; margin-top: 16px; padding: 15px; border: 1px solid rgba(200,255,77,.3); border-radius: 18px; background: rgba(255,255,255,.09); }
+.hero-planned-activity span { display: block; margin-bottom: 5px; color: var(--lime); font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+.hero-planned-activity strong { display: block; font-size: 16px; line-height: 1.25; }
+.hero-planned-activity small { display: block; margin-top: 5px; color: rgba(255,255,255,.7); font-size: 11px; line-height: 1.4; }
+.hero-planned-activity button { width: 100%; min-height: 48px; padding: 10px 14px; border: 0; border-radius: 13px; background: var(--lime); color: var(--night); font-size: 13px; font-weight: 900; }
+.hero-planned-activity button:hover { background: #d9ff8d; }
 
 .section-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 28px 2px 13px; }
 .section-title-row h2, .data-card h2 { margin: 0; font-size: 22px; line-height: 1.1; letter-spacing: -0.8px; }
@@ -181,6 +193,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .coach-session-option > strong { font-size: 13px; }
 .coach-session-option > small { margin-top: 3px; color: var(--muted); font-size: 9px; }
 .coach-session-option ul, .routine-plan-details { margin: 9px 0 11px; padding-left: 17px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.planned-activity-dialog { background: #fff; }
+.planned-activity-options { display: grid; gap: 12px; }
+.planned-activity-option { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+.planned-activity-option h3 { margin: 0; font-size: 18px; line-height: 1.2; }
+.planned-activity-option p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.planned-activity-option ul { margin: 12px 0; padding-left: 19px; color: #454b55; font-size: 12px; line-height: 1.5; }
+.planned-activity-option ul:empty { display: none; }
+.planned-activity-option button, .planned-activity-timer button { width: 100%; min-height: 48px; margin-top: 10px; padding: 10px 14px; border: 0; border-radius: 12px; background: var(--blue); color: white; font-size: 13px; font-weight: 900; }
+.planned-activity-timer { margin-top: 14px; padding: 18px; border-radius: 18px; background: var(--night); color: white; text-align: center; }
+.planned-activity-timer span { display: block; color: var(--lime); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+.planned-activity-timer strong { display: block; margin: 8px 0; font-size: 38px; font-variant-numeric: tabular-nums; }
+.planned-activity-timer button { background: var(--lime); color: var(--night); }
+.planned-activity-full-plan { width: 100%; min-height: 44px; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--blue); font-size: 12px; font-weight: 850; }
 .coach-plan-rules { margin-top: 12px; padding: 16px; border-radius: 20px; background: var(--night); color: white; }
 .coach-plan-rules h3 { margin: 0; font-size: 16px; }
 .coach-plan-rules ul { margin: 11px 0 0; padding-left: 17px; color: rgba(255,255,255,0.7); font-size: 10px; line-height: 1.5; }
@@ -222,6 +247,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-icon.rest { color: #d8bfff; }
 
 .training-form { padding: 18px; border: 1px solid var(--line); border-radius: 28px; background: white; box-shadow: 0 20px 45px rgba(30, 35, 50, 0.08); }
+.planned-physical-fields { margin: 15px 0; padding: 14px; border-radius: 18px; background: #f0f3ff; }
+.planned-physical-fields h2 { margin: 0; font-size: 19px; }
+.planned-physical-fields p, .planned-physical-fields ul { color: #4e566b; font-size: 12px; line-height: 1.5; }
+.planned-physical-fields ul { padding-left: 19px; }
 .form-date-row { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 label, legend { display: block; margin: 13px 0 6px; color: #4e5562; font-size: 12px; font-weight: 850; }
 fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }

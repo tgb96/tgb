@@ -30,7 +30,10 @@ test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async
   assert.match(html, /id="openAiPlanButton"/);
   assert.match(html, /id="aiPlanDialog"/);
   assert.doesNotMatch(html, /weeklyPlan|Plan semanal/);
-  assert.match(html, /id="evolutionMetrics"/);
+  assert.match(html, /id="weekSessionDelta"/);
+  assert.match(html, /id="weekBestAbsDelta"/);
+  assert.match(html, /id="startPlannedActivityButton"/);
+  assert.doesNotMatch(html, /id="homeRegisterButton"|id="evolutionMetrics"/);
   assert.match(html, /id="exerciseProgress"/);
   assert.match(html, /<details class="exercise-progress-card"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
@@ -110,7 +113,7 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /renderPhysicalRankings/);
   assert.match(app, /physicalRoutineDurationAverages/);
   assert.doesNotMatch(app, /renderWeeklyPlan|weeklyPlanOptions/);
-  assert.match(app, /renderEvolution/);
+  assert.match(app, /renderHeroEvolution/);
   assert.match(app, /renderExerciseProgress/);
   assert.match(app, /routineCompletionSummary/);
   assert.match(app, /Copiar informe para el entrenador/);
@@ -174,8 +177,8 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v58/);
-  assert.match(worker, /coach-tracking\.js\?v=58/);
+  assert.match(worker, /tgtrain-shell-v59/);
+  assert.match(worker, /coach-tracking\.js\?v=59/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {

@@ -1,6 +1,6 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=58";
-import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=58";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=59";
+import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=59";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -215,11 +215,12 @@ export function createAiClient() {
         "Eres el importador de planificaciones de TGTrain, una aplicación personal de entrenamiento.",
         "Convierte fielmente el texto del entrenador en un calendario estructurado; no inventes entrenamientos ausentes.",
         "Usa fechas YYYY-MM-DD y semanas ISO YYYY-WNN. Conserva alternativas dentro de options y deja como primaria la primera o la indicada explícitamente.",
-        "Para entrenamiento físico usa exclusivamente routineId y exerciseId existentes en el catálogo. Si el texto no modifica un ejercicio, omítelo de exerciseSettings.",
+        "Para entrenamiento físico usa routineId y exerciseId del catálogo solo si realmente corresponde a una de esas rutinas. Si es una sesión distinta, omite routineId y conserva sus ejercicios, series, repeticiones, cargas y límites en details. Nunca la reemplaces por una rutina parecida.",
         "Para cardio, tenis y descanso usa exclusivamente los identificadores del catálogo. Los campos que no correspondan deben ir vacíos, las distancias desconocidas deben ser null y las listas pueden quedar vacías.",
         "Escribe todo en español claro. No incluyas explicaciones fuera del JSON.",
-        "La salida debe ser compacta y no debe copiar el texto completo: título máximo 100 caracteres; subtitle 180; máximo 10 rules y 6 priority; label 80, context y objective 180; summary 140; máximo 5 details de 140 caracteres por opción.",
+        "La salida debe ser compacta: título máximo 100 caracteres; subtitle 180; máximo 10 rules y 6 priority; label 80, context y objective 180; summary 140; máximo 5 details de 140 caracteres por opción. Excepción: si la sesión física no corresponde a ninguna rutina del catálogo, conserva sus ejercicios, series, repeticiones y cargas en hasta 12 details de 180 caracteres para que pueda realizarse fielmente.",
         "No repitas reglas generales dentro de semanas, sesiones ni opciones. Pon cada regla transversal una sola vez en rules y conserva en details únicamente la indicación específica necesaria para ejecutar ese día.",
+        "Cada semana debe tener un label corto y distintivo según su propósito real, por ejemplo 'Semana de partido', 'Semana de recuperación' o 'Semana de fortalecimiento'. No uses 'Semana 39' como único label.",
         "Omite por completo los campos opcionales que no correspondan. No escribas cadenas vacías, null ni listas vacías salvo options, sessions y weeks. En exerciseSettings incluye solo ejercicios que el plan modifica u omite; no copies la rutina base completa."
       ].join("\n");
       const request = {

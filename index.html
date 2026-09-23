@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=58">
+  <link rel="stylesheet" href="assets/css/styles.css?v=59">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -42,10 +42,18 @@
         <p class="eyebrow">Hoy</p>
         <h1 id="homeTitle"></h1>
         <p id="weekRange" class="hero-range"></p>
+        <button id="heroWeekTheme" class="hero-week-theme" type="button" aria-label="Ver planificación de la semana"></button>
         <div class="hero-stats" aria-label="Resumen semanal">
-          <div><strong id="weekSessionCount">0</strong><span>sesiones</span></div>
-          <div><strong id="weekMinutes">0</strong><span>minutos</span></div>
-          <div><strong id="weekCalories">0</strong><span>kcal</span></div>
+          <div><strong id="weekSessionCount">0</strong><span>Sesiones</span><small id="weekSessionDelta"></small></div>
+          <div><strong id="weekMinutes">0</strong><span>Minutos</span><small id="weekMinutesDelta"></small></div>
+          <div><strong id="weekCalories">0</strong><span>Calorías</span><small id="weekCaloriesDelta"></small></div>
+          <div><strong id="weekActiveDays">0</strong><span>Días activos</span><small id="weekActiveDaysDelta"></small></div>
+          <div><strong id="weekVolumeKg">0 kg</strong><span>Volumen físico</span><small id="weekVolumeDelta"></small></div>
+          <div><strong id="weekBestAbs">—</strong><span>Mejor abdominal</span><small id="weekBestAbsDelta"></small></div>
+        </div>
+        <div id="heroPlannedActivity" class="hero-planned-activity hidden">
+          <div><span>Plan de hoy</span><strong id="heroPlannedTitle"></strong><small id="heroPlannedSummary"></small></div>
+          <button id="startPlannedActivityButton" type="button">Iniciar actividad programada</button>
         </div>
       </div>
 
@@ -60,11 +68,6 @@
       <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
       <div id="homeCoachFeedback" aria-live="polite"></div>
 
-      <button id="homeRegisterButton" class="primary-cta" type="button">
-        <span class="cta-plus" aria-hidden="true">+</span>
-        <span><strong>Registrar actividad</strong><small>Físico, cardio, tenis o descanso</small></span>
-        <span class="cta-arrow" aria-hidden="true">→</span>
-      </button>
     </section>
 
     <section id="viewRegister" class="view hidden" hidden aria-labelledby="registerHeading">
@@ -176,14 +179,6 @@
         </div>
         <span id="historyTotal" class="history-total"></span>
       </div>
-
-      <section class="evolution-card" aria-labelledby="evolutionTitle">
-        <p class="eyebrow dark">Panel de evolución</p>
-        <h2 id="evolutionTitle">Tu progreso de las últimas semanas</h2>
-        <p id="evolutionComparison" class="evolution-comparison"></p>
-        <div id="evolutionMetrics" class="evolution-metrics"></div>
-        <div id="evolutionChart" class="evolution-chart" aria-label="Minutos entrenados durante las últimas seis semanas"></div>
-      </section>
 
       <details class="exercise-progress-card" aria-labelledby="exerciseProgressTitle">
         <summary class="exercise-progress-card-summary">
@@ -299,6 +294,24 @@
     </section>
   </dialog>
 
+  <dialog id="plannedActivityDialog" class="coach-plan-dialog planned-activity-dialog" aria-labelledby="plannedActivityDialogTitle">
+    <div class="coach-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Actividad programada</p>
+        <h2 id="plannedActivityDialogTitle">Plan de hoy</h2>
+        <p id="plannedActivityObjective"></p>
+      </div>
+      <button id="plannedActivityDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <div id="plannedActivityOptions" class="planned-activity-options"></div>
+    <div id="plannedActivityTimer" class="planned-activity-timer hidden" aria-live="polite">
+      <span>Tiempo transcurrido</span>
+      <strong id="plannedActivityClock">00:00:00</strong>
+      <button id="finishPlannedActivityButton" type="button">Finalizar y completar registro</button>
+    </div>
+    <button id="plannedActivityFullPlanButton" class="planned-activity-full-plan" type="button">Ver planificación completa</button>
+  </dialog>
+
   <dialog id="aiPlanDialog" class="coach-plan-dialog ai-plan-dialog" aria-labelledby="aiPlanDialogTitle">
     <div class="coach-dialog-heading">
       <div>
@@ -345,6 +358,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=58"></script>
+  <script type="module" src="assets/js/app.js?v=59"></script>
 </body>
 </html>

@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=58";
+} from "./data.js?v=59";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=58";
-import { createRepository } from "./storage.js?v=58";
-import { createCloudSync } from "./cloud.js?v=58";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=58";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock } from "./training-plan.js?v=58";
-import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=58";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=58";
+} from "./coach-plan.js?v=59";
+import { createRepository } from "./storage.js?v=59";
+import { createCloudSync } from "./cloud.js?v=59";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=59";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=59";
+import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=59";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=59";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=58";
+} from "./utils.js?v=59";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -80,6 +80,7 @@ let routineSessionTicker = null;
 let openRoutineId = "";
 let currentCloudStatus = { state: "unconfigured", user: null };
 let plannedRegistrationContext = null;
+let plannedActivityTicker = null;
 let aiPlanCandidate = null;
 const aiAnalysisInFlight = new Set();
 
@@ -87,6 +88,7 @@ const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const PLANNED_ROUTINE_CONTEXT_KEY = "tgb-planned-routine-v1";
+const PLANNED_ACTIVITY_KEY = "tgb-planned-activity-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
 const TIMER_REST_OPTIONS = [20, 30, 40, 50];
@@ -249,7 +251,7 @@ function applyPlannedRoutineSettings(routine, option) {
   return before;
 }
 
-function openPlannedOption(session, optionId) {
+function openPlannedOption(session, optionId, { startNow = false } = {}) {
   const block = activeTrainingBlock();
   const option = coachOption(session, optionId);
   if (!option) return;
@@ -267,9 +269,11 @@ function openPlannedOption(session, optionId) {
   }
   const payload = planContextPayload(session, option, block);
   $("coachPlanDialog")?.close();
+  $("plannedActivityDialog")?.close();
   if (option.category === "physical") {
     const routine = physicalRoutineById(option.prefill?.routineId);
-    if (!routine) return showToast("No se encontró la rutina indicada por el plan.");
+    if (!routine && startNow) return startGenericPlannedActivity(session, option, block);
+    if (!routine) return openPlannedRegistration(session, option, block);
     const active = loadRoutineSession();
     if (active?.status === "active") {
       openRoutineId = active.routineId;
@@ -289,15 +293,146 @@ function openPlannedOption(session, optionId) {
     });
     openRoutineId = routine.id;
     showView("routines");
-    scrollToRoutine(routine.id);
-    showToast("Plan cargado. Revísalo y pulsa Iniciar cuando estés listo.");
+    if (startNow) {
+      startRoutineSession(routine);
+      scrollToRoutineProgress(routine.id);
+    } else {
+      scrollToRoutine(routine.id);
+      showToast("Plan cargado. Revísalo y pulsa Iniciar cuando estés listo.");
+    }
     return;
   }
+  if (startNow && option.category !== "rest") return startGenericPlannedActivity(session, option, block);
+  openPlannedRegistration(session, option, block);
+}
 
-  plannedRegistrationContext = payload;
+function openPlannedRegistration(session, option, block, timing = {}) {
+  const customPhysical = option.category === "physical" && !physicalRoutineById(option.prefill?.routineId);
+  plannedRegistrationContext = {
+    ...planContextPayload(session, option, block),
+    customPhysical,
+    startedAt: timing.startedAt || "",
+    endedAt: timing.endedAt || "",
+    planDetails: option.details || []
+  };
   resetRegistration({ keepPlan: true });
   showView("register");
-  selectCategory(option.category, { ...plannedPrefill(option), ...option.prefill, dateISO: session.dateISO });
+  selectCategory(option.category, {
+    ...plannedPrefill(option), ...option.prefill,
+    routineName: customPhysical ? option.title : "",
+    dateISO: session.dateISO,
+    durationSeconds: timing.durationSeconds ?? "",
+    durationMinutes: timing.durationSeconds ? timing.durationSeconds / 60 : ""
+  });
+}
+
+function loadPlannedActivity() {
+  try {
+    const state = JSON.parse(window.localStorage.getItem(PLANNED_ACTIVITY_KEY) || "null");
+    return state?.blockId === activeTrainingBlock().id && state?.sessionId && state?.optionId && ["active", "finished"].includes(state.status) ? state : null;
+  } catch { return null; }
+}
+
+function savePlannedActivity(state) {
+  if (state) window.localStorage.setItem(PLANNED_ACTIVITY_KEY, JSON.stringify(state));
+  else window.localStorage.removeItem(PLANNED_ACTIVITY_KEY);
+}
+
+function plannedActivityContext(state) {
+  const block = activeTrainingBlock();
+  if (!state || state.blockId !== block.id) return null;
+  const session = coachSessionForDate(state.dateISO, block);
+  const option = coachOption(session, state.optionId);
+  return session?.id === state.sessionId && option ? { block, session, option } : null;
+}
+
+function startGenericPlannedActivity(session, option, block) {
+  const current = loadPlannedActivity();
+  if (current?.status === "active") return showToast("Ya tienes una actividad programada en curso. Continúala o finalízala primero.");
+  if (current?.status === "finished") return showToast("Completa el registro programado pendiente antes de iniciar otro.");
+  if (loadRoutineSession()?.status === "active") return showToast("Primero finaliza la rutina física que ya está en curso.");
+  try {
+    savePlannedActivity({ status: "active", blockId: block.id, sessionId: session.id, optionId: option.id, dateISO: session.dateISO, startedAt: new Date().toISOString() });
+  } catch { return showToast("No se pudo conservar el temporizador de esta actividad."); }
+  renderPlannedActivityDialog(session, block);
+  if (!$("plannedActivityDialog").open) $("plannedActivityDialog").showModal();
+  renderHome();
+}
+
+function finishGenericPlannedActivity() {
+  const state = loadPlannedActivity();
+  const context = plannedActivityContext(state);
+  if (!context) return showToast("Ya no se encontró esta actividad en el plan activo.");
+  const endedAt = state.status === "finished" ? state.endedAt : new Date().toISOString();
+  const durationSeconds = Math.max(1, Math.round((Date.parse(endedAt) - Date.parse(state.startedAt)) / 1000));
+  const finished = { ...state, status: "finished", endedAt, durationSeconds };
+  try { savePlannedActivity(finished); }
+  catch { return showToast("No se pudo conservar la duración. Inténtalo otra vez."); }
+  $("plannedActivityDialog").close();
+  openPlannedRegistration(context.session, context.option, context.block, finished);
+  showToast("Tiempo guardado. Completa las calorías y sensaciones para registrar la actividad.");
+}
+
+function updatePlannedActivityClock() {
+  const state = loadPlannedActivity();
+  if (state?.status !== "active") {
+    if (plannedActivityTicker) clearInterval(plannedActivityTicker);
+    plannedActivityTicker = null;
+    return;
+  }
+  const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(state.startedAt)) / 1000));
+  $("plannedActivityClock").textContent = formatTimerClock(elapsed);
+  if (!plannedActivityTicker) plannedActivityTicker = setInterval(updatePlannedActivityClock, 1000);
+}
+
+function renderPlannedActivityDialog(session, block) {
+  $("plannedActivityDialogTitle").textContent = `${weekDisplayTitle(session.week)} · ${formatShortDate(session.dateISO)}`;
+  $("plannedActivityObjective").textContent = session.objective;
+  const options = $("plannedActivityOptions");
+  options.replaceChildren();
+  const state = loadPlannedActivity();
+  const active = plannedActivityContext(state);
+  session.options.forEach(option => {
+    if (active && option.id !== active.option.id) return;
+    const card = document.createElement("article");
+    card.className = "planned-activity-option";
+    const title = document.createElement("h3");
+    title.textContent = option.title;
+    const summary = document.createElement("p");
+    summary.textContent = option.summary;
+    const details = document.createElement("ul");
+    (option.details || []).forEach(detail => {
+      const row = document.createElement("li");
+      row.textContent = detail;
+      details.append(row);
+    });
+    card.append(title, summary, details);
+    if (!active) {
+      const start = document.createElement("button");
+      start.type = "button";
+      start.textContent = option.category === "rest" ? "Registrar descanso programado" : `Iniciar ${option.title}`;
+      start.addEventListener("click", () => openPlannedOption(session, option.id, { startNow: true }));
+      card.append(start);
+    }
+    options.append(card);
+  });
+  $("plannedActivityTimer").classList.toggle("hidden", !active);
+  $("finishPlannedActivityButton").textContent = "Finalizar y completar registro";
+  if (active?.status === "active") updatePlannedActivityClock();
+  else if (active?.status === "finished") {
+    $("plannedActivityClock").textContent = formatTimerClock(state.durationSeconds || 0);
+    $("finishPlannedActivityButton").textContent = "Continuar registro";
+  }
+}
+
+function openTodayPlannedActivity() {
+  const state = loadPlannedActivity();
+  const active = plannedActivityContext(state);
+  const block = activeTrainingBlock();
+  const session = active?.session || coachSessionForDate(getChileDateISO(), block);
+  if (!session) return;
+  renderPlannedActivityDialog(session, block);
+  if (!$("plannedActivityDialog").open) $("plannedActivityDialog").showModal();
 }
 
 function createPlanOptionButton(session, option, records, { compact = false } = {}) {
@@ -379,7 +514,7 @@ function renderCoachPlanDialog(records = repository.list()) {
     const eyebrow = document.createElement("span");
     eyebrow.textContent = `Semana ${week.number} · ${formatShortDate(week.startISO)}–${formatShortDate(week.endISO)}`;
     const title = document.createElement("strong");
-    title.textContent = week.label;
+    title.textContent = weekDisplayTitle(week);
     const objective = document.createElement("small");
     objective.textContent = week.objective;
     copy.append(eyebrow, title, objective);
@@ -481,7 +616,7 @@ function renderAiPlanPreview(block) {
     const card = document.createElement("section");
     card.className = "ai-preview-week";
     const title = document.createElement("strong");
-    title.textContent = `Semana ${week.number} · ${week.label}`;
+    title.textContent = `Semana ${week.number} · ${weekDisplayTitle(week)}`;
     card.append(title);
     week.sessions.forEach(session => {
       const option = coachOption(session, session.primaryOptionId) || session.options[0];
@@ -666,17 +801,30 @@ function renderHome() {
   const week = isoWeekInfo(todayISO);
   const allRecords = repository.list();
   const records = allRecords.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
-  const trainingRecords = records.filter(record => record.category !== "rest");
   const todayRecords = records.filter(record => record.dateISO === todayISO);
-  const activeDays = new Set(records.map(record => record.dateISO)).size;
+  const activeDays = new Set(records.filter(record => record.category !== "rest").map(record => record.dateISO)).size;
+  const plannedWeek = coachWeekForDate(todayISO, block);
+  const plannedState = loadPlannedActivity();
+  const activePlanned = plannedActivityContext(plannedState);
+  const todayPlan = activePlanned?.session || coachSessionForDate(todayISO, block);
 
   $("currentWeekBadge").textContent = `Semana ${week.weekNumber} · ${week.weekYear}`;
   $("todayStatus").textContent = todayRecords.length ? `${todayRecords.length} ${todayRecords.length === 1 ? "actividad" : "actividades"} hoy` : "Sin registrar hoy";
   $("homeTitle").textContent = formatLongDate(todayISO);
   $("weekRange").textContent = `${formatShortDate(week.startISO)} — ${formatShortDate(week.endISO)}`;
-  $("weekSessionCount").textContent = String(trainingRecords.length);
-  $("weekMinutes").textContent = String(Math.round(trainingRecords.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)));
-  $("weekCalories").textContent = String(trainingRecords.reduce((sum, record) => sum + (Number(record.calories) || 0), 0));
+  $("heroWeekTheme").textContent = plannedWeek ? weekDisplayTitle(plannedWeek) : "";
+  renderHeroEvolution(allRecords);
+  const plannedPanel = $("heroPlannedActivity");
+  plannedPanel.classList.toggle("hidden", !todayPlan);
+  if (todayPlan) {
+    const option = coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0];
+    const actual = planRecordForSession(todayPlan, allRecords, block);
+    $("heroPlannedTitle").textContent = option.title;
+    $("heroPlannedSummary").textContent = todayPlan.objective || option.summary;
+    $("startPlannedActivityButton").textContent = activePlanned?.session.id === todayPlan.id
+      ? plannedState.status === "active" ? "Continuar actividad en curso" : "Completar registro programado"
+      : actual?.routineAiAnalysis?.planComparison?.status === "completed" ? "Ver actividad registrada" : "Iniciar actividad programada";
+  }
   $("weekProgress").textContent = `${activeDays}/7 días`;
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
@@ -813,6 +961,50 @@ function createChoice({ name, value, title, description, checked }) {
 }
 
 function renderPhysicalFields(record = {}) {
+  const customPhysical = plannedRegistrationContext?.customPhysical
+    || (editingRecordId && record.routineName && !record.routineId);
+  if (customPhysical) {
+    const box = document.createElement("div");
+    box.className = "planned-physical-fields";
+    const heading = document.createElement("h2");
+    heading.textContent = plannedRegistrationContext?.optionTitle || record.routineName;
+    const description = document.createElement("p");
+    description.textContent = "Actividad física indicada por tu entrenador. Registra lo que realizaste, aunque no corresponda a una rutina base.";
+    box.append(heading, description);
+    const details = plannedRegistrationContext?.planDetails || plannedContextForRecord(record, activeTrainingBlock())?.option.details || [];
+    if (details.length) {
+      const list = document.createElement("ul");
+      details.forEach(detail => {
+        const item = document.createElement("li");
+        item.textContent = detail;
+        list.append(item);
+      });
+      box.append(list);
+    }
+    const addField = (id, title, { type = "number", value = "", min = "0", max = "", placeholder = "" } = {}) => {
+      const label = document.createElement("label");
+      label.htmlFor = id;
+      label.textContent = title;
+      const input = type === "textarea" ? document.createElement("textarea") : document.createElement("input");
+      input.id = id;
+      if (type !== "textarea") {
+        input.type = type;
+        input.inputMode = "numeric";
+        input.min = min;
+        if (max) input.max = max;
+      } else input.maxLength = 3000;
+      input.placeholder = placeholder;
+      input.value = value === "" || value === null ? "" : String(value);
+      box.append(label, input);
+    };
+    addField("plannedPhysicalExercises", "Ejercicios, series, repeticiones y pesos realizados", { type: "textarea", value: record.routineSummary || "", placeholder: "Ej.: sentadilla 3 × 10 con 8 kg; movilidad 10 min…" });
+    addField("plannedPhysicalAbs", "Abdominales finales (si hiciste)", { value: record.routineAbsCount ?? "" });
+    addField("plannedPhysicalEffort", "Esfuerzo percibido (1 a 10)", { value: record.routineEffort ?? "", min: "1", max: "10" });
+    addField("plannedPhysicalPain", "Dolor o molestia (0 a 10)", { value: record.routinePain ?? "", max: "10" });
+    addField("plannedPhysicalPainDetail", "Detalle de la molestia (si corresponde)", { type: "textarea", value: record.routinePainDetail || "", placeholder: "Dónde y cómo se sintió" });
+    $("categoryFields").append(box);
+    return;
+  }
   if (!editingRecordId) {
     const records = repository.list();
     const durationAverages = physicalRoutineDurationAverages(records);
@@ -1635,7 +1827,7 @@ function selectCategory(categoryId, record = null) {
 
   $("recordDate").value = record?.dateISO || getChileDateISO();
   const isRest = categoryId === "rest";
-  const isRoutineLauncher = categoryId === "physical" && !editingRecordId;
+  const isRoutineLauncher = categoryId === "physical" && !editingRecordId && !plannedRegistrationContext?.customPhysical;
   $("registrationDateRow").classList.toggle("hidden", isRoutineLauncher);
   $("commonFields").classList.toggle("hidden", isRest || isRoutineLauncher);
   $("saveTrainingButton").classList.toggle("hidden", isRoutineLauncher);
@@ -1700,13 +1892,14 @@ function formRecord() {
   const isRest = currentCategory === "rest";
   const duration = isRest ? { durationMinutes: "", durationSeconds: "" } : currentDurationValues();
   const preserveRoutineBalance = existing?.category === "physical" && existing.routineId === routineId;
+  const customPhysical = currentCategory === "physical" && !routineId && Boolean(plannedRegistrationContext?.customPhysical || existing?.routineName);
   return {
     id: editingRecordId || createId(),
     dateISO: $("recordDate").value,
     category: currentCategory,
     categoryName: category?.shortName || "",
     routineId,
-    routineName: physicalRoutineById(routineId)?.name || "",
+    routineName: physicalRoutineById(routineId)?.name || (customPhysical ? plannedRegistrationContext?.optionTitle || existing?.routineName || "" : ""),
     cardioTypeId,
     cardioTypeName: cardioTypeById(cardioTypeId)?.name || "",
     tennisTypeId: $("tennisType")?.value || "",
@@ -1733,15 +1926,15 @@ function formRecord() {
     routineTotalExercises: preserveRoutineBalance ? existing.routineTotalExercises : "",
     routineTotalReps: preserveRoutineBalance ? existing.routineTotalReps : "",
     routineVolumeKg: preserveRoutineBalance ? existing.routineVolumeKg : "",
-    routineAbsCount: preserveRoutineBalance ? existing.routineAbsCount : "",
-    routineEffort: preserveRoutineBalance ? existing.routineEffort : "",
-    routinePain: preserveRoutineBalance ? existing.routinePain : "",
-    routinePainDetail: preserveRoutineBalance ? existing.routinePainDetail : "",
+    routineAbsCount: customPhysical ? $("plannedPhysicalAbs")?.value || "" : preserveRoutineBalance ? existing.routineAbsCount : "",
+    routineEffort: customPhysical ? $("plannedPhysicalEffort")?.value || "" : preserveRoutineBalance ? existing.routineEffort : "",
+    routinePain: customPhysical ? $("plannedPhysicalPain")?.value || "" : preserveRoutineBalance ? existing.routinePain : "",
+    routinePainDetail: customPhysical ? $("plannedPhysicalPainDetail")?.value.trim() || "" : preserveRoutineBalance ? existing.routinePainDetail : "",
     routineExercises: preserveRoutineBalance ? existing.routineExercises : [],
-    routineSummary: preserveRoutineBalance ? existing.routineSummary : "",
+    routineSummary: customPhysical ? $("plannedPhysicalExercises")?.value.trim() || "" : preserveRoutineBalance ? existing.routineSummary : "",
     routineAiAnalysis: null,
-    routineStartedAt: preserveRoutineBalance ? existing.routineStartedAt : "",
-    routineEndedAt: preserveRoutineBalance ? existing.routineEndedAt : "",
+    routineStartedAt: plannedRegistrationContext?.startedAt || (preserveRoutineBalance || customPhysical ? existing?.routineStartedAt || "" : ""),
+    routineEndedAt: plannedRegistrationContext?.endedAt || (preserveRoutineBalance || customPhysical ? existing?.routineEndedAt || "" : ""),
     planBlockId: plannedRegistrationContext?.blockId || existing?.planBlockId || "",
     planWeekKey: plannedRegistrationContext?.weekKey || existing?.planWeekKey || "",
     planSessionId: plannedRegistrationContext?.sessionId || existing?.planSessionId || "",
@@ -1778,6 +1971,7 @@ function saveTraining(event) {
   const candidate = attachMatchingPlan(formRecord());
   const validation = validateRecord(candidate);
   if (!validation.valid) return showFormError(validation.errors.join(" "));
+  if (candidate.category === "physical" && !candidate.routineId && Number(candidate.routinePain) > 0 && !candidate.routinePainDetail) return showFormError("Describe la molestia para que la guía pueda considerarla.");
   try {
     repository.upsert(candidate);
   } catch (error) {
@@ -1786,6 +1980,8 @@ function saveTraining(event) {
   const message = editingRecordId
     ? "Registro actualizado."
     : candidate.category === "rest" ? "Descanso registrado." : "Entrenamiento registrado.";
+  const pending = loadPlannedActivity();
+  if (pending?.status === "finished" && pending.blockId === candidate.planBlockId && pending.sessionId === candidate.planSessionId) savePlannedActivity(null);
   resetRegistration();
   renderHome();
   renderCoachPlanDialog();
@@ -2002,6 +2198,25 @@ function currentExerciseSettings(routine, exercise, settings) {
   return { sets, target, weightKg };
 }
 
+function renderHeroEvolution(records) {
+  const weeks = weeklyEvolution(records, getChileDateISO(), 2);
+  const current = weeks.at(-1);
+  const previous = weeks[0];
+  const values = [
+    ["weekSessionCount", "weekSessionDelta", current.sessions, previous.sessions, ""],
+    ["weekMinutes", "weekMinutesDelta", current.minutes, previous.minutes, " min"],
+    ["weekCalories", "weekCaloriesDelta", current.calories, previous.calories, " kcal"],
+    ["weekActiveDays", "weekActiveDaysDelta", current.activeDays, previous.activeDays, ""],
+    ["weekVolumeKg", "weekVolumeDelta", current.volumeKg, previous.volumeKg, " kg"],
+    ["weekBestAbs", "weekBestAbsDelta", current.maxAbdominals, previous.maxAbdominals, ""]
+  ];
+  values.forEach(([valueId, comparisonId, value, before, unit]) => {
+    $(valueId).textContent = valueId === "weekBestAbs" && !value ? "—" : `${Number(value).toLocaleString("es-CL")}${valueId === "weekVolumeKg" ? " kg" : ""}`;
+    $(comparisonId).textContent = valueId === "weekBestAbs" && !value
+      ? "Sin marca esta semana" : signedDifference(value, before, unit);
+  });
+}
+
 function routineSettingsSnapshot(routine, settings) {
   return Object.fromEntries(routine.exercises.map(exercise => [
     exercise.id,
@@ -2216,6 +2431,7 @@ function routineForAi(record) {
     durationMinutes: timing.durationMinutes,
     calories: record.calories,
     sensations: record.sensations,
+    routineSummary: record.routineSummary,
     effortRpe: record.routineEffort,
     painScore: record.routinePain,
     painDetail: record.routinePainDetail,
@@ -3607,55 +3823,6 @@ function signedDifference(current, previous, suffix = "") {
   return `${difference > 0 ? "+" : ""}${difference.toLocaleString("es-CL")}${suffix} vs. semana anterior`;
 }
 
-function renderEvolution(records) {
-  const weeks = weeklyEvolution(records, getChileDateISO(), 6);
-  const current = weeks.at(-1);
-  const previous = weeks.at(-2) || { sessions: 0, activeDays: 0, minutes: 0, calories: 0, volumeKg: 0, maxAbdominals: 0 };
-  $("evolutionComparison").textContent = current.sessions
-    ? `Semana ${current.weekNumber}: ${current.sessions} ${current.sessions === 1 ? "entrenamiento" : "entrenamientos"} en ${current.activeDays} ${current.activeDays === 1 ? "día activo" : "días activos"}.`
-    : `Todavía no hay entrenamientos registrados en la semana ${current.weekNumber}.`;
-  const metrics = $("evolutionMetrics");
-  metrics.replaceChildren();
-  [
-    ["Sesiones", current.sessions, signedDifference(current.sessions, previous.sessions)],
-    ["Minutos", current.minutes.toLocaleString("es-CL"), signedDifference(current.minutes, previous.minutes, " min")],
-    ["Calorías", current.calories.toLocaleString("es-CL"), signedDifference(current.calories, previous.calories, " kcal")],
-    ["Días activos", current.activeDays, signedDifference(current.activeDays, previous.activeDays)],
-    ["Volumen físico", `${current.volumeKg.toLocaleString("es-CL")} kg`, signedDifference(current.volumeKg, previous.volumeKg, " kg")],
-    ["Mejor abdominal", current.maxAbdominals || "—", current.maxAbdominals ? signedDifference(current.maxAbdominals, previous.maxAbdominals) : "Sin marca esta semana"]
-  ].forEach(([label, value, comparison]) => {
-    const card = document.createElement("div");
-    card.className = "evolution-metric";
-    const strong = document.createElement("strong");
-    strong.textContent = String(value);
-    const span = document.createElement("span");
-    span.textContent = label;
-    const small = document.createElement("small");
-    small.textContent = comparison;
-    card.append(strong, span, small);
-    metrics.append(card);
-  });
-
-  const chart = $("evolutionChart");
-  chart.replaceChildren();
-  const maximum = Math.max(1, ...weeks.map(item => item.minutes));
-  weeks.forEach((item, index) => {
-    const column = document.createElement("div");
-    column.className = `evolution-bar${index === weeks.length - 1 ? " current" : ""}`;
-    const track = document.createElement("div");
-    track.className = "evolution-bar-track";
-    const fill = document.createElement("span");
-    fill.className = "evolution-bar-fill";
-    fill.style.height = `${Math.max(4, Math.round((item.minutes / maximum) * 100))}%`;
-    fill.title = `Semana ${item.weekNumber}: ${item.minutes} min`;
-    track.append(fill);
-    const label = document.createElement("small");
-    label.textContent = `S${item.weekNumber} · ${item.minutes}m`;
-    column.append(track, label);
-    chart.append(column);
-  });
-}
-
 function renderExerciseProgress(records) {
   const container = $("exerciseProgress");
   const exercises = exerciseProgress(records);
@@ -3716,7 +3883,6 @@ function renderExerciseProgress(records) {
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
-  renderEvolution(records);
   renderExerciseProgress(records);
   renderPhysicalRankings(records);
   renderRunningRankings(records);
@@ -3740,7 +3906,10 @@ function renderHistory() {
     const summary = document.createElement("summary");
     const heading = document.createElement("div");
     const title = document.createElement("h2");
-    title.textContent = `Semana ${group.weekNumber} · ${group.weekYear}`;
+    const planWeek = activeTrainingBlock().weeks.find(item => item.weekKey === group.key);
+    title.textContent = planWeek
+      ? `Semana ${group.weekNumber} · ${weekDisplayTitle(planWeek)}`
+      : `Semana ${group.weekNumber} · ${group.weekYear}`;
     const range = document.createElement("p");
     range.textContent = `${formatShortDate(group.startISO)} — ${formatShortDate(group.endISO)}`;
     heading.append(title, range);
@@ -3832,6 +4001,12 @@ function createHistoryEntry(sourceRecord) {
       automaticSummary.textContent = record.routineSummary;
       copy.append(automaticSummary);
     }
+  }
+  if (record.category === "physical" && record.routinePlannedSets === "" && record.routineSummary) {
+    const notes = document.createElement("p");
+    notes.className = "history-auto-summary";
+    notes.textContent = `Ejercicios y cargas realizados: ${record.routineSummary}`;
+    copy.append(notes);
   }
   const aiCard = createRoutineAiCard(record, { compact: true });
   if (record.category === "physical" && record.routineExercises.length) {
@@ -3969,7 +4144,24 @@ function bindEvents() {
     if (target === "register") openRegistrationOrActiveRoutine();
     else showView(target);
   }));
-  $("homeRegisterButton").addEventListener("click", openRegistrationOrActiveRoutine);
+  $("startPlannedActivityButton").addEventListener("click", () => {
+    const block = activeTrainingBlock();
+    const session = coachSessionForDate(getChileDateISO(), block);
+    const actual = session && planRecordForSession(session, repository.list(), block);
+    if (!loadPlannedActivity() && actual?.routineAiAnalysis?.planComparison?.status === "completed") return showView("history");
+    openTodayPlannedActivity();
+  });
+  $("heroWeekTheme").addEventListener("click", openCoachPlanDialog);
+  $("plannedActivityDialogClose").addEventListener("click", () => $("plannedActivityDialog").close());
+  $("plannedActivityDialog").addEventListener("close", () => {
+    if (plannedActivityTicker) clearInterval(plannedActivityTicker);
+    plannedActivityTicker = null;
+  });
+  $("finishPlannedActivityButton").addEventListener("click", finishGenericPlannedActivity);
+  $("plannedActivityFullPlanButton").addEventListener("click", () => {
+    $("plannedActivityDialog").close();
+    openCoachPlanDialog();
+  });
   $("openAiPlanButton").addEventListener("click", openAiPlanDialog);
   $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());
   $("aiPlanDialogClose").addEventListener("click", () => $("aiPlanDialog").close());
