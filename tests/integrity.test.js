@@ -179,8 +179,8 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v61/);
-  assert.match(worker, /coach-tracking\.js\?v=61/);
+  assert.match(worker, /tgtrain-shell-v62/);
+  assert.match(worker, /coach-tracking\.js\?v=62/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {

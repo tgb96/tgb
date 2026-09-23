@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=61";
+} from "./data.js?v=62";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=61";
-import { createRepository } from "./storage.js?v=61";
-import { createCloudSync } from "./cloud.js?v=61";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=61";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=61";
-import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=61";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=61";
+} from "./coach-plan.js?v=62";
+import { createRepository } from "./storage.js?v=62";
+import { createCloudSync } from "./cloud.js?v=62";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=62";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=62";
+import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=62";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=62";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=61";
+} from "./utils.js?v=62";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);

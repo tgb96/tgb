@@ -23,6 +23,18 @@ function publicUser(user) {
   } : null;
 }
 
+// Firestore rechaza `undefined` incluso dentro de un objeto o una lista anidados.
+// Los datos locales se conservan tal cual; solo se prepara una copia para el envío.
+export function firestoreDocument(value) {
+  if (Array.isArray(value)) return value.map(item => item === undefined ? null : firestoreDocument(item));
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .map(([key, item]) => [key, firestoreDocument(item)]));
+  }
+  return value;
+}
+
 export function createCloudSync({
   repository,
   storage,
@@ -110,36 +122,38 @@ export function createCloudSync({
   const coachQuestionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "coachQuestions");
   const coachQuestionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "coachQuestions", cloudDocumentId(id));
 
+  const setCloudDoc = (reference, value) => awaitServer(modules.firestoreModule.setDoc(reference, firestoreDocument(value)));
+
   async function writeChange(change) {
     if (!user) return;
     if (change.type === "plan-upsert") {
-      await awaitServer(modules.firestoreModule.setDoc(planDocumentReference(change.plan.weekKey), change.plan));
+      await setCloudDoc(planDocumentReference(change.plan.weekKey), change.plan);
       return;
     }
     if (change.type === "training-block-upsert") {
-      await awaitServer(modules.firestoreModule.setDoc(trainingBlockDocumentReference(change.block.id), change.block));
+      await setCloudDoc(trainingBlockDocumentReference(change.block.id), change.block);
       return;
     }
     if (change.type === "coach-profile-upsert") {
-      await awaitServer(modules.firestoreModule.setDoc(coachProfileDocumentReference(), change.profile));
+      await setCloudDoc(coachProfileDocumentReference(), change.profile);
       return;
     }
     if (change.type === "coach-question-upsert") {
-      await awaitServer(modules.firestoreModule.setDoc(coachQuestionDocumentReference(change.question.id), change.question));
+      await setCloudDoc(coachQuestionDocumentReference(change.question.id), change.question);
       return;
     }
     if (change.type === "remove") {
-      await awaitServer(modules.firestoreModule.setDoc(documentReference(change.id), {
+      await setCloudDoc(documentReference(change.id), {
         id: change.id,
         deleted: true,
         updatedAt: change.deletedAt
-      }));
+      });
       return;
     }
-    await awaitServer(modules.firestoreModule.setDoc(documentReference(change.record.id), {
+    await setCloudDoc(documentReference(change.record.id), {
       ...change.record,
       deleted: false
-    }));
+    });
   }
 
   function queueChange(change) {
