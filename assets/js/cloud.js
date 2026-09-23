@@ -29,9 +29,10 @@ export function createCloudSync({
   onStatus = () => {},
   onDataChanged = () => {},
   configuration = firebaseConfig,
-  isConfigured = firebaseConfigured
+  isConfigured = firebaseConfigured,
+  firebaseModules = null
 }) {
-  let modules = null;
+  let modules = firebaseModules;
   let app = null;
   let auth = null;
   let database = null;
@@ -43,8 +44,48 @@ export function createCloudSync({
   let unsubscribeCoachProfile = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
+  let mergePromise = null;
+  let retryTimer = null;
+  let retryDelayMs = 10000;
+  let syncError = false;
 
   const emit = (state, message, extra = {}) => onStatus({ state, message, user: publicUser(user), ...extra });
+
+  async function awaitServer(promise) {
+    let deadline;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error("La nube no respondió a tiempo.")), 15000); })
+      ]);
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
+  function scheduleRetry() {
+    if (retryTimer || !user) return;
+    retryTimer = setTimeout(async () => {
+      retryTimer = null;
+      if (!user) return;
+      try {
+        await writeQueue;
+        await mergeCloudAndLocal();
+        syncError = false;
+        retryDelayMs = 10000;
+        observeCloudRecords();
+        observeCloudPlans();
+        observeCloudTrainingBlocks();
+        observeCloudCoachProfile();
+        emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+      } catch {
+        syncError = true;
+        retryDelayMs = Math.min(retryDelayMs * 2, 120000);
+        emit("offline", "No se pudo sincronizar toda la planificación. Se intentará otra vez; los datos siguen en este dispositivo.");
+        scheduleRetry();
+      }
+    }, retryDelayMs);
+  }
 
   async function loadFirebase() {
     if (modules) return modules;
@@ -68,41 +109,51 @@ export function createCloudSync({
   async function writeChange(change) {
     if (!user) return;
     if (change.type === "plan-upsert") {
-      await modules.firestoreModule.setDoc(planDocumentReference(change.plan.weekKey), change.plan);
+      await awaitServer(modules.firestoreModule.setDoc(planDocumentReference(change.plan.weekKey), change.plan));
       return;
     }
     if (change.type === "training-block-upsert") {
-      await modules.firestoreModule.setDoc(trainingBlockDocumentReference(change.block.id), change.block);
+      await awaitServer(modules.firestoreModule.setDoc(trainingBlockDocumentReference(change.block.id), change.block));
       return;
     }
     if (change.type === "coach-profile-upsert") {
-      await modules.firestoreModule.setDoc(coachProfileDocumentReference(), change.profile);
+      await awaitServer(modules.firestoreModule.setDoc(coachProfileDocumentReference(), change.profile));
       return;
     }
     if (change.type === "remove") {
-      await modules.firestoreModule.setDoc(documentReference(change.id), {
+      await awaitServer(modules.firestoreModule.setDoc(documentReference(change.id), {
         id: change.id,
         deleted: true,
         updatedAt: change.deletedAt
-      });
+      }));
       return;
     }
-    await modules.firestoreModule.setDoc(documentReference(change.record.id), {
+    await awaitServer(modules.firestoreModule.setDoc(documentReference(change.record.id), {
       ...change.record,
       deleted: false
-    });
+    }));
   }
 
   function queueChange(change) {
     writeQueue = writeQueue
       .then(() => writeChange(change))
-      .then(() => emit("synced", "Todos tus cambios están guardados en la nube."))
-      .catch(() => emit("offline", "El cambio quedó guardado en este dispositivo y se subirá al recuperar conexión."));
+      .then(() => { if (!syncError) emit("synced", "Entrenamientos y planificación sincronizados con Google."); })
+      .catch(() => {
+        syncError = true;
+        emit("offline", "Hay cambios locales pendientes, incluida la planificación. Se intentará sincronizar otra vez.");
+        scheduleRetry();
+      });
   }
 
-  async function mergeCloudAndLocal() {
+  function mergeCloudAndLocal() {
+    if (!mergePromise) mergePromise = performMergeCloudAndLocal().finally(() => { mergePromise = null; });
+    return mergePromise;
+  }
+
+  async function performMergeCloudAndLocal() {
     emit("syncing", "Comparando tus registros locales con la nube…");
-    const snapshot = await modules.firestoreModule.getDocs(collectionReference());
+    await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
+    const snapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(collectionReference()));
     const remote = new Map();
     snapshot.forEach(item => {
       const value = item.data();
@@ -129,7 +180,7 @@ export function createCloudSync({
       if (!remote.has(id)) uploads.push({ type: "upsert", record: localRecord });
     });
     for (const change of uploads) await writeChange(change);
-    const plansSnapshot = await modules.firestoreModule.getDocs(plansCollectionReference());
+    const plansSnapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(plansCollectionReference()));
     const remotePlans = new Map();
     plansSnapshot.forEach(item => {
       const value = item.data();
@@ -148,7 +199,7 @@ export function createCloudSync({
       if (!remotePlans.has(weekKey)) uploads.push({ type: "plan-upsert", plan: localPlan });
     });
     for (const change of uploads.filter(change => change.type === "plan-upsert")) await writeChange(change);
-    const blocksSnapshot = await modules.firestoreModule.getDocs(trainingBlocksCollectionReference());
+    const blocksSnapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(trainingBlocksCollectionReference()));
     const remoteBlocks = new Map();
     blocksSnapshot.forEach(item => {
       const value = item.data();
@@ -167,7 +218,7 @@ export function createCloudSync({
       if (!remoteBlocks.has(id)) uploads.push({ type: "training-block-upsert", block: localBlock });
     });
     for (const change of uploads.filter(change => change.type === "training-block-upsert")) await writeChange(change);
-    const profileSnapshot = await modules.firestoreModule.getDoc(coachProfileDocumentReference());
+    const profileSnapshot = await awaitServer(modules.firestoreModule.getDocFromServer(coachProfileDocumentReference()));
     const remoteProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
     const localProfile = repository.getCoachProfile();
     if (remoteProfile && (!localProfile || recordTimestamp(remoteProfile) >= recordTimestamp(localProfile))) {
@@ -175,6 +226,7 @@ export function createCloudSync({
     } else if (localProfile) {
       await writeChange({ type: "coach-profile-upsert", profile: localProfile });
     }
+    await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
     if (localChanged) onDataChanged();
   }
 
@@ -189,8 +241,13 @@ export function createCloudSync({
         else changed = repository.applyCloudRecord(cloudRecord) || changed;
       });
       if (changed) onDataChanged();
-      emit("synced", "Todos tus cambios están guardados en la nube.");
-    }, () => emit("offline", "Sin conexión con la nube. Tus cambios siguen seguros en este dispositivo."));
+      if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) return;
+      if (!syncError) emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar el historial desde la nube. Se intentará otra vez.");
+      scheduleRetry();
+    });
   }
 
   function observeCloudPlans() {
@@ -202,7 +259,11 @@ export function createCloudSync({
         changed = repository.applyCloudPlan(change.doc.data()) || changed;
       });
       if (changed) onDataChanged();
-    }, () => emit("offline", "Sin conexión con la nube. Tus cambios siguen seguros en este dispositivo."));
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar la planificación desde la nube. Se intentará otra vez.");
+      scheduleRetry();
+    });
   }
 
   function observeCloudTrainingBlocks() {
@@ -214,7 +275,11 @@ export function createCloudSync({
         changed = repository.applyCloudTrainingBlock(change.doc.data()) || changed;
       });
       if (changed) onDataChanged();
-    }, () => emit("offline", "Sin conexión con la nube. Tus datos locales permanecen seguros."));
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar el plan activo desde la nube. Se intentará otra vez.");
+      scheduleRetry();
+    });
   }
 
   function observeCloudCoachProfile() {
@@ -222,11 +287,17 @@ export function createCloudSync({
     unsubscribeCoachProfile = modules.firestoreModule.onSnapshot(coachProfileDocumentReference(), snapshot => {
       if (!snapshot.exists()) return;
       if (repository.applyCloudCoachProfile(snapshot.data())) onDataChanged();
-    }, () => emit("offline", "Sin conexión con la nube. Tu perfil del entrenador permanece guardado localmente."));
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar el perfil desde la nube. Se intentará otra vez.");
+      scheduleRetry();
+    });
   }
 
   async function connect(currentUser) {
     user = currentUser;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
     unsubscribeRepository?.();
     unsubscribeRepository = null;
     unsubscribeRecords?.();
@@ -249,15 +320,21 @@ export function createCloudSync({
     storage?.setItem("tgtrain-cloud-owner-v1", user.uid);
     try {
       await mergeCloudAndLocal();
+      syncError = false;
+      retryDelayMs = 10000;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
       unsubscribeRepository = repository.subscribe(queueChange);
       observeCloudRecords();
       observeCloudPlans();
       observeCloudTrainingBlocks();
       observeCloudCoachProfile();
-      emit("synced", "Todos tus cambios están guardados en la nube.");
+      emit("synced", "Entrenamientos y planificación sincronizados con Google.");
     } catch {
+      syncError = true;
       unsubscribeRepository = repository.subscribe(queueChange);
-      emit("offline", "No fue posible acceder a la nube. Tus datos locales permanecen seguros.");
+      emit("offline", "No fue posible sincronizar toda la planificación. Tus datos locales permanecen seguros.");
+      scheduleRetry();
     }
   }
 
@@ -296,10 +373,27 @@ export function createCloudSync({
     },
     async syncNow() {
       if (!user) throw new Error("Primero inicia sesión con Google.");
-      await mergeCloudAndLocal();
-      emit("synced", "Todos tus cambios están guardados en la nube.");
+      try {
+        await writeQueue;
+        await mergeCloudAndLocal();
+        syncError = false;
+        retryDelayMs = 10000;
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = null;
+        observeCloudRecords();
+        observeCloudPlans();
+        observeCloudTrainingBlocks();
+        observeCloudCoachProfile();
+        emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+      } catch (error) {
+        syncError = true;
+        emit("offline", "No se pudo sincronizar toda la planificación. Se intentará otra vez.");
+        scheduleRetry();
+        throw error;
+      }
     },
     destroy() {
+      if (retryTimer) clearTimeout(retryTimer);
       unsubscribeAuth?.();
       unsubscribeRecords?.();
       unsubscribePlans?.();

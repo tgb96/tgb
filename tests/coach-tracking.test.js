@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparableActivity, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
+import { comparableActivity, dayPlanOverview, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
+import { normalizeRecord } from "../assets/js/utils.js";
 
 const run = { category: "cardio", cardioTypeId: "running", distanceKm: 5, dateISO: "2026-09-15", sensations: "Comentarios completos" };
 
@@ -57,12 +58,34 @@ test("distancia menor o mayor queda adaptada, no cumplida automáticamente", () 
   assert.equal(planAssessment(run, plannedContextForRecord(run, block)).status, "unknown");
 });
 
-test("respeta evaluación de la guía y no pierde la relación al guardar sus metadatos", () => {
+test("solo respeta la evaluación de la guía si corresponde a esta versión del plan", () => {
   const record = { ...run, cardioTypeId: "padel", planBlockId: coachTrainingBlock.id, planSessionId: plannedContextForRecord(run, coachTrainingBlock).session.id,
-    routineAiAnalysis: { planComparison: { status: "adapted", reason: "Otra forma de trabajar el objetivo" } } };
-  assert.ok(plannedContextForRecord(record, coachTrainingBlock));
-  assert.equal(planAssessment(record, plannedContextForRecord(record, coachTrainingBlock)).label, "Adaptado");
+    routineAiAnalysis: { summary: "Se adaptó la actividad.", planComparison: { status: "adapted", reason: "Otra forma de trabajar el objetivo" } } };
+  const match = plannedContextForRecord(record, coachTrainingBlock);
+  assert.ok(match);
+  assert.equal(planAssessment(record, match, coachTrainingBlock).label, "Otra actividad");
+  const current = { ...record, routineAiAnalysis: { ...record.routineAiAnalysis, planContext: {
+    blockId: coachTrainingBlock.id, blockUpdatedAt: coachTrainingBlock.updatedAt || "", sessionId: match.session.id, optionId: match.option.id
+  } } };
+  assert.equal(planAssessment(current, match, coachTrainingBlock).label, "Adaptado");
+  assert.deepEqual(normalizeRecord(current).routineAiAnalysis.planContext, current.routineAiAnalysis.planContext);
+  assert.equal(planAssessment(current, match, { ...coachTrainingBlock, updatedAt: "2026-09-22T12:00:00.000Z" }).label, "Otra actividad");
   assert.equal(plannedContextForRecord({ ...record, planBlockId: "otro" }, coachTrainingBlock), null);
+});
+
+test("Inicio describe registros y cambios de plan sin afirmar cumplimiento ni pedir evaluación", () => {
+  const session = coachTrainingBlock.weeks[1].sessions.find(item => item.dateISO === "2026-09-22");
+  assert.equal(dayPlanOverview(session, []).label, "Previsto");
+  assert.equal(dayPlanOverview(session, [{ category: "rest", restTypeId: "planned" }]).label, "Descanso registrado");
+  assert.equal(dayPlanOverview(session, [{ category: "physical", routineId: "legs" }]).label, "Cambio de plan");
+  const option = session.options[0];
+  assert.equal(dayPlanOverview(session, [{ category: option.category, cardioTypeId: option.prefill.cardioTypeId }]).label, "Registrado");
+});
+
+test("un descanso nunca se muestra como cumplido por un análisis antiguo", () => {
+  const record = { category: "rest", restTypeId: "planned", dateISO: "2026-09-22", routineAiAnalysis: { planComparison: { status: "completed" } } };
+  const match = plannedContextForRecord(record, coachTrainingBlock);
+  assert.equal(planAssessment(record, match, coachTrainingBlock).status, "recovery");
 });
 
 test("no asigna otra actividad a una sesión arbitraria si hay varias posibles", () => {

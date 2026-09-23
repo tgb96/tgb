@@ -1,6 +1,6 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=59";
-import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=59";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=60";
+import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=60";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;

@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=59";
+} from "./data.js?v=60";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -518,6 +518,12 @@ function normalizeRoutineAiAnalysis(value) {
     goal: String(value.goal || "").trim().slice(0, 1000),
     planComparison: ["completed", "partial", "adapted", "recovery", "different", "unknown"].includes(value.planComparison?.status)
       ? { status: value.planComparison.status, reason: String(value.planComparison.reason || "").trim().slice(0, 2000) } : null,
+    planContext: value.planContext?.blockId && value.planContext?.sessionId && value.planContext?.optionId ? {
+      blockId: String(value.planContext.blockId).slice(0, 120),
+      blockUpdatedAt: String(value.planContext.blockUpdatedAt || "").slice(0, 40),
+      sessionId: String(value.planContext.sessionId).slice(0, 100),
+      optionId: String(value.planContext.optionId).slice(0, 100)
+    } : null,
     encouragement: String(value.encouragement || "").trim().slice(0, 1000),
     status: statuses.has(value.status) ? value.status : (changes.length || value.decision ? "pending" : ""),
     appliedAt: String(value.appliedAt || "").slice(0, 40),

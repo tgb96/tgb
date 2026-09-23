@@ -11,6 +11,25 @@ export function recordMatchesPlanOption(record, option) {
   return false;
 }
 
+// Inicio informa lo que se registró, sin presentar una opinión de la IA como hecho.
+export function dayPlanOverview(session, dayRecords = []) {
+  if (!session) return { status: "none", label: "", reason: "" };
+  if (!dayRecords.length) return { status: "planned", label: "Previsto", reason: "Todavía no hay actividad registrada para este día." };
+  const matched = dayRecords.some(record => (session.options || []).some(option => recordMatchesPlanOption(record, option)));
+  if (matched) return { status: "registered", label: "Registrado", reason: "Hay una actividad registrada del mismo tipo que una opción del plan. Esto no evalúa intensidad, cargas ni sensaciones." };
+  if (dayRecords.some(record => record.category === "rest")) return { status: "rest", label: "Descanso registrado", reason: "Se registró descanso en lugar de la actividad prevista." };
+  return { status: "changed", label: "Cambio de plan", reason: "Se registró otra actividad en lugar de la prevista." };
+}
+
+export function analysisMatchesCurrentPlan(record, match, block) {
+  const context = record?.routineAiAnalysis?.planContext;
+  return Boolean(context && match && block
+    && context.blockId === block.id
+    && context.blockUpdatedAt === (block.updatedAt || "")
+    && context.sessionId === match.session.id
+    && context.optionId === match.option.id);
+}
+
 export function plannedMatchForRecord(record, block) {
   for (const week of block?.weeks || []) {
     for (const session of week.sessions || []) {
@@ -42,13 +61,13 @@ export function plannedContextForRecord(record, block) {
   return option ? { week, session, option, exact: false } : null;
 }
 
-export function planAssessment(record, match) {
+export function planAssessment(record, match, block = null) {
   if (!record) return { status: "pending", label: "Plan", reason: "" };
   const assessment = record.routineAiAnalysis?.planComparison;
-  const labels = { completed: "Cumplido", partial: "Parcial", adapted: "Adaptado", recovery: "Recuperación", different: "Otra actividad", unknown: "Por evaluar" };
-  if (labels[assessment?.status]) return { ...assessment, label: labels[assessment.status] };
+  const labels = { completed: "Cumplido", partial: "Parcial", adapted: "Adaptado", recovery: "Recuperación", different: "Otra actividad", unknown: "Registrado" };
   if (!match) return { status: "unknown", label: "Sin plan relacionado", reason: "" };
   if (record.category === "rest" && match.option.category !== "rest") return { status: "recovery", label: "Descanso", reason: "Descanso registrado en lugar del entrenamiento. La guía evaluará su relación con la recuperación." };
+  if (labels[assessment?.status] && analysisMatchesCurrentPlan(record, match, block)) return { ...assessment, label: labels[assessment.status] };
   if (!recordMatchesPlanOption(record, match.option)) return { status: "different", label: "Otra actividad", reason: "Actividad relacionada con el día; falta evaluar si cubre el objetivo del plan." };
   const target = match.option.prefill || {};
   if (record.category === "cardio" && Number(target.distanceKm) > 0 && Number(record.distanceKm) !== Number(target.distanceKm)) return { status: "adapted", label: "Distancia adaptada", reason: `${record.distanceKm || 0} km realizados frente a ${target.distanceKm} km previstos. Más distancia no implica mejor cumplimiento.` };

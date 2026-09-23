@@ -15,19 +15,19 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=59";
+} from "./data.js?v=60";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
-} from "./coach-plan.js?v=59";
-import { createRepository } from "./storage.js?v=59";
-import { createCloudSync } from "./cloud.js?v=59";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=59";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=59";
-import { comparableActivity, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=59";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=59";
+} from "./coach-plan.js?v=60";
+import { createRepository } from "./storage.js?v=60";
+import { createCloudSync } from "./cloud.js?v=60";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=60";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=60";
+import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=60";
+import { activityTiming, durationModeFor } from "./training-metrics.js?v=60";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +52,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=59";
+} from "./utils.js?v=60";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -143,13 +143,14 @@ function planRecordForSession(session, records = repository.list(), block = acti
 function createPlanActualFeedback(session, records, block = activeTrainingBlock()) {
   const box = document.createElement("div");
   box.className = "plan-actual-feedback";
-  records.filter(record => plannedContextForRecord(record, block)?.session.id === session.id).forEach(record => {
-    const assessment = planAssessment(record, plannedContextForRecord(record, block));
+  const dayRecords = records.filter(record => record.dateISO === session.dateISO);
+  const overview = dayPlanOverview(session, dayRecords);
+  dayRecords.forEach(record => {
     const row = document.createElement("p");
     const title = document.createElement("strong");
-    title.textContent = `${assessment.label} · ${recordTitle(record)}`;
+    title.textContent = `${overview.label} · ${recordTitle(record)}`;
     const detail = document.createElement("small");
-    detail.textContent = assessment.reason;
+    detail.textContent = overview.reason;
     row.append(title, detail);
     box.append(row);
   });
@@ -260,11 +261,11 @@ function openPlannedOption(session, optionId, { startNow = false } = {}) {
     showToast(`Esta sesión estará disponible el ${formatShortDate(session.dateISO)}.`);
     return;
   }
-  const actual = planRecordForSession(session, repository.list(), block);
-  if (actual && planAssessment(actual, plannedContextForRecord(actual, block)).status === "completed") {
+  if (repository.list().some(record => record.dateISO === session.dateISO)) {
     $("coachPlanDialog")?.close();
+    $("plannedActivityDialog")?.close();
     showView("history");
-    showToast("Esta sesión ya está registrada. Puedes revisarla en el historial.");
+    showToast("Ya hay una actividad registrada para este día. Revísala en el historial.");
     return;
   }
   const payload = planContextPayload(session, option, block);
@@ -439,11 +440,10 @@ function createPlanOptionButton(session, option, records, { compact = false } = 
   const button = document.createElement("button");
   button.type = "button";
   button.className = compact ? "coach-option-button compact" : "coach-option-button";
-  const completed = planRecordForSession(session, records);
+  const hasActivity = records.some(record => record.dateISO === session.dateISO);
   const future = session.dateISO > getChileDateISO();
   button.disabled = future;
-  const fulfilled = completed && planAssessment(completed, plannedContextForRecord(completed, activeTrainingBlock())).status === "completed";
-  button.textContent = fulfilled ? "Ver registro" : future ? `Disponible ${formatShortDate(session.dateISO)}` : completed ? `Realizar ${option.title}` : `Elegir ${option.title}`;
+  button.textContent = future ? `Disponible ${formatShortDate(session.dateISO)}` : hasActivity ? "Ver registro" : `Elegir ${option.title}`;
   button.addEventListener("click", () => openPlannedOption(session, option.id));
   return button;
 }
@@ -508,7 +508,7 @@ function renderCoachPlanDialog(records = repository.list()) {
     const todayISO = getChileDateISO();
     weekCard.open = coachWeekForDate(todayISO, block)?.weekKey === week.weekKey
       || (todayISO < block.startISO && weekIndex === 0);
-    const completed = week.sessions.filter(session => planRecordForSession(session, records, block)).length;
+    const completed = week.sessions.filter(session => records.some(record => record.dateISO === session.dateISO)).length;
     const summary = document.createElement("summary");
     const copy = document.createElement("div");
     const eyebrow = document.createElement("span");
@@ -528,8 +528,8 @@ function renderCoachPlanDialog(records = repository.list()) {
       const day = document.createElement("article");
       day.className = "coach-session-card";
       if (session.dateISO === getChileDateISO()) day.classList.add("today");
-      const actual = planRecordForSession(session, records, block);
-      if (actual && planAssessment(actual, plannedContextForRecord(actual, block)).status === "completed") day.classList.add("complete");
+      const overview = dayPlanOverview(session, records.filter(record => record.dateISO === session.dateISO));
+      if (overview.status === "registered") day.classList.add("complete");
       const heading = document.createElement("div");
       const date = document.createElement("span");
       date.textContent = formatLongDate(session.dateISO);
@@ -694,6 +694,12 @@ function updateCloudStatus(status) {
   button.className = `cloud-status-button ${status.state}`;
   label.textContent = stateLabels[status.state] || "Datos locales";
   $("cloudMessage").textContent = status.message || "";
+  const activePlan = activeTrainingBlock();
+  const importedPlan = repository.listTrainingBlocks().length > 0;
+  const updatedAt = Date.parse(activePlan.updatedAt || "");
+  $("cloudPlanStatus").textContent = importedPlan
+    ? `Plan activo en este dispositivo: ${activePlan.title}${Number.isFinite(updatedAt) ? ` · actualizado ${new Date(updatedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}` : ""}.`
+    : "Plan activo: el plan incluido en TGTrain. Aún no hay una planificación importada en este dispositivo.";
 
   const identity = $("cloudIdentity");
   const hasUser = Boolean(status.user);
@@ -818,12 +824,17 @@ function renderHome() {
   plannedPanel.classList.toggle("hidden", !todayPlan);
   if (todayPlan) {
     const option = coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0];
-    const actual = planRecordForSession(todayPlan, allRecords, block);
-    $("heroPlannedTitle").textContent = option.title;
-    $("heroPlannedSummary").textContent = todayPlan.objective || option.summary;
-    $("startPlannedActivityButton").textContent = activePlanned?.session.id === todayPlan.id
+    const overview = dayPlanOverview(todayPlan, todayRecords);
+    const inProgress = activePlanned?.session.id === todayPlan.id;
+    $("heroPlannedLabel").textContent = inProgress ? "Actividad en curso" : todayRecords.length ? "Actividad de hoy" : "Plan de hoy";
+    $("heroPlannedTitle").textContent = !inProgress && todayRecords.length ? todayRecords.map(recordTitle).join(" · ") : option.title;
+    $("heroPlannedSummary").textContent = inProgress ? todayPlan.objective : todayRecords.length
+      ? `${overview.reason} Plan previsto: ${option.title}.`
+      : todayPlan.objective || option.summary;
+    $("startPlannedActivityButton").textContent = inProgress
       ? plannedState.status === "active" ? "Continuar actividad en curso" : "Completar registro programado"
-      : actual?.routineAiAnalysis?.planComparison?.status === "completed" ? "Ver actividad registrada" : "Iniciar actividad programada";
+      : todayRecords.length ? "Ver registro en historial"
+        : "Iniciar actividad programada";
   }
   $("weekProgress").textContent = `${activeDays}/7 días`;
   const feedback = $("homeCoachFeedback");
@@ -862,11 +873,10 @@ function renderHome() {
       if (plannedSession) {
         const primary = coachOption(plannedSession, plannedSession.primaryOptionId) || plannedSession.options[0];
         const planLine = document.createElement("div");
-        const actual = planRecordForSession(plannedSession, allRecords, block);
-        const assessment = planAssessment(actual, actual ? plannedContextForRecord(actual, block) : null);
-        planLine.className = `planned-activity-line ${assessment.status === "completed" ? "complete" : ""}`;
+        const overview = dayPlanOverview(plannedSession, dayRecords);
+        planLine.className = `planned-activity-line ${overview.status}`;
         const planBadge = document.createElement("span");
-        planBadge.textContent = assessment.label;
+        planBadge.textContent = overview.label;
         const planCopy = document.createElement("div");
         const planTitle = document.createElement("strong");
         planTitle.textContent = primary.title;
@@ -2494,7 +2504,9 @@ function routineAiContext(record) {
   const match = plannedContextForRecord(record, block);
   const currentPlan = match ? {
     blockId: block.id,
+    blockUpdatedAt: block.updatedAt || "",
     sessionId: match.session.id,
+    optionId: match.option.id,
     exactOptionMatch: match.exact,
     title: match.option.title,
     summary: match.option.summary,
@@ -2546,6 +2558,12 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
         ...analysis,
         changes: record.category === "physical" ? analysis.changes : [],
         status: record.category === "physical" ? "pending" : "reviewed",
+        planContext: context.currentPlan ? {
+          blockId: context.currentPlan.blockId,
+          blockUpdatedAt: context.currentPlan.blockUpdatedAt,
+          sessionId: context.currentPlan.sessionId,
+          optionId: context.currentPlan.optionId
+        } : null,
         generatedAt: new Date().toISOString(),
         model: result?.model || analysis?.model || ""
       },
@@ -2886,8 +2904,14 @@ function createRoutineAiCard(record, { compact = false } = {}) {
     if (analysis.planComparison?.status) {
       const comparison = document.createElement("p");
       comparison.className = "routine-ai-plan-comparison";
-      const assessment = planAssessment(record, plannedContextForRecord(record, activeTrainingBlock()));
-      comparison.textContent = `Plan y realidad · ${assessment.label}: ${analysis.planComparison.reason}`;
+      const block = activeTrainingBlock();
+      const match = plannedContextForRecord(record, block);
+      if (analysisMatchesCurrentPlan(record, match, block)) {
+        const assessment = planAssessment(record, match, block);
+        comparison.textContent = `Plan y realidad · ${assessment.label}: ${assessment.reason || analysis.planComparison.reason}`;
+      } else {
+        comparison.textContent = "El plan cambió desde este comentario. Su comparación anterior ya no describe la planificación actual.";
+      }
       card.append(comparison);
     }
     const groups = document.createElement("div");
@@ -4147,8 +4171,7 @@ function bindEvents() {
   $("startPlannedActivityButton").addEventListener("click", () => {
     const block = activeTrainingBlock();
     const session = coachSessionForDate(getChileDateISO(), block);
-    const actual = session && planRecordForSession(session, repository.list(), block);
-    if (!loadPlannedActivity() && actual?.routineAiAnalysis?.planComparison?.status === "completed") return showView("history");
+    if (session && !plannedActivityContext(loadPlannedActivity()) && repository.list().some(record => record.dateISO === session.dateISO)) return showView("history");
     openTodayPlannedActivity();
   });
   $("heroWeekTheme").addEventListener("click", openCoachPlanDialog);
