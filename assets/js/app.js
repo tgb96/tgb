@@ -24,11 +24,11 @@ import {
 } from "./coach-plan.js?v=63";
 import { createRepository } from "./storage.js?v=71";
 import { createCloudSync } from "./cloud.js?v=71";
-import { createNutritionUI } from "./nutrition-ui.js?v=71";
-import { createGuidedUI } from "./guided-ui.js?v=68";
+import { createNutritionUI } from "./nutrition-ui.js?v=72";
+import { createGuidedUI } from "./guided-ui.js?v=72";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=67";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=67";
-import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=67";
+import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
 import {
@@ -89,7 +89,10 @@ const guidedUI = createGuidedUI(repository, {
   showToast: message => showToast(message),
   onSaved: record => {
     openHistoryRecord(record.id);
-    showToast("Sesión guardada. Si la registraste con la banda, vincúlala aquí cuando aparezca.");
+    const hasMainActivity = repository.list().some(item => item.dateISO === record.dateISO && isMainDayRecord(item));
+    showToast(hasMainActivity
+      ? "Complemento guardado. Tu actividad principal sigue registrada por separado."
+      : "Complemento guardado. Tu actividad principal y el plan del día siguen pendientes.");
   }
 });
 
@@ -173,10 +176,6 @@ function openRegistration() {
 
 function activeTrainingBlock() {
   return newestTrainingBlock(repository.listTrainingBlocks()) || coachTrainingBlock;
-}
-
-function isMainDayRecord(record) {
-  return ["physical", "cardio", "tennis", "rest"].includes(record.category);
 }
 
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
@@ -899,7 +898,10 @@ function coachQuestionContext() {
     todayISO,
     coachProfile: String(repository.getCoachProfile()?.profileText || "").slice(0, 14000),
     equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
-    recentActivities: records.slice(0, 6).map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
+    recentActivities: records.filter(isMainDayRecord).slice(0, 6)
+      .map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
+    complementaryActivities: records.filter(isComplementaryActivity).slice(0, 6)
+      .map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
     wearableRecovery: wearableData.days.filter(day => day.dateISO >= addDaysISO(todayISO, -6))
       .map(day => ({ dateISO: day.dateISO, steps: day.steps, sleepMinutes: day.sleepMinutes })),
     latestAnalysis: latest ? {
@@ -1065,7 +1067,7 @@ function renderHome() {
   const todayPlan = activePlanned?.session || coachSessionForDate(todayISO, block);
 
   $("currentWeekBadge").textContent = `Semana ${week.weekNumber} · ${week.weekYear}`;
-  $("todayStatus").textContent = todayRecords.length ? `${todayRecords.length} ${todayRecords.length === 1 ? "actividad" : "actividades"} hoy` : "Sin registrar hoy";
+  $("todayStatus").textContent = dayActivitySummary(todayRecords).label;
   $("homeTitle").textContent = formatLongDate(todayISO);
   $("weekRange").textContent = `${formatShortDate(week.startISO)} — ${formatShortDate(week.endISO)}`;
   $("heroWeekTheme").textContent = plannedWeek ? weekDisplayTitle(plannedWeek) : "";
@@ -1152,7 +1154,8 @@ function renderHome() {
         planLine.append(planBadge, planCopy);
         activities.append(planLine);
       }
-      for (const record of dayRecords) {
+      const orderedRecords = [...dayRecords.filter(isMainDayRecord), ...dayRecords.filter(record => !isMainDayRecord(record))];
+      for (const record of orderedRecords) {
         const line = document.createElement("div");
         line.className = "activity-line";
         const copy = document.createElement("div");
@@ -1161,7 +1164,7 @@ function renderHome() {
         dot.className = `category-dot ${record.category}`;
         const text = document.createElement("div");
         const title = document.createElement("strong");
-        title.textContent = recordTitle(record);
+        title.textContent = isComplementaryActivity(record) ? `Complemento · ${recordTitle(record)}` : recordTitle(record);
         const details = document.createElement("small");
         details.textContent = recordDetails(record);
         text.append(title, details);
@@ -4325,7 +4328,8 @@ function renderHistory() {
     heading.append(title, range);
     const count = document.createElement("span");
     count.className = "week-summary-count";
-    count.textContent = `${group.records.length} ${group.records.length === 1 ? "sesión" : "sesiones"}`;
+    const complementaryCount = group.records.filter(isComplementaryActivity).length;
+    count.textContent = `${group.records.length} ${group.records.length === 1 ? "registro" : "registros"}${complementaryCount ? ` · ${complementaryCount} complementario${complementaryCount === 1 ? "" : "s"}` : ""}`;
     summary.append(heading, count);
 
     const body = document.createElement("div");
@@ -4474,7 +4478,7 @@ function createHistoryEntry(sourceRecord) {
   top.className = "history-entry-top";
   const copy = document.createElement("div");
   const title = document.createElement("h3");
-  title.textContent = recordTitle(record);
+  title.textContent = isComplementaryActivity(record) ? `Complemento · ${recordTitle(record)}` : recordTitle(record);
   const details = document.createElement("p");
   details.textContent = recordDetails(record);
   copy.append(title, details);

@@ -1,5 +1,6 @@
 import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=71";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal } from "./nutrition-presets.js?v=71";
+import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
 const byId = id => document.getElementById(id);
@@ -182,13 +183,16 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     byId("nutritionHydrationTip").textContent = plan.hydration;
     const context = byId("nutritionActivityContext"); context.replaceChildren();
     const activities = repository.list().filter(item => item.dateISO === selectedDate);
-    const mainActivity = activities.find(item => item.category === "tennis")
-      || activities.find(item => item.category === "physical")
-      || activities.find(item => item.category === "cardio")
-      || activities.find(item => item.category === "rest");
+    const primaryActivities = activities.filter(isMainDayRecord);
+    const complements = activities.filter(isComplementaryActivity);
+    const mainActivity = primaryActivities.find(item => item.category === "tennis")
+      || primaryActivities.find(item => item.category === "physical")
+      || primaryActivities.find(item => item.category === "cardio")
+      || primaryActivities.find(item => item.category === "rest");
     const activityLine = document.createElement("p");
-    activityLine.textContent = activities.length
-      ? `Registrado en TGTrain: ${activities.slice(0, 4).map(recordTitle).join(" · ")}${activities.length > 4 ? ` y ${activities.length - 4} más` : ""}.`
+    activityLine.textContent = primaryActivities.length
+      ? `Actividad principal registrada: ${primaryActivities.map(recordTitle).join(" · ")}.${complements.length ? ` Además, ${complements.length} sesión${complements.length === 1 ? "" : "es"} complementaria${complements.length === 1 ? "" : "s"}.` : ""}`
+      : complements.length ? `${complements.length} sesión${complements.length === 1 ? "" : "es"} complementaria${complements.length === 1 ? "" : "s"} registrada${complements.length === 1 ? "" : "s"}. La actividad principal del día sigue pendiente.`
       : "Aún no hay una actividad registrada en TGTrain este día.";
     context.append(activityLine);
     const wearable = getWearableData();

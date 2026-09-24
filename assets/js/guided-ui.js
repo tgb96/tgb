@@ -150,6 +150,7 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
     panel.append(element("p", "eyebrow dark", editingRecord ? "Editar registro" : "Balance de la guía"),
       element("h2", "", editingRecord ? "Ajusta los datos guardados" : `${done}/${plan.steps.length} pasos realizados`));
     if (!editingRecord) panel.append(element("p", "", `Tiempo activo: ${clock(guidedElapsedMs(state))}. Puedes guardar la sesión aunque hayas omitido pasos.`));
+    panel.append(element("p", "", "Esta sesión se guarda como complemento. No reemplaza ni completa la actividad principal planificada para el día."));
     const form = element("form", "guided-review-form");
     form.noValidate = true;
     const dateLabel = element("label", "", "Fecha del registro");

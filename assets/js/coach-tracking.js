@@ -1,4 +1,15 @@
 // Relaciona actividades reales con el plan sin alterar distancia, duración o sensaciones.
+export const isComplementaryActivity = record => ["warmup", "stretching"].includes(record?.category);
+export const isMainDayRecord = record => ["physical", "cardio", "tennis", "rest"].includes(record?.category);
+
+export function dayActivitySummary(records = []) {
+  const main = records.filter(isMainDayRecord).length;
+  const complementary = records.filter(isComplementaryActivity).length;
+  const mainLabel = main ? `${main} actividad${main === 1 ? "" : "es"} principal${main === 1 ? "" : "es"}` : "Sin actividad principal";
+  const complementaryLabel = complementary ? ` · ${complementary} complemento${complementary === 1 ? "" : "s"}` : "";
+  return { main, complementary, label: main || complementary ? `${mainLabel}${complementaryLabel}` : "Sin registrar hoy" };
+}
+
 export function recordMatchesPlanOption(record, option) {
   if (!record || !option || record.category !== option.category) return false;
   const prefill = option.prefill || {};
@@ -14,7 +25,7 @@ export function recordMatchesPlanOption(record, option) {
 // Inicio informa lo que se registró, sin presentar una opinión de la IA como hecho.
 export function dayPlanOverview(session, dayRecords = []) {
   if (!session) return { status: "none", label: "", reason: "" };
-  dayRecords = dayRecords.filter(record => ["physical", "cardio", "tennis", "rest"].includes(record.category));
+  dayRecords = dayRecords.filter(isMainDayRecord);
   if (!dayRecords.length) return { status: "planned", label: "Previsto", reason: "Todavía no hay actividad registrada para este día." };
   const matched = dayRecords.some(record => (session.options || []).some(option => recordMatchesPlanOption(record, option)));
   if (matched) return { status: "registered", label: "Registrado", reason: "Hay una actividad registrada del mismo tipo que una opción del plan. Esto no evalúa intensidad, cargas ni sensaciones." };
@@ -49,7 +60,7 @@ export function plannedMatchForRecord(record, block) {
 // No elige arbitrariamente entre varias sesiones posibles ni cambia planes anteriores.
 export function plannedContextForRecord(record, block) {
   // Calentamiento y estiramientos son complementarios: no sustituyen ni cumplen el plan principal.
-  if (["warmup", "stretching"].includes(record?.category)) return null;
+  if (isComplementaryActivity(record)) return null;
   const exact = plannedMatchForRecord(record, block);
   if (exact) return { ...exact, exact: true };
   if (record?.planBlockId && record.planBlockId !== block?.id) return null;

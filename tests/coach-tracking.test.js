@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparableActivity, dayPlanOverview, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
+import { comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
 import { normalizeRecord } from "../assets/js/utils.js";
 
@@ -80,6 +80,27 @@ test("Inicio describe registros y cambios de plan sin afirmar cumplimiento ni pe
   assert.equal(dayPlanOverview(session, [{ category: "physical", routineId: "legs" }]).label, "Cambio de plan");
   const option = session.options[0];
   assert.equal(dayPlanOverview(session, [{ category: option.category, cardioTypeId: option.prefill.cardioTypeId }]).label, "Registrado");
+});
+
+test("calentamiento y estiramiento quedan como complementos aunque precedan al tenis", () => {
+  const session = { id: "tenis-grupal", dateISO: "2026-09-24", primaryOptionId: "group",
+    options: [{ id: "group", category: "tennis", title: "Tenis grupal", prefill: { tennisTypeId: "group-training" } }] };
+  const block = { id: "test", weeks: [{ sessions: [session] }] };
+  const warmup = { id: "calentamiento", dateISO: session.dateISO, category: "warmup" };
+  const stretching = { id: "estiramiento", dateISO: session.dateISO, category: "stretching" };
+  const tennis = { id: "tenis", dateISO: session.dateISO, category: "tennis", tennisTypeId: "group-training" };
+  assert.equal(isComplementaryActivity(warmup), true);
+  assert.equal(isComplementaryActivity(stretching), true);
+  assert.equal(isMainDayRecord(warmup), false);
+  assert.equal(dayActivitySummary([warmup, stretching]).main, 0);
+  assert.match(dayActivitySummary([warmup, stretching]).label, /Sin actividad principal/);
+  assert.equal(dayPlanOverview(session, [warmup, stretching]).status, "planned");
+  assert.equal(plannedContextForRecord(warmup, block), null);
+  assert.equal(plannedContextForRecord(stretching, block), null);
+  assert.equal(dayActivitySummary([warmup, tennis, stretching]).main, 1);
+  assert.equal(dayActivitySummary([warmup, tennis, stretching]).complementary, 2);
+  assert.equal(dayPlanOverview(session, [warmup, tennis, stretching]).status, "registered");
+  assert.equal(plannedContextForRecord(tennis, block)?.exact, true);
 });
 
 test("un descanso nunca se muestra como cumplido por un análisis antiguo", () => {
