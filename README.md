@@ -12,6 +12,8 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Bloque activo de cuatro semanas creado por el entrenador, con objetivo semanal, actividad diaria, alternativas y acceso directo al registro correspondiente.
 - Inicio que diferencia lo planificado de lo realmente realizado y marca el cumplimiento del bloque sin alterar el historial.
 - Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
+- Pestaña Nutrición con la planificación semanal de comidas e hidratación entregada por el entrenador: días de físico, tenis, recuperación y escenarios de partido. La guía se puede cambiar por fecha cuando el entrenamiento real varía.
+- Diario de comidas y agua por día, con edición y eliminación. Cada comida se anota como se consumió realmente; calorías y macros son opcionales y nunca se calculan automáticamente a partir del texto.
 - Al elegir entrenamiento físico y una rutina, se abre primero una vista previa completa; la sesión y su cronómetro solo comienzan al pulsar Iniciar entrenamiento.
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
 - Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
@@ -69,6 +71,8 @@ TGTrain utiliza semanas ISO: comienzan el lunes y terminan el domingo. El bloque
 ## Cuenta de Google y nube
 
 TGTrain mantiene primero una copia local para continuar funcionando sin conexión. Una vez configurado Firebase, el botón de estado ubicado en el encabezado permite iniciar sesión con Google. En la primera conexión combina los registros del dispositivo con los de la cuenta; después, las altas, ediciones y eliminaciones se sincronizan automáticamente. Cada registro se guarda como un documento independiente para evitar que el historial completo dependa del límite de tamaño de un único documento.
+
+El diario de nutrición se guarda en la misma copia local y respaldo JSON. Con la sesión de Google activa, sus registros se sincronizan como documentos privados independientes. Los objetivos de proteína y agua reproducen el texto del entrenador; la app no valida su adecuación clínica ni presenta los totales incompletos como consumo real exacto.
 
 Las reglas incluidas en `firestore.rules` limitan cada historial al identificador privado del usuario autenticado. Un dispositivo ya vinculado no mezcla automáticamente su copia local con una cuenta diferente. La activación está documentada en `FIREBASE_SETUP.md`.
 

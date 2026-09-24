@@ -1,10 +1,11 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=65";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=65";
+import { normalizeNutritionEntries } from "./nutrition.js?v=66";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 function parseJSON(value, fallback) {
   try {
@@ -86,15 +87,16 @@ export function loadData(storage) {
     trainingBlocks: normalizeTrainingBlocks(current.trainingBlocks),
     coachProfile: normalizeCoachProfile(current.coachProfile),
     coachQuestions: normalizeCoachQuestions(current.coachQuestions),
+    nutritionEntries: normalizeNutritionEntries(current.nutritionEntries),
     migrated: false,
     sourceKey: DATA_KEY
   };
 
   const previous = parseJSON(storage.getItem(PREVIOUS_DATA_KEY), null);
-  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
+  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
 
   const legacy = parseJSON(storage.getItem(LEGACY_HISTORY_KEY), []);
-  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
+  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
 }
 
 export function saveData(storage, data) {
@@ -104,7 +106,8 @@ export function saveData(storage, data) {
     plans: normalizePlans(data.plans),
     trainingBlocks: normalizeTrainingBlocks(data.trainingBlocks),
     coachProfile: normalizeCoachProfile(data.coachProfile),
-    coachQuestions: normalizeCoachQuestions(data.coachQuestions)
+    coachQuestions: normalizeCoachQuestions(data.coachQuestions),
+    nutritionEntries: normalizeNutritionEntries(data.nutritionEntries)
   };
   try {
     storage.setItem(DATA_KEY, JSON.stringify(payload));
@@ -139,8 +142,8 @@ export function createRepository(storage) {
     }
   }
 
-  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks, coachProfile = state.coachProfile, coachQuestions = state.coachQuestions } = {}) => {
-    state = { ...saveData(storage, { records, plans, trainingBlocks, coachProfile, coachQuestions }), migrated: false, sourceKey: DATA_KEY };
+  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks, coachProfile = state.coachProfile, coachQuestions = state.coachQuestions, nutritionEntries = state.nutritionEntries } = {}) => {
+    state = { ...saveData(storage, { records, plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries }), migrated: false, sourceKey: DATA_KEY };
     return state;
   };
 
@@ -186,6 +189,7 @@ export function createRepository(storage) {
       const incomingBlocks = normalizeTrainingBlocks(backup?.trainingBlocks);
       const incomingProfile = normalizeCoachProfile(backup?.coachProfile);
       const incomingQuestions = normalizeCoachQuestions(backup?.coachQuestions);
+      const incomingNutrition = normalizeNutritionEntries(backup?.nutritionEntries);
       const merged = new Map(state.records.map(record => [record.id, record]));
       incoming.forEach(record => merged.set(record.id, record));
       const plans = { ...state.plans };
@@ -217,12 +221,22 @@ export function createRepository(storage) {
           appliedQuestions.push(question);
         }
       });
-      persist({ records: [...merged.values()], plans, trainingBlocks, coachProfile, coachQuestions });
+      const nutritionEntries = { ...state.nutritionEntries };
+      const appliedNutrition = [];
+      Object.values(incomingNutrition).forEach(entry => {
+        const current = nutritionEntries[entry.id];
+        if (!current || recordTimestamp(entry) >= recordTimestamp(current)) {
+          nutritionEntries[entry.id] = entry;
+          appliedNutrition.push(entry);
+        }
+      });
+      persist({ records: [...merged.values()], plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries });
       incoming.forEach(record => notify({ type: "upsert", record }));
       appliedPlans.forEach(plan => notify({ type: "plan-upsert", plan }));
       appliedBlocks.forEach(block => notify({ type: "training-block-upsert", block }));
       if (incomingProfile && coachProfile === incomingProfile) notify({ type: "coach-profile-upsert", profile: incomingProfile });
       appliedQuestions.forEach(question => notify({ type: "coach-question-upsert", question }));
+      appliedNutrition.forEach(entry => notify({ type: "nutrition-upsert", entry }));
       return incoming.length;
     },
     applyCloudRecord(record) {
@@ -322,13 +336,35 @@ export function createRepository(storage) {
       persist({ coachQuestions: { ...state.coachQuestions, [next.id]: next } });
       return true;
     },
+    listNutritionEntries(dateISO = "") {
+      return Object.values(state.nutritionEntries).filter(item => !dateISO || item.dateISO === dateISO)
+        .sort((a, b) => String(a.time || a.createdAt).localeCompare(String(b.time || b.createdAt)));
+    },
+    getNutritionEntry(id) {
+      return state.nutritionEntries[String(id)] || null;
+    },
+    saveNutritionEntry(entry, { silent = false } = {}) {
+      const next = Object.values(normalizeNutritionEntries([entry]))[0];
+      if (!next) throw new Error("Completa la fecha y lo que comiste, o indica la cantidad de agua.");
+      persist({ nutritionEntries: { ...state.nutritionEntries, [next.id]: next } });
+      if (!silent) notify({ type: "nutrition-upsert", entry: next });
+      return next;
+    },
+    applyCloudNutritionEntry(entry) {
+      const next = Object.values(normalizeNutritionEntries([entry]))[0];
+      if (!next) return false;
+      const current = state.nutritionEntries[next.id];
+      if (current && recordTimestamp(current) >= recordTimestamp(next)) return false;
+      persist({ nutritionEntries: { ...state.nutritionEntries, [next.id]: next } });
+      return true;
+    },
     subscribe(listener) {
       if (typeof listener !== "function") return () => {};
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     backup() {
-      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks, coachProfile: state.coachProfile, coachQuestions: state.coachQuestions }, null, 2);
+      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks, coachProfile: state.coachProfile, coachQuestions: state.coachQuestions, nutritionEntries: state.nutritionEntries }, null, 2);
     }
   };
 }

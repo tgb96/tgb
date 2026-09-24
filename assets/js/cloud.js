@@ -56,6 +56,7 @@ export function createCloudSync({
   let unsubscribeTrainingBlocks = null;
   let unsubscribeCoachProfile = null;
   let unsubscribeCoachQuestions = null;
+  let unsubscribeNutrition = null;
   let unsubscribeWearableDays = null;
   let unsubscribeWearableSessions = null;
   let unsubscribeRepository = null;
@@ -94,8 +95,9 @@ export function createCloudSync({
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
+        observeCloudNutrition();
         observeCloudWearable();
-        emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+        emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
       } catch {
         syncError = true;
         retryDelayMs = Math.min(retryDelayMs * 2, 120000);
@@ -125,6 +127,8 @@ export function createCloudSync({
   const coachProfileDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "settings", "coachProfile");
   const coachQuestionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "coachQuestions");
   const coachQuestionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "coachQuestions", cloudDocumentId(id));
+  const nutritionCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "nutritionEntries");
+  const nutritionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "nutritionEntries", cloudDocumentId(id));
   const wearableDaysCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableDays");
   const wearableSessionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableSessions");
   let wearableDays = [];
@@ -151,6 +155,10 @@ export function createCloudSync({
       await setCloudDoc(coachQuestionDocumentReference(change.question.id), change.question);
       return;
     }
+    if (change.type === "nutrition-upsert") {
+      await setCloudDoc(nutritionDocumentReference(change.entry.id), change.entry);
+      return;
+    }
     if (change.type === "remove") {
       await setCloudDoc(documentReference(change.id), {
         id: change.id,
@@ -168,7 +176,7 @@ export function createCloudSync({
   function queueChange(change) {
     writeQueue = writeQueue
       .then(() => writeChange(change))
-      .then(() => { if (!syncError) emit("synced", "Entrenamientos y planificación sincronizados con Google."); })
+      .then(() => { if (!syncError) emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google."); })
       .catch(() => {
         syncError = true;
         emit("offline", "Hay cambios locales pendientes, incluida la planificación. Se intentará sincronizar otra vez.");
@@ -275,6 +283,24 @@ export function createCloudSync({
       if (!remoteQuestions.has(id)) questionUploads.push({ type: "coach-question-upsert", question: localQuestion });
     });
     for (const change of questionUploads) await writeChange(change);
+    const nutritionSnapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(nutritionCollectionReference()));
+    const remoteNutrition = new Map();
+    nutritionSnapshot.forEach(item => {
+      const value = item.data();
+      if (value?.id) remoteNutrition.set(String(value.id), value);
+    });
+    const localNutrition = new Map(repository.listNutritionEntries().map(entry => [entry.id, entry]));
+    const nutritionUploads = [];
+    remoteNutrition.forEach((cloudEntry, id) => {
+      const localEntry = localNutrition.get(id);
+      if (!localEntry || recordTimestamp(cloudEntry) >= recordTimestamp(localEntry)) {
+        if (repository.applyCloudNutritionEntry(cloudEntry)) localChanged = true;
+      } else nutritionUploads.push({ type: "nutrition-upsert", entry: localEntry });
+    });
+    localNutrition.forEach((localEntry, id) => {
+      if (!remoteNutrition.has(id)) nutritionUploads.push({ type: "nutrition-upsert", entry: localEntry });
+    });
+    for (const change of nutritionUploads) await writeChange(change);
     await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
     if (localChanged) onDataChanged();
   }
@@ -291,7 +317,7 @@ export function createCloudSync({
       });
       if (changed) onDataChanged();
       if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) return;
-      if (!syncError) emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+      if (!syncError) emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
     }, () => {
       syncError = true;
       emit("offline", "No se pudo actualizar el historial desde la nube. Se intentará otra vez.");
@@ -359,6 +385,22 @@ export function createCloudSync({
     });
   }
 
+  function observeCloudNutrition() {
+    unsubscribeNutrition?.();
+    unsubscribeNutrition = modules.firestoreModule.onSnapshot(nutritionCollectionReference(), snapshot => {
+      let changed = false;
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") return;
+        changed = repository.applyCloudNutritionEntry(change.doc.data()) || changed;
+      });
+      if (changed) onDataChanged();
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar el diario de alimentación. Se intentará otra vez.");
+      scheduleRetry();
+    });
+  }
+
   function observeCloudWearable() {
     unsubscribeWearableDays?.();
     unsubscribeWearableSessions?.();
@@ -388,6 +430,8 @@ export function createCloudSync({
     unsubscribeCoachProfile = null;
     unsubscribeCoachQuestions?.();
     unsubscribeCoachQuestions = null;
+    unsubscribeNutrition?.();
+    unsubscribeNutrition = null;
     unsubscribeWearableDays?.();
     unsubscribeWearableDays = null;
     unsubscribeWearableSessions?.();
@@ -417,8 +461,9 @@ export function createCloudSync({
       observeCloudTrainingBlocks();
       observeCloudCoachProfile();
       observeCloudCoachQuestions();
+      observeCloudNutrition();
       observeCloudWearable();
-      emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+      emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
     } catch {
       syncError = true;
       unsubscribeRepository = repository.subscribe(queueChange);
@@ -474,8 +519,9 @@ export function createCloudSync({
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
+        observeCloudNutrition();
         observeCloudWearable();
-        emit("synced", "Entrenamientos y planificación sincronizados con Google.");
+        emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
       } catch (error) {
         syncError = true;
         emit("offline", "No se pudo sincronizar toda la planificación. Se intentará otra vez.");
@@ -491,6 +537,7 @@ export function createCloudSync({
       unsubscribeTrainingBlocks?.();
       unsubscribeCoachProfile?.();
       unsubscribeCoachQuestions?.();
+      unsubscribeNutrition?.();
       unsubscribeWearableDays?.();
       unsubscribeWearableSessions?.();
       unsubscribeRepository?.();

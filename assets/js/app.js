@@ -22,8 +22,9 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=65";
-import { createCloudSync } from "./cloud.js?v=64";
+import { createRepository } from "./storage.js?v=66";
+import { createCloudSync } from "./cloud.js?v=66";
+import { createNutritionUI } from "./nutrition-ui.js?v=66";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=65";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=65";
 import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=63";
@@ -72,10 +73,12 @@ const cloudSync = createCloudSync({
   onDataChanged: () => {
     renderHome();
     renderHistory();
+    nutritionUI.render();
     renderCoachPlanDialog();
     updateCoachProfileButton();
   }
 });
+const nutritionUI = createNutritionUI(repository, { showToast: message => showToast(message) });
 
 let currentCategory = null;
 let editingRecordId = null;
@@ -119,7 +122,7 @@ const timerState = {
 };
 
 function showView(name) {
-  for (const viewName of ["Home", "Register", "Routines", "Timer", "History"]) {
+  for (const viewName of ["Home", "Register", "Routines", "Nutrition", "Timer", "History"]) {
     const view = $(`view${viewName}`);
     const visible = viewName.toLowerCase() === name;
     view.hidden = !visible;
@@ -135,6 +138,7 @@ function showView(name) {
   if (name === "home") renderHome();
   if (name === "routines") renderRoutines();
   if (name === "history") renderHistory();
+  if (name === "nutrition") nutritionUI.render();
   window.scrollTo({ top: 0, behavior: name === "routines" ? "auto" : "smooth" });
 }
 
@@ -4541,6 +4545,7 @@ async function importJSON(event) {
     const count = repository.importMerge(content);
     renderHome();
     renderHistory();
+    nutritionUI.render();
     showToast(`${count} registro(s) importado(s).`);
   } catch (error) {
     showToast(error.message);
@@ -4648,6 +4653,7 @@ function bindEvents() {
 }
 
 function initialize() {
+  nutritionUI.initialize();
   renderCategoryChooser();
   resetRegistration();
   initializeTimer();

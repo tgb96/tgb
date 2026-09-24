@@ -668,11 +668,70 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .data-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .data-actions button { min-height: 46px; border: 1px solid #d0d1cb; border-radius: 13px; background: white; color: var(--ink); font-size: 11px; font-weight: 850; }
 
-.bottom-nav { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); min-height: 70px; margin: auto; padding: 7px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 23px; background: rgba(17, 21, 34, 0.96); box-shadow: 0 15px 35px rgba(17, 21, 34, 0.32); backdrop-filter: blur(18px); }
+.bottom-nav { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); min-height: 70px; margin: auto; padding: 7px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 23px; background: rgba(17, 21, 34, 0.96); box-shadow: 0 15px 35px rgba(17, 21, 34, 0.32); backdrop-filter: blur(18px); }
 .nav-item { min-height: 54px; border: 0; border-radius: 17px; background: transparent; color: #949aa8; }
 .nav-item span { display: block; font-size: 21px; line-height: 1; }
 .nav-item small { display: block; margin-top: 5px; font-size: 10px; font-weight: 800; }
 .nav-item.active { background: var(--lime); color: var(--night); }
+
+.nutrition-heading { margin-bottom: 17px; }
+.nutrition-date-picker { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; margin-bottom: 14px; }
+.nutrition-date-picker > button { min-height: 48px; border: 1px solid var(--line); border-radius: 14px; background: white; font-size: 22px; }
+.nutrition-date-picker label { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 48px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 14px; background: white; color: var(--muted); font-size: 12px; font-weight: 800; }
+.nutrition-date-picker input { width: min(100%, 175px); min-height: 34px; border: 0; background: transparent; color: var(--ink); font-size: 14px; font-weight: 850; }
+.nutrition-week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 0 0 13px; }
+.nutrition-week-strip button { min-width: 0; min-height: 66px; padding: 6px 1px; border: 1px solid var(--line); border-radius: 13px; background: white; color: var(--ink); }
+.nutrition-week-strip button.active { border-color: var(--blue); background: var(--blue); color: white; }
+.nutrition-week-strip span, .nutrition-week-strip strong, .nutrition-week-strip small { display: block; }
+.nutrition-week-strip span { font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.nutrition-week-strip strong { margin: 2px 0; font-size: 18px; }
+.nutrition-week-strip small { overflow: hidden; font-size: 8px; white-space: nowrap; }
+.nutrition-day-card { padding: 20px; border-radius: 25px; background: var(--night); color: white; }
+.nutrition-day-card .eyebrow { color: var(--lime); }
+.nutrition-day-card h2 { margin: 5px 0 7px; font-size: 25px; letter-spacing: -.7px; }
+.nutrition-day-card > p:not(.eyebrow) { margin: 0; color: #d2d6df; font-size: 13px; line-height: 1.5; }
+.nutrition-day-card .nutrition-hydration-tip { margin-top: 12px !important; color: #f0f3f8 !important; }
+.nutrition-saturday-row { display: grid; gap: 6px; margin-top: 15px; font-size: 12px; font-weight: 800; }
+.nutrition-saturday-row select { min-height: 45px; padding: 0 12px; border: 0; border-radius: 13px; background: white; color: var(--ink); }
+.nutrition-targets { display: grid; gap: 7px; margin-top: 15px; }
+.nutrition-targets span { width: fit-content; padding: 8px 10px; border-radius: 999px; background: rgba(200,255,77,.15); color: var(--lime); font-size: 12px; font-weight: 850; }
+.nutrition-summary-card { margin-top: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 23px; background: white; }
+.nutrition-summary-card h2 { margin: 0 0 12px; font-size: 19px; }
+.nutrition-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.nutrition-summary div { padding: 12px; border-radius: 14px; background: var(--paper); }
+.nutrition-summary strong, .nutrition-summary span { display: block; }
+.nutrition-summary strong { font-size: 20px; }
+.nutrition-summary span { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 750; }
+.nutrition-water-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 13px; }
+.nutrition-water-actions button { min-height: 45px; padding: 6px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
+.nutrition-summary-card > p, .nutrition-disclaimer { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.nutrition-summary-card > p { margin: 12px 0 0; }
+.nutrition-slots { display: grid; gap: 11px; }
+.nutrition-slot { padding: 16px; border: 1px solid var(--line); border-radius: 21px; background: white; }
+.nutrition-slot-heading span { color: var(--blue); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; }
+.nutrition-slot h3 { margin: 4px 0 11px; font-size: 19px; }
+.nutrition-slot > p { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.nutrition-options { display: grid; gap: 7px; }
+.nutrition-options button { min-height: 43px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font-size: 12px; font-weight: 750; line-height: 1.35; text-align: left; }
+.nutrition-other-button { margin-top: 9px; padding: 8px 0; border: 0; background: none; color: var(--blue); font-size: 12px; font-weight: 850; }
+.nutrition-entry { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 11px; border-radius: 12px; background: #ebf5d7; }
+.nutrition-entry > div { flex: 1; min-width: 0; }
+.nutrition-entry strong { display: block; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
+.nutrition-entry small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; }
+.nutrition-entry button { flex: 0 0 auto; padding: 4px; border: 0; background: transparent; color: var(--blue-dark); font-size: 10px; font-weight: 900; }
+.nutrition-extra-button { width: 100%; min-height: 52px; margin-top: 13px; border: 0; border-radius: 15px; background: var(--blue); color: white; font-weight: 900; }
+.nutrition-disclaimer { margin: 14px 4px; }
+.nutrition-entry-dialog { width: min(calc(100% - 24px), 520px); max-height: calc(100dvh - 28px); margin: auto; padding: 20px; overflow: auto; border: 0; border-radius: 24px; background: white; }
+.nutrition-entry-dialog::backdrop { background: rgba(8,11,19,.7); }
+.nutrition-entry-dialog .coach-dialog-heading { margin-bottom: 16px; }
+.nutrition-entry-dialog h2 { margin: 4px 0 0; font-size: 22px; }
+.nutrition-entry-dialog label { display: block; margin: 12px 0 6px; font-size: 12px; font-weight: 850; }
+.nutrition-entry-dialog input, .nutrition-entry-dialog textarea { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--ink); }
+.nutrition-entry-dialog textarea { min-height: 96px; resize: vertical; }
+.nutrition-macros { margin: 15px 0; }
+.nutrition-macros summary { color: var(--blue); font-size: 12px; font-weight: 850; }
+.nutrition-macro-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.nutrition-entry-dialog .save-button { width: 100%; margin-top: 12px; }
 
 .toast { position: fixed; z-index: 30; left: 50%; bottom: calc(94px + env(safe-area-inset-bottom)); width: min(calc(100% - 28px), 500px); transform: translateX(-50%); padding: 13px 15px; border-radius: 15px; background: var(--night); color: white; box-shadow: 0 16px 30px rgba(17, 21, 34, 0.3); font-size: 13px; font-weight: 750; text-align: center; }
 .update-banner { position: sticky; z-index: 40; top: max(7px, env(safe-area-inset-top)); width: min(100%, 560px); margin: 0 auto 10px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 15px; background: var(--night); color: white; font-size: 12px; }
@@ -697,6 +756,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
   .history-routine-balance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .evolution-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nav-item small { font-size: 9px; }
+  .nutrition-water-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

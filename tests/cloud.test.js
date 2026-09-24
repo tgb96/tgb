@@ -38,7 +38,7 @@ test("el envío a Firebase omite campos undefined sin alterar el plan local", ()
 });
 
 test("un plan importado se sube al servidor y aparece en otro dispositivo", async () => {
-  const remote = { records: new Map(), plans: new Map(), trainingBlocks: new Map(), settings: new Map(), coachQuestions: new Map() };
+  const remote = { records: new Map(), plans: new Map(), trainingBlocks: new Map(), settings: new Map(), coachQuestions: new Map(), nutritionEntries: new Map() };
   const user = { uid: "test-user", email: "test@example.com" };
   const containsUndefined = value => value === undefined || (value && typeof value === "object"
     && Object.values(value).some(containsUndefined));
@@ -87,14 +87,17 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
     weeks: item.weeks.map(week => ({ ...week, optionalNote: undefined }))
   }));
   phone.saveCoachQuestion({ id: "question-1", question: "¿Cómo estuvo mi trote?", answer: "Cuida la rodilla.", createdAt: "2026-09-23T12:00:00.000Z", updatedAt: "2026-09-23T12:01:00.000Z" });
+  phone.saveNutritionEntry({ id: "food-1", dateISO: "2026-09-23", kind: "meal", slotId: "lunch", text: "Pollo y arroz", proteinG: 35, createdAt: "2026-09-23T13:00:00.000Z", updatedAt: "2026-09-23T13:00:00.000Z" });
   const phoneCloud = await connect(phone, phoneStorage);
   assert.equal(remote.trainingBlocks.get(block.id).title, "Plan del teléfono");
   assert.equal([...remote.coachQuestions.values()][0].answer, "Cuida la rodilla.");
+  assert.equal([...remote.nutritionEntries.values()][0].text, "Pollo y arroz");
   const computerStorage = makeStorage();
   const computer = createRepository(computerStorage);
   const computerCloud = await connect(computer, computerStorage);
   assert.equal(computer.listTrainingBlocks()[0].title, "Plan del teléfono");
   assert.equal(computer.listCoachQuestions()[0].answer, "Cuida la rodilla.");
+  assert.equal(computer.listNutritionEntries()[0].proteinG, 35);
   phoneCloud.destroy();
   computerCloud.destroy();
 });

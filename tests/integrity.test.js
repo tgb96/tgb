@@ -14,15 +14,17 @@ test("el enlace de Android entrega un APK y no lo guarda en la caché PWA", asyn
   assert.ok((await stat(resolve(root, "downloads/tgtrain-sync-0.2.0.apk"))).size > 1_000_000);
 });
 
-test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async () => {
+test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   assert.match(html, /assets\/css\/styles\.css/);
   assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
-  assert.equal([...html.matchAll(/class="nav-item/g)].length, 4);
+  assert.equal([...html.matchAll(/class="nav-item/g)].length, 5);
   assert.doesNotMatch(html, /class="nav-item"[^>]+data-view-target="routines"/);
   assert.match(html, /id="viewRoutines"/);
   assert.match(html, /id="viewTimer"/);
+  assert.match(html, /id="viewNutrition"/);
+  assert.match(html, /id="nutritionEntryForm"/);
   assert.match(html, /id="timerWorkDuration"/);
   assert.match(html, /id="timerStageLabel"/);
   assert.match(html, /id="sensationSuggestions"/);
@@ -186,11 +188,19 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v65/);
+  assert.match(worker, /tgtrain-shell-v66/);
   assert.match(worker, /coach-tracking\.js\?v=63/);
+});
+
+test("la vista de nutrición enlaza todos sus controles", async () => {
+  const html = await readFile(resolve(root, "index.html"), "utf8");
+  const ui = await readFile(resolve(root, "assets/js/nutrition-ui.js"), "utf8");
+  for (const [, id] of ui.matchAll(/byId\("([^"]+)"\)/g)) {
+    assert.match(html, new RegExp(`id="${id}"`), `Falta el control ${id}`);
+  }
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {

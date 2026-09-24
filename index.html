@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=65">
+  <link rel="stylesheet" href="assets/css/styles.css?v=66">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -25,7 +25,7 @@
     <header class="app-header">
       <button class="brand" type="button" data-view-target="home" aria-label="Ir al inicio">
         <img class="brand-mark" src="assets/brand/tgtrain-mark-160.png?v=36" alt="">
-        <span class="brand-copy"><strong class="brand-name"><span>TG</span>Train</strong><small>Entrenamiento semanal</small></span>
+        <span class="brand-copy"><strong class="brand-name"><span>TG</span>Train</strong><small>Entrenamiento y nutrición</small></span>
       </button>
       <button id="cloudStatusButton" class="cloud-status-button" type="button" aria-haspopup="dialog">
         <span class="cloud-status-dot" aria-hidden="true"></span>
@@ -168,6 +168,54 @@
         <p>Trabaja a intensidad moderada, prioriza la técnica y evita llegar al fallo. Al finalizar podrás elegir si tus ajustes serán el punto de partida de la próxima sesión.</p>
       </aside>
       <div id="routineLibrary" class="routine-library"></div>
+    </section>
+
+    <section id="viewNutrition" class="view hidden" hidden aria-labelledby="nutritionHeading">
+      <div class="page-heading nutrition-heading">
+        <div>
+          <p class="eyebrow dark">Alimentación e hidratación</p>
+          <h1 id="nutritionHeading">Nutrición para tu semana</h1>
+          <p class="page-subtitle">Tu plan es una guía. Registra lo que realmente comiste y bebiste, incluso si fue distinto.</p>
+        </div>
+      </div>
+      <div class="nutrition-date-picker">
+        <button id="nutritionPreviousDay" type="button" aria-label="Día anterior">←</button>
+        <label for="nutritionDate">Día <input id="nutritionDate" type="date"></label>
+        <button id="nutritionNextDay" type="button" aria-label="Día siguiente">→</button>
+      </div>
+      <div id="nutritionWeekStrip" class="nutrition-week-strip" aria-label="Elegir día de la semana"></div>
+      <section class="nutrition-day-card" aria-live="polite">
+        <p class="eyebrow">Plan del entrenador</p>
+        <h2 id="nutritionDayTitle"></h2>
+        <p id="nutritionDayDescription"></p>
+        <label class="nutrition-saturday-row" for="nutritionDayMode">Ajustar guía si cambió el entrenamiento
+          <select id="nutritionDayMode">
+            <option value="default">Según el plan semanal</option>
+            <option value="physical">Entrenamiento físico</option>
+            <option value="tennis">Tenis grupal</option>
+            <option value="recovery">Descanso / recuperación</option>
+            <option value="early">Partido 13:45</option>
+            <option value="late">Partido 17:15</option>
+            <option value="other">Trekking / cardio sin partido</option>
+          </select>
+        </label>
+        <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
+        <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
+      </section>
+      <section class="nutrition-summary-card" aria-labelledby="nutritionSummaryTitle">
+        <h2 id="nutritionSummaryTitle">Lo que llevas registrado</h2>
+        <div id="nutritionSummary" class="nutrition-summary"></div>
+        <div class="nutrition-water-actions">
+          <button type="button" data-water-ml="250">+ 250 ml agua</button>
+          <button type="button" data-water-ml="500">+ 500 ml agua</button>
+          <button id="nutritionCustomWater" type="button">Otra cantidad</button>
+        </div>
+        <p>Solo se suman los nutrientes que tú ingreses; si faltan datos, el total es parcial. El agua registrada no incluye bebidas de comidas salvo que la añadas.</p>
+      </section>
+      <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
+      <div id="nutritionSlots" class="nutrition-slots"></div>
+      <button id="nutritionExtraMeal" class="nutrition-extra-button" type="button">+ Registrar otra comida o colación</button>
+      <p class="nutrition-disclaimer">Esta planificación fue entregada por tu entrenador. TGTrain no calcula automáticamente calorías o nutrientes ni sustituye una evaluación nutricional individual.</p>
     </section>
 
     <section id="viewTimer" class="view hidden" hidden aria-labelledby="timerHeading">
@@ -379,12 +427,38 @@
     </div>
   </dialog>
 
+  <dialog id="nutritionEntryDialog" class="nutrition-entry-dialog" aria-labelledby="nutritionEntryTitle">
+    <form id="nutritionEntryForm" novalidate>
+      <div class="coach-dialog-heading">
+        <div><p class="eyebrow dark">Diario real</p><h2 id="nutritionEntryTitle">Registrar comida</h2></div>
+        <button id="nutritionEntryClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <label for="nutritionMealTime">Hora</label>
+      <input id="nutritionMealTime" type="time" required>
+      <label for="nutritionMealText">¿Qué comiste y cuánto? <small>(obligatorio)</small></label>
+      <textarea id="nutritionMealText" rows="4" maxlength="1000" placeholder="Ej.: 2 huevos, 2 rebanadas de pan y 1 plátano" required></textarea>
+      <details class="nutrition-macros"><summary>Agregar kcal y macros de etiqueta o medición (opcional)</summary>
+        <div class="nutrition-macro-grid">
+          <label>kcal<input id="nutritionMealCalories" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
+          <label>Proteína (g)<input id="nutritionMealProtein" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
+          <label>Carbohidratos (g)<input id="nutritionMealCarbs" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
+          <label>Grasas (g)<input id="nutritionMealFat" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
+        </div>
+      </details>
+      <p id="nutritionEntryMessage" class="form-message hidden" role="status"></p>
+      <button class="save-button" type="submit">Guardar lo que comí</button>
+    </form>
+  </dialog>
+
   <nav class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
       <span aria-hidden="true">⌂</span><small>Inicio</small>
     </button>
     <button class="nav-item" type="button" data-view-target="register">
       <span aria-hidden="true">＋</span><small>Registrar</small>
+    </button>
+    <button class="nav-item" type="button" data-view-target="nutrition">
+      <span aria-hidden="true">◉</span><small>Nutrición</small>
     </button>
     <button class="nav-item" type="button" data-view-target="timer">
       <span aria-hidden="true">◷</span><small>Timer</small>
@@ -396,6 +470,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=65"></script>
+  <script type="module" src="assets/js/app.js?v=66"></script>
 </body>
 </html>
