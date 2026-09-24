@@ -34,6 +34,26 @@ test("un registro sin horario solo ofrece la misma fecha para confirmación manu
   assert.match(candidates[0].match.reason, /Mismo día/);
 });
 
+test("la hora manual de inicio prioriza la sesión correcta de la pulsera", () => {
+  const running = { ...manual, category: "cardio", cardioTypeId: "running", routineStartedAt: "", routineEndedAt: "",
+    activityStartTime: "11:05", durationSeconds: 1800 };
+  const morning = { ...band, id: "morning", title: "Trote", startTime: "2026-09-22T14:04:00Z",
+    endTime: "2026-09-22T14:34:00Z", durationSeconds: 1800 };
+  const evening = { ...band, id: "evening", title: "Trote", startTime: "2026-09-22T22:00:00Z",
+    endTime: "2026-09-22T22:30:00Z", durationSeconds: 1800 };
+  const candidates = wearableCandidates(running, [evening, morning]);
+  assert.equal(candidates[0].session.id, "morning");
+  assert.match(candidates[0].match.reason, /inicio muy cercana/);
+});
+
+test("una sesión completa de tenis no se ofrece para un calentamiento breve", () => {
+  const warmup = { ...manual, category: "warmup", routineStartedAt: "", routineEndedAt: "",
+    guidedStartedAt: "2026-09-22T14:00:00Z", guidedEndedAt: "2026-09-22T14:10:00Z",
+    durationSeconds: 600 };
+  const tennis = { ...band, title: "Tenis", durationSeconds: 3600 };
+  assert.deepEqual(wearableCandidates(warmup, [tennis]), []);
+});
+
 test("una rutina que cruza medianoche admite la sesión con horario superpuesto", () => {
   const late = { ...manual, dateISO: "2026-09-22", routineStartedAt: "2026-09-23T02:45:00Z", routineEndedAt: "2026-09-23T03:25:00Z" };
   const overnight = { ...band, dateISO: "2026-09-23", startTime: "2026-09-23T02:47:00Z", endTime: "2026-09-23T03:26:00Z" };

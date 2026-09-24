@@ -14,6 +14,7 @@ export function recordMatchesPlanOption(record, option) {
 // Inicio informa lo que se registró, sin presentar una opinión de la IA como hecho.
 export function dayPlanOverview(session, dayRecords = []) {
   if (!session) return { status: "none", label: "", reason: "" };
+  dayRecords = dayRecords.filter(record => ["physical", "cardio", "tennis", "rest"].includes(record.category));
   if (!dayRecords.length) return { status: "planned", label: "Previsto", reason: "Todavía no hay actividad registrada para este día." };
   const matched = dayRecords.some(record => (session.options || []).some(option => recordMatchesPlanOption(record, option)));
   if (matched) return { status: "registered", label: "Registrado", reason: "Hay una actividad registrada del mismo tipo que una opción del plan. Esto no evalúa intensidad, cargas ni sensaciones." };
@@ -47,6 +48,8 @@ export function plannedMatchForRecord(record, block) {
 // Una actividad distinta también es contexto del día, no cumplimiento automático.
 // No elige arbitrariamente entre varias sesiones posibles ni cambia planes anteriores.
 export function plannedContextForRecord(record, block) {
+  // Calentamiento y estiramientos son complementarios: no sustituyen ni cumplen el plan principal.
+  if (["warmup", "stretching"].includes(record?.category)) return null;
   const exact = plannedMatchForRecord(record, block);
   if (exact) return { ...exact, exact: true };
   if (record?.planBlockId && record.planBlockId !== block?.id) return null;

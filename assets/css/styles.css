@@ -109,9 +109,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .wearable-sessions { display: grid; gap: 7px; margin-top: 14px; }
 .wearable-sessions:empty { display: none; }
 .wearable-sessions > strong { margin-bottom: 3px; font-size: 12px; }
-.wearable-session { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; }
+.wearable-session { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; }
 .wearable-session strong { min-width: 0; font-size: 12px; }
-.wearable-session span { color: var(--muted); font-size: 10px; text-align: right; }
+.wearable-session span, .wearable-session small { color: var(--muted); font-size: 10px; text-align: left; }
+.wearable-session button { width: fit-content; min-height: 32px; margin-top: 3px; padding: 6px 9px; border: 0; border-radius: 9px; background: var(--night); color: var(--lime); font-size: 10px; font-weight: 850; }
 
 .section-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 28px 2px 13px; }
 .section-title-row h2, .data-card h2 { margin: 0; font-size: 22px; line-height: 1.1; letter-spacing: -0.8px; }
@@ -135,6 +136,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-dot.physical { background: #7ba511; }
 .category-dot.cardio { background: var(--coral); }
 .category-dot.tennis { background: var(--blue); }
+.category-dot.warmup { background: #81b521; }
+.category-dot.stretching { background: #5e79d6; }
 .category-dot.rest { background: #8c63d9; }
 .activity-copy { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 
@@ -253,6 +256,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .category-icon.physical { color: var(--lime); }
 .category-icon.cardio { color: #ff9b85; }
 .category-icon.tennis { color: #aabaff; }
+.category-icon.warmup { color: var(--lime); }
+.category-icon.stretching { color: #aabaff; }
 .routine-launch-heading { margin: 2px 2px 14px; }
 .routine-launch-heading h2 { margin: 0; font-size: 22px; letter-spacing: -0.7px; }
 .routine-launch-heading p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
@@ -269,7 +274,54 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .routine-launch-action { color: var(--blue); font-size: 10px; font-weight: 900; white-space: nowrap; }
 .category-icon.rest { color: #d8bfff; }
 
+.guided-heading { min-height: 0; justify-content: space-between; align-items: flex-start; }
+.guided-heading .guided-back { flex: 0 0 auto; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: white; font-size: 11px; font-weight: 850; }
+.guided-safety { margin: -5px 0 15px; padding: 12px 14px; border-left: 4px solid var(--coral); border-radius: 10px; background: #fff1ec; color: #563e38; font-size: 12px; line-height: 1.5; }
+.guided-preview, .guided-active, .guided-review { padding: 19px; border-radius: 25px; background: var(--night); color: white; }
+.guided-preview > strong { display: block; font-size: 18px; }
+.guided-preview > p { color: #d9dce6; font-size: 12px; line-height: 1.5; }
+.guided-gentle { display: flex; align-items: flex-start; gap: 9px; margin: 13px 0; font-size: 12px; line-height: 1.4; }
+.guided-gentle input { width: 18px; height: 18px; accent-color: var(--lime); }
+.guided-primary { min-height: 50px; padding: 10px 14px; border: 0; border-radius: 13px; background: var(--lime); color: var(--night); font-size: 13px; font-weight: 900; }
+.guided-preview > .guided-primary { width: 100%; }
+.guided-secondary { min-height: 44px; padding: 8px 11px; border: 1px solid rgba(255,255,255,.25); border-radius: 13px; background: rgba(255,255,255,.09); color: white; font-size: 12px; font-weight: 850; }
+.guided-step-list { display: grid; gap: 8px; margin: 15px 0; padding: 0; list-style: none; }
+.guided-step-list li { padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.guided-step-list li.active { border-color: var(--blue); box-shadow: inset 4px 0 0 var(--blue); }
+.guided-step-list li.done { background: #e8f5d2; }
+.guided-step-list li.skipped { opacity: .62; }
+.guided-step-list strong, .guided-step-list small { display: block; }
+.guided-step-list strong { font-size: 13px; }
+.guided-step-list small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.guided-position { margin: 0 0 7px; color: var(--lime); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .7px; }
+.guided-active h2 { margin: 0; font-size: 25px; line-height: 1.15; }
+.guided-countdown { display: block; margin: 14px 0; color: var(--lime); font-size: clamp(66px, 18vw, 95px); line-height: 1; letter-spacing: -4px; font-variant-numeric: tabular-nums; }
+.guided-instruction { margin: 10px 0; font-size: 15px; line-height: 1.5; }
+.guided-alternative { padding: 10px; border-radius: 10px; background: rgba(255,255,255,.11); color: #e6eaf1; font-size: 12px; line-height: 1.45; }
+.guided-time-status { color: #b7ff70; font-size: 11px; }
+.guided-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 16px; }
+.guided-controls button { min-width: 0; padding: 7px 4px; font-size: 11px; }
+.guided-end-early { margin-top: 13px; padding: 8px 0; border: 0; background: transparent; color: #d9dce6; font-size: 11px; text-decoration: underline; }
+.guided-elapsed, .guided-sources { margin: 12px 2px; color: var(--muted); font-size: 11px; }
+.guided-sources a { color: var(--blue-dark); }
+.guided-review h2 { margin: 4px 0 8px; font-size: 25px; }
+.guided-review > p:not(.eyebrow) { color: #d9dce6; font-size: 12px; }
+.guided-review-form { display: grid; gap: 12px; margin-top: 14px; }
+.guided-review-form label { display: grid; gap: 6px; color: #eef0f6; font-size: 12px; font-weight: 800; }
+.guided-review-form input, .guided-review-form textarea, .guided-review-form select { width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: 10px; background: white; color: var(--ink); }
+.guided-review-form textarea { resize: vertical; }
+.guided-sensation-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.guided-sensation-chips button { min-height: 34px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; background: rgba(255,255,255,.12); color: white; font-size: 10px; }
+.guided-review-actions { display: grid; gap: 8px; }
+.guided-review-actions .save-button { width: 100%; margin: 0; }
+.guided-error { margin: 0; color: #ffb7a6; font-size: 12px; }
+
 .training-form { padding: 18px; border: 1px solid var(--line); border-radius: 28px; background: white; box-shadow: 0 20px 45px rgba(30, 35, 50, 0.08); }
+.activity-start-time-row { margin: 4px 0 16px; padding: 12px; border-radius: 14px; background: #eef2ff; }
+.activity-start-time-row label, .activity-start-time-row small { display: block; }
+.activity-start-time-row label { margin: 0 0 6px; font-size: 12px; font-weight: 850; }
+.activity-start-time-row input { width: 100%; min-height: 42px; padding: 8px; border: 1px solid #c8d2fb; border-radius: 10px; background: white; }
+.activity-start-time-row small { margin-top: 6px; color: var(--muted); font-size: 10px; }
 .planned-physical-fields { margin: 15px 0; padding: 14px; border-radius: 18px; background: #f0f3ff; }
 .planned-physical-fields h2 { margin: 0; font-size: 19px; }
 .planned-physical-fields p, .planned-physical-fields ul { color: #4e566b; font-size: 12px; line-height: 1.5; }
@@ -691,6 +743,12 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-day-card h2 { margin: 5px 0 7px; font-size: 25px; letter-spacing: -.7px; }
 .nutrition-day-card > p:not(.eyebrow) { margin: 0; color: #d2d6df; font-size: 13px; line-height: 1.5; }
 .nutrition-day-card .nutrition-hydration-tip { margin-top: 12px !important; color: #f0f3f8 !important; }
+.nutrition-context-card { margin-top: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 22px; background: white; }
+.nutrition-context-card h2 { margin: 4px 0 10px; font-size: 19px; }
+.nutrition-context-card p:not(.eyebrow) { margin: 7px 0; color: #4e5663; font-size: 12px; line-height: 1.45; }
+.nutrition-context-card > div > small { display: block; margin-top: 9px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.nutrition-plan-adjust { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 13px; background: #ecf2ff; color: var(--ink); font-size: 11px; line-height: 1.4; }
+.nutrition-plan-adjust button { width: fit-content; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--blue); color: white; font-size: 11px; font-weight: 850; }
 .nutrition-saturday-row { display: grid; gap: 6px; margin-top: 15px; font-size: 12px; font-weight: 800; }
 .nutrition-saturday-row select { min-height: 45px; padding: 0 12px; border: 0; border-radius: 13px; background: white; color: var(--ink); }
 .nutrition-targets { display: grid; gap: 7px; margin-top: 15px; }

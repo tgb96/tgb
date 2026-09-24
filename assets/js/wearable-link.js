@@ -27,8 +27,8 @@ export function normalizeWearableSnapshot(value) {
 }
 
 function recordWindow(record) {
-  const start = Date.parse(record.routineStartedAt || "");
-  const end = Date.parse(record.routineEndedAt || "");
+  const start = Date.parse(record.routineStartedAt || record.guidedStartedAt || "");
+  const end = Date.parse(record.routineEndedAt || record.guidedEndedAt || "");
   return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 }
 
@@ -46,11 +46,15 @@ export function wearableMatch(record, session) {
   if (session.dateISO !== record.dateISO && !overlaps) return null;
   const recordedSeconds = numberOrNull(record.durationSeconds) ?? (numberOrNull(record.durationMinutes) || 0) * 60;
   const bandSeconds = numberOrNull(session.durationSeconds) || 0;
+  // Una sesión de tenis de 90 min no debe aparecer como pulsera del calentamiento de 10 min.
+  if (["warmup", "stretching"].includes(record.category) && recordedSeconds > 0 && bandSeconds > recordedSeconds * 1.75) return null;
   const durationDifference = recordedSeconds > 0 && bandSeconds > 0
     ? Math.abs(recordedSeconds - bandSeconds) / Math.max(recordedSeconds, bandSeconds) : 1;
   const title = String(session.title || "").toLowerCase();
   const sameType = record.category === "physical" ? /físico|fuerza|pesas/.test(title)
     : record.category === "tennis" ? /tenis/.test(title)
+      : record.category === "warmup" ? /calentamiento|warm.?up/.test(title)
+        : record.category === "stretching" ? /estiramiento|stretch|movilidad/.test(title)
       : record.cardioTypeId === "running" ? /trote|correr/.test(title)
         : record.cardioTypeId === "trekking" ? /trekking|senderismo/.test(title)
           : record.cardioTypeId?.startsWith("bik") ? /bicicleta/.test(title) : false;
@@ -69,6 +73,15 @@ export function wearableMatch(record, session) {
       score -= 30;
       reason = "Horarios distintos; revisa antes de vincular";
     }
+  } else if (record.activityStartTime && band && session.dateISO === record.dateISO) {
+    const bandLocal = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(band.start));
+    const [recordHour, recordMinute] = record.activityStartTime.split(":").map(Number);
+    const [bandHour, bandMinute] = bandLocal.split(":").map(Number);
+    const rawDifference = Math.abs((recordHour * 60 + recordMinute) - (bandHour * 60 + bandMinute));
+    const difference = Math.min(rawDifference, 1440 - rawDifference);
+    if (difference <= 10) { score += 85; reason = "Hora de inicio muy cercana"; }
+    else if (difference <= 30) { score += 45; reason = "Hora de inicio cercana"; }
+    else if (difference > 120) { score -= 25; reason = "Hora de inicio distinta; revisa antes de vincular"; }
   }
   return { score, reason };
 }
@@ -87,6 +100,8 @@ export function wearableSummaryText(snapshot) {
   const data = normalizeWearableSnapshot(snapshot);
   if (!data) return "";
   const parts = [];
+  if (data.durationSeconds !== null) parts.push(`${Math.round(data.durationSeconds / 60)} min`);
+  if (data.distanceMeters !== null && data.distanceMeters > 0) parts.push(`${(data.distanceMeters / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} km`);
   if (data.heartRateAvgBpm !== null) parts.push(`FC media ${Math.round(data.heartRateAvgBpm)} lpm`);
   if (data.heartRateMaxBpm !== null) parts.push(`máxima ${Math.round(data.heartRateMaxBpm)} lpm`);
   if (data.activeCaloriesKcal !== null) parts.push(`${Math.round(data.activeCaloriesKcal)} kcal activas estimadas`);

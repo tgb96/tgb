@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=66">
+  <link rel="stylesheet" href="assets/css/styles.css?v=67">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -131,6 +131,11 @@
         <div id="categoryFields"></div>
 
         <div id="commonFields" class="common-fields">
+          <div id="activityStartTimeRow" class="activity-start-time-row hidden">
+            <label for="activityStartTime">Hora aproximada de inicio (opcional)</label>
+            <input id="activityStartTime" name="activityStartTime" type="time">
+            <small>Ayuda a encontrar la sesión correcta de la pulsera; no inicia ningún reloj.</small>
+          </div>
           <div class="two-columns common-metrics">
             <div id="durationField"></div>
             <div>
@@ -152,6 +157,10 @@
         <button id="saveTrainingButton" class="save-button" type="submit">Guardar entrenamiento</button>
         <button id="cancelEditButton" class="text-button hidden" type="button">Cancelar edición</button>
       </form>
+    </section>
+
+    <section id="viewGuided" class="view hidden" hidden aria-label="Sesión guiada de calentamiento o estiramientos">
+      <div id="guidedContent"></div>
     </section>
 
     <section id="viewRoutines" class="view hidden" hidden aria-labelledby="routinesHeading">
@@ -201,6 +210,11 @@
         </label>
         <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
         <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
+      </section>
+      <section class="nutrition-context-card" aria-labelledby="nutritionContextTitle">
+        <p class="eyebrow dark">Plan + realidad + pulsera</p>
+        <h2 id="nutritionContextTitle">Contexto de este día</h2>
+        <div id="nutritionActivityContext"></div>
       </section>
       <section class="nutrition-summary-card" aria-labelledby="nutritionSummaryTitle">
         <h2 id="nutritionSummaryTitle">Lo que llevas registrado</h2>
@@ -470,6 +484,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=66"></script>
+  <script type="module" src="assets/js/app.js?v=67"></script>
 </body>
 </html>

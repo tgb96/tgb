@@ -15,21 +15,22 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=63";
+} from "./data.js?v=67";
 import {
   coachOption,
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=66";
+import { createRepository } from "./storage.js?v=67";
 import { createCloudSync } from "./cloud.js?v=66";
-import { createNutritionUI } from "./nutrition-ui.js?v=66";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=65";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=65";
-import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=63";
+import { createNutritionUI } from "./nutrition-ui.js?v=67";
+import { createGuidedUI } from "./guided-ui.js?v=67";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=67";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=67";
+import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=67";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableSummaryText } from "./wearable-link.js?v=65";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -54,7 +55,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=65";
+} from "./utils.js?v=67";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -68,6 +69,7 @@ const cloudSync = createCloudSync({
     wearableData = data;
     renderWearable();
     renderHistory();
+    nutritionUI.render();
     if (loadRoutineSession()?.status === "complete") renderRoutines();
   },
   onDataChanged: () => {
@@ -78,7 +80,27 @@ const cloudSync = createCloudSync({
     updateCoachProfileButton();
   }
 });
-const nutritionUI = createNutritionUI(repository, { showToast: message => showToast(message) });
+const nutritionUI = createNutritionUI(repository, {
+  showToast: message => showToast(message),
+  getWearableData: () => wearableData
+});
+const guidedUI = createGuidedUI(repository, {
+  showView: name => showView(name),
+  showToast: message => showToast(message),
+  onSaved: record => {
+    openHistoryRecord(record.id);
+    showToast("Sesión guardada. Si la registraste con la banda, vincúlala aquí cuando aparezca.");
+  }
+});
+
+function openHistoryRecord(recordId) {
+  showView("history");
+  const entry = [...document.querySelectorAll(".history-entry")].find(item => item.dataset.recordId === recordId);
+  if (!entry) return;
+  const week = entry.closest("details"); if (week) week.open = true;
+  const choices = entry.querySelector(".wearable-link-choices"); if (choices) choices.open = true;
+  requestAnimationFrame(() => entry.scrollIntoView({ behavior: "smooth", block: "center" }));
+}
 
 let currentCategory = null;
 let editingRecordId = null;
@@ -122,13 +144,13 @@ const timerState = {
 };
 
 function showView(name) {
-  for (const viewName of ["Home", "Register", "Routines", "Nutrition", "Timer", "History"]) {
+  for (const viewName of ["Home", "Register", "Guided", "Routines", "Nutrition", "Timer", "History"]) {
     const view = $(`view${viewName}`);
     const visible = viewName.toLowerCase() === name;
     view.hidden = !visible;
     view.classList.toggle("hidden", !visible);
   }
-  const activeNavTarget = name === "routines" ? "register" : name;
+  const activeNavTarget = ["routines", "guided"].includes(name) ? "register" : name;
   document.querySelectorAll(".nav-item").forEach(button => {
     const active = button.dataset.viewTarget === activeNavTarget;
     button.classList.toggle("active", active);
@@ -137,6 +159,7 @@ function showView(name) {
   });
   if (name === "home") renderHome();
   if (name === "routines") renderRoutines();
+  if (name === "guided") guidedUI.render();
   if (name === "history") renderHistory();
   if (name === "nutrition") nutritionUI.render();
   window.scrollTo({ top: 0, behavior: name === "routines" ? "auto" : "smooth" });
@@ -152,6 +175,10 @@ function activeTrainingBlock() {
   return newestTrainingBlock(repository.listTrainingBlocks()) || coachTrainingBlock;
 }
 
+function isMainDayRecord(record) {
+  return ["physical", "cardio", "tennis", "rest"].includes(record.category);
+}
+
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
   const related = records.filter(record => plannedContextForRecord(record, block)?.session.id === session?.id);
   // Preferir la actividad que sí cubre la opción prevista, sin ocultar otras actividades del día.
@@ -163,7 +190,7 @@ function planRecordForSession(session, records = repository.list(), block = acti
 function createPlanActualFeedback(session, records, block = activeTrainingBlock()) {
   const box = document.createElement("div");
   box.className = "plan-actual-feedback";
-  const dayRecords = records.filter(record => record.dateISO === session.dateISO);
+  const dayRecords = records.filter(record => record.dateISO === session.dateISO && isMainDayRecord(record));
   const overview = dayPlanOverview(session, dayRecords);
   dayRecords.forEach(record => {
     const row = document.createElement("p");
@@ -281,7 +308,7 @@ function openPlannedOption(session, optionId, { startNow = false } = {}) {
     showToast(`Esta sesión estará disponible el ${formatShortDate(session.dateISO)}.`);
     return;
   }
-  if (repository.list().some(record => record.dateISO === session.dateISO)) {
+  if (repository.list().some(record => record.dateISO === session.dateISO && isMainDayRecord(record))) {
     $("coachPlanDialog")?.close();
     $("plannedActivityDialog")?.close();
     showView("history");
@@ -460,7 +487,7 @@ function createPlanOptionButton(session, option, records, { compact = false } = 
   const button = document.createElement("button");
   button.type = "button";
   button.className = compact ? "coach-option-button compact" : "coach-option-button";
-  const hasActivity = records.some(record => record.dateISO === session.dateISO);
+  const hasActivity = records.some(record => record.dateISO === session.dateISO && isMainDayRecord(record));
   const future = session.dateISO > getChileDateISO();
   button.disabled = future;
   button.textContent = future ? `Disponible ${formatShortDate(session.dateISO)}` : hasActivity ? "Ver registro" : `Elegir ${option.title}`;
@@ -528,7 +555,7 @@ function renderCoachPlanDialog(records = repository.list()) {
     const todayISO = getChileDateISO();
     weekCard.open = coachWeekForDate(todayISO, block)?.weekKey === week.weekKey
       || (todayISO < block.startISO && weekIndex === 0);
-    const completed = week.sessions.filter(session => records.some(record => record.dateISO === session.dateISO)).length;
+    const completed = week.sessions.filter(session => records.some(record => record.dateISO === session.dateISO && isMainDayRecord(record))).length;
     const summary = document.createElement("summary");
     const copy = document.createElement("div");
     const eyebrow = document.createElement("span");
@@ -548,7 +575,7 @@ function renderCoachPlanDialog(records = repository.list()) {
       const day = document.createElement("article");
       day.className = "coach-session-card";
       if (session.dateISO === getChileDateISO()) day.classList.add("today");
-      const overview = dayPlanOverview(session, records.filter(record => record.dateISO === session.dateISO));
+      const overview = dayPlanOverview(session, records.filter(record => record.dateISO === session.dateISO && isMainDayRecord(record)));
       if (overview.status === "registered") day.classList.add("complete");
       const heading = document.createElement("div");
       const date = document.createElement("span");
@@ -818,6 +845,7 @@ function openRegistrationOrActiveRoutine() {
     ensureRoutineSessionTicker();
     return;
   }
+  if (guidedUI.resumePending()) return;
   openRegistration();
 }
 
@@ -1028,7 +1056,8 @@ function renderHome() {
   const allRecords = repository.list();
   const records = allRecords.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const todayRecords = records.filter(record => record.dateISO === todayISO);
-  const activeDays = new Set(records.filter(record => record.category !== "rest").map(record => record.dateISO)).size;
+  const activeDays = new Set(records.filter(record => isMainDayRecord(record) && record.category !== "rest").map(record => record.dateISO)).size;
+  const todayMainRecords = todayRecords.filter(isMainDayRecord);
   const plannedWeek = coachWeekForDate(todayISO, block);
   const plannedState = loadPlannedActivity();
   const activePlanned = plannedActivityContext(plannedState);
@@ -1044,16 +1073,16 @@ function renderHome() {
   plannedPanel.classList.toggle("hidden", !todayPlan);
   if (todayPlan) {
     const option = coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0];
-    const overview = dayPlanOverview(todayPlan, todayRecords);
+    const overview = dayPlanOverview(todayPlan, todayMainRecords);
     const inProgress = activePlanned?.session.id === todayPlan.id;
-    $("heroPlannedLabel").textContent = inProgress ? "Actividad en curso" : todayRecords.length ? "Actividad de hoy" : "Plan de hoy";
-    $("heroPlannedTitle").textContent = !inProgress && todayRecords.length ? todayRecords.map(recordTitle).join(" · ") : option.title;
-    $("heroPlannedSummary").textContent = inProgress ? todayPlan.objective : todayRecords.length
+    $("heroPlannedLabel").textContent = inProgress ? "Actividad en curso" : todayMainRecords.length ? "Actividad de hoy" : "Plan de hoy";
+    $("heroPlannedTitle").textContent = !inProgress && todayMainRecords.length ? todayMainRecords.map(recordTitle).join(" · ") : option.title;
+    $("heroPlannedSummary").textContent = inProgress ? todayPlan.objective : todayMainRecords.length
       ? `${overview.reason} Plan previsto: ${option.title}.`
       : todayPlan.objective || option.summary;
     $("startPlannedActivityButton").textContent = inProgress
       ? plannedState.status === "active" ? "Continuar actividad en curso" : "Completar registro programado"
-      : todayRecords.length ? "Ver registro en historial"
+      : todayMainRecords.length ? "Ver registro en historial"
         : "Iniciar actividad programada";
   }
   $("weekProgress").textContent = `${activeDays}/7 días`;
@@ -1109,7 +1138,7 @@ function renderHome() {
       if (plannedSession) {
         const primary = coachOption(plannedSession, plannedSession.primaryOptionId) || plannedSession.options[0];
         const planLine = document.createElement("div");
-        const overview = dayPlanOverview(plannedSession, dayRecords);
+        const overview = dayPlanOverview(plannedSession, dayRecords.filter(isMainDayRecord));
         planLine.className = `planned-activity-line ${overview.status}`;
         const planBadge = document.createElement("span");
         planBadge.textContent = overview.label;
@@ -1165,7 +1194,8 @@ function renderCategoryChooser() {
     icon.setAttribute("aria-hidden", "true");
     icon.innerHTML = categoryIcon(category.id);
     button.append(copy, icon);
-    button.addEventListener("click", () => selectCategory(category.id));
+    button.addEventListener("click", () => ["warmup", "stretching"].includes(category.id)
+      ? guidedUI.open(category.id) : selectCategory(category.id));
     chooser.append(button);
   }
 }
@@ -1175,7 +1205,9 @@ function categoryIcon(categoryId) {
     physical: `<svg viewBox="0 0 64 64" role="img"><path d="M8 25v14M15 20v24M49 20v24M56 25v14M15 32h34"/></svg>`,
     cardio: `<svg viewBox="0 0 64 64" role="img"><path d="M8 34h11l5-14 9 28 7-21 5 7h11"/><path d="M49 13c-7 0-11 5-11 5s-4-5-11-5c-8 0-14 6-14 14"/></svg>`,
     tennis: `<svg viewBox="0 0 64 64" role="img"><ellipse cx="27" cy="23" rx="15" ry="20" transform="rotate(38 27 23)"/><path d="M36 38l14 14M44 46l-7 7M14 15l25 19M11 24l20 15"/><circle cx="52" cy="14" r="5"/></svg>`,
-    rest: `<svg viewBox="0 0 64 64" role="img"><path d="M47 43A23 23 0 0 1 23 17a22 22 0 1 0 24 26Z"/><path d="M43 13v8M39 17h8M51 25v6M48 28h6"/></svg>`
+    rest: `<svg viewBox="0 0 64 64" role="img"><path d="M47 43A23 23 0 0 1 23 17a22 22 0 1 0 24 26Z"/><path d="M43 13v8M39 17h8M51 25v6M48 28h6"/></svg>`,
+    warmup: `<svg viewBox="0 0 64 64" role="img"><path d="M10 44h44M16 44l9-16 9 6 9-17M20 20l-5 5M43 17l4 6"/><circle cx="47" cy="12" r="4"/></svg>`,
+    stretching: `<svg viewBox="0 0 64 64" role="img"><circle cx="31" cy="12" r="5"/><path d="M31 18v19M31 25l-16 8M31 25l16 8M31 37l-12 14M31 37l14 14M11 54h42"/></svg>`
   };
   return icons[categoryId] || "";
 }
@@ -2076,6 +2108,8 @@ function selectCategory(categoryId, record = null) {
   const isRoutineLauncher = categoryId === "physical" && !editingRecordId && !plannedRegistrationContext?.customPhysical;
   $("registrationDateRow").classList.toggle("hidden", isRoutineLauncher);
   $("commonFields").classList.toggle("hidden", isRest || isRoutineLauncher);
+  $("activityStartTimeRow").classList.toggle("hidden", !["cardio", "tennis"].includes(categoryId));
+  $("activityStartTime").value = record?.activityStartTime || "";
   $("saveTrainingButton").classList.toggle("hidden", isRoutineLauncher);
   $("calories").required = !isRest && !isRoutineLauncher;
   if (isRest || isRoutineLauncher) {
@@ -2113,6 +2147,7 @@ function resetRegistration({ keepPlan = false } = {}) {
   $("durationField").replaceChildren();
   $("sensationSuggestions").replaceChildren();
   $("commonFields").classList.remove("hidden");
+  $("activityStartTimeRow").classList.add("hidden");
   $("registrationDateRow").classList.remove("hidden");
   $("saveTrainingButton").classList.remove("hidden");
   $("calories").required = true;
@@ -2163,6 +2198,7 @@ function formRecord() {
     durationMinutes: duration.durationMinutes,
     durationSeconds: duration.durationSeconds,
     durationPrecision: durationMode(),
+    activityStartTime: ["cardio", "tennis"].includes(currentCategory) ? $("activityStartTime").value : existing?.activityStartTime || "",
     calories: isRest ? "" : $("calories").value,
     sensations: isRest ? "" : $("sensations").value,
     routineCompletedSets: preserveRoutineBalance ? existing.routineCompletedSets : "",
@@ -2242,6 +2278,7 @@ function saveTraining(event) {
 function editRecord(id) {
   const record = repository.get(id);
   if (!record || !categoryById(record.category)) return showToast("Este registro antiguo puede verse y exportarse, pero no editarse desde el formulario nuevo.");
+  if (["warmup", "stretching"].includes(record.category)) return guidedUI.editRecord(record);
   editingRecordId = record.id;
   showView("register");
   selectCategory(record.category, record);
@@ -2490,6 +2527,28 @@ function renderWearable() {
     const bpm = Number(session.heartRateAvgBpm) > 0 ? ` · ${Math.round(Number(session.heartRateAvgBpm))} lpm media` : "";
     details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}${bpm}`;
     row.append(title, details);
+    const linkedRecord = repository.list().find(record => record.wearableSessionId === session.id);
+    if (linkedRecord) {
+      const status = document.createElement("small");
+      status.textContent = `Vinculada: ${recordTitle(linkedRecord)}`;
+      row.append(status);
+    } else {
+      const candidates = repository.list().filter(record => !record.wearableSessionId && record.category !== "rest")
+        .map(record => ({ record, match: wearableMatch(record, session) })).filter(item => item.match)
+        .sort((a, b) => b.match.score - a.match.score);
+      const best = candidates[0];
+      const unique = best && (best.match.score >= 90 || (best.match.score >= 30 && !candidates[1]));
+      const status = document.createElement("small");
+      status.textContent = unique ? `Posible registro: ${recordTitle(best.record)}. Confirma antes de vincular.`
+        : "Sin vínculo confirmado con un registro de TGTrain.";
+      row.append(status);
+      if (unique) {
+        const review = document.createElement("button");
+        review.type = "button"; review.textContent = "Revisar vínculo";
+        review.addEventListener("click", () => openHistoryRecord(best.record.id));
+        row.append(review);
+      }
+    }
     list.append(row);
   }
 }
@@ -2727,6 +2786,10 @@ function routineForAi(record) {
     durationMinutes: timing.durationMinutes,
     calories: record.calories,
     wearable: record.wearableSnapshot,
+    guidedSessionName: record.guidedSessionName,
+    guidedSteps: record.guidedSteps,
+    guidedPainScore: record.guidedPainScore,
+    guidedPainNotes: record.guidedPainNotes,
     sensations: record.sensations,
     routineSummary: record.routineSummary,
     effortRpe: record.routineEffort,
@@ -3621,15 +3684,23 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     history.type = "button";
     history.className = "routine-history-button";
     history.textContent = "Ver en historial";
-    history.addEventListener("click", () => {
-      showView("history");
-      requestAnimationFrame(() => [...document.querySelectorAll(".history-entry")]
-        .find(entry => entry.dataset.recordId === session.recordId)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-    });
+    history.addEventListener("click", () => openHistoryRecord(session.recordId));
+    const availableBandSessions = completedRecord && !completedRecord.wearableSessionId
+      ? wearableCandidates(completedRecord, wearableData.sessions, repository.list()) : [];
+    if (availableBandSessions.length) {
+      const reviewBand = document.createElement("button");
+      reviewBand.type = "button";
+      reviewBand.className = "routine-history-button";
+      reviewBand.textContent = "Revisar sesión de pulsera";
+      reviewBand.addEventListener("click", () => openHistoryRecord(session.recordId));
+      panel.append(reviewBand);
+    }
     const wearableHint = document.createElement("small");
     wearableHint.textContent = completedRecord?.wearableSessionId
       ? "Pulsera vinculada. Puedes actualizar o corregir el vínculo desde Historial."
-      : "Cuando Mi Fitness termine de sincronizar, abre TGTrain Sync y vincula la sesión de la pulsera desde Historial.";
+      : availableBandSessions.length
+        ? "Hay una sesión de la pulsera del mismo día. Revisa el horario antes de confirmar el vínculo."
+        : "Cuando Mi Fitness termine de sincronizar, abre TGTrain Sync y vincula la sesión de la pulsera desde Historial.";
     panel.append(note, wearableHint, history);
     return panel;
   }
@@ -4340,7 +4411,7 @@ function createWearableLinkPanel(record) {
     const metrics = document.createElement("p");
     metrics.textContent = wearableSummaryText(record.wearableSnapshot);
     const note = document.createElement("small");
-    note.textContent = `TGTrain: ${record.calories} kcal anotadas · Pulsera: ${record.wearableSnapshot.activeCaloriesKcal === null ? "sin kcal activas" : `${Math.round(record.wearableSnapshot.activeCaloriesKcal)} kcal activas estimadas`}. No se suman.`;
+    note.textContent = `TGTrain: ${record.calories === "" ? "kcal no anotadas" : `${record.calories} kcal anotadas`} · Pulsera: ${record.wearableSnapshot.activeCaloriesKcal === null ? "sin kcal activas" : `${Math.round(record.wearableSnapshot.activeCaloriesKcal)} kcal activas estimadas`}. No se suman.`;
     panel.append(title, metrics, note);
     const comparison = wearableComparison(record, repository.list());
     if (comparison) {
@@ -4416,6 +4487,23 @@ function createHistoryEntry(sourceRecord) {
     const sensations = document.createElement("p");
     sensations.textContent = record.sensations;
     copy.append(sensations);
+  }
+  if (["warmup", "stretching"].includes(record.category) && record.guidedSteps.length) {
+    const disclosure = document.createElement("details");
+    disclosure.className = "history-exercise-details";
+    const summary = document.createElement("summary");
+    summary.textContent = `Ver pasos de la guía (${record.guidedSteps.filter(step => step.status === "done").length}/${record.guidedSteps.length})`;
+    const list = document.createElement("ol");
+    record.guidedSteps.forEach(step => {
+      const item = document.createElement("li");
+      item.textContent = `${step.title} · ${step.status === "done" ? "realizado" : "omitido"} · ${step.seconds} s sugeridos`;
+      list.append(item);
+    });
+    disclosure.append(summary, list); copy.append(disclosure);
+    if (record.guidedPainNotes) {
+      const note = document.createElement("p"); note.className = "history-pain-detail";
+      note.textContent = `Molestia: ${record.guidedPainNotes}`; copy.append(note);
+    }
   }
   if (record.category === "physical" && record.routinePlannedSets !== "") {
     const balance = document.createElement("div");
@@ -4604,7 +4692,7 @@ function bindEvents() {
   $("startPlannedActivityButton").addEventListener("click", () => {
     const block = activeTrainingBlock();
     const session = coachSessionForDate(getChileDateISO(), block);
-    if (session && !plannedActivityContext(loadPlannedActivity()) && repository.list().some(record => record.dateISO === session.dateISO)) return showView("history");
+    if (session && !plannedActivityContext(loadPlannedActivity()) && repository.list().some(record => record.dateISO === session.dateISO && isMainDayRecord(record))) return showView("history");
     openTodayPlannedActivity();
   });
   $("heroWeekTheme").addEventListener("click", openCoachPlanDialog);
@@ -4654,6 +4742,7 @@ function bindEvents() {
 
 function initialize() {
   nutritionUI.initialize();
+  guidedUI.initialize();
   renderCategoryChooser();
   resetRegistration();
   initializeTimer();
@@ -4673,7 +4762,7 @@ function initialize() {
       openRoutineId = planned.routineId;
       showView("routines");
       scrollToRoutine(planned.routineId);
-    }
+    } else guidedUI.resumePending();
   }
   cloudSync.initialize();
   registerServiceWorker();

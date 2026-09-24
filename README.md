@@ -1,6 +1,6 @@
 # TGTrain · Entrenamiento semanal
 
-La integración personal con Xiaomi Smart Band mediante Health Connect está en [TGTrain Sync para Android](android/tgtrain-sync/README.md). [Descarga el APK instalable](downloads/tgtrain-sync-0.2.0.apk), inicia sesión con la misma cuenta de TGTrain y sincroniza desde la app puente. Los datos aparecen en Inicio y puedes vincular cada sesión de la pulsera con el entrenamiento manual correspondiente desde Historial, sin duplicarlo. La versión 0.2.0 añade la frecuencia cardíaca media, máxima y mínima si Mi Fitness la comparte.
+La integración personal con Xiaomi Smart Band mediante Health Connect está en [TGTrain Sync para Android](android/tgtrain-sync/README.md). [Descarga el APK instalable](downloads/tgtrain-sync-0.2.0.apk), inicia sesión con la misma cuenta de TGTrain y sincroniza desde la app puente. Los datos aparecen en Inicio y puedes vincular cada sesión de la pulsera con el entrenamiento manual correspondiente desde Historial, sin duplicarlo. La versión 0.2.0 añade la frecuencia cardíaca media, máxima y mínima si Mi Fitness la comparte. Para registros manuales de cardio o tenis, una hora aproximada de inicio opcional ayuda a encontrar la sesión correcta. La vinculación siempre requiere confirmación.
 
 PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, organizada por semanas ISO de lunes a domingo y preparada para sincronizar el historial mediante una cuenta de Google.
 
@@ -11,9 +11,11 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Resumen semanal de sesiones, minutos y calorías.
 - Bloque activo de cuatro semanas creado por el entrenador, con objetivo semanal, actividad diaria, alternativas y acceso directo al registro correspondiente.
 - Inicio que diferencia lo planificado de lo realmente realizado y marca el cumplimiento del bloque sin alterar el historial.
-- Registro guiado de entrenamiento físico, cardio, tenis y días de descanso.
+- El calentamiento y los estiramientos aparecen en el día y en Historial, pero no sustituyen una actividad prevista ni inflan el conteo de entrenamientos principales.
+- Registro guiado de entrenamiento físico, cardio, tenis, calentamiento, estiramientos y días de descanso.
 - Pestaña Nutrición con la planificación semanal de comidas e hidratación entregada por el entrenador: días de físico, tenis, recuperación y escenarios de partido. La guía se puede cambiar por fecha cuando el entrenamiento real varía.
 - Diario de comidas y agua por día, con edición y eliminación. Cada comida se anota como se consumió realmente; calorías y macros son opcionales y nunca se calculan automáticamente a partir del texto.
+- Nutrición muestra el entrenamiento realmente registrado, los pasos y sueño compartidos por la banda y las mediciones de sesiones vinculadas. Son contexto para elegir conscientemente la guía del día; las kcal de la pulsera no se descuentan de lo comido ni cambian automáticamente las metas.
 - Al elegir entrenamiento físico y una rutina, se abre primero una vista previa completa; la sesión y su cronómetro solo comienzan al pulsar Iniciar entrenamiento.
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
 - Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
@@ -59,6 +61,10 @@ Permite registrar un día de descanso planificado o un descanso por molestia. Cu
 ### Tenis
 
 Antes del lugar permite elegir el tipo de sesión: entrenamiento grupal, partido, frontón o peloteo amistoso. También ofrece lugares frecuentes y una opción personalizada, superficie de arcilla o cemento y duración mediante selectores HH:MM:SS. Club Open Tenis propone arcilla; Sport Park y Parque Araucano proponen cemento.
+
+### Calentamiento y estiramientos guiados
+
+En Registrar hay dos tarjetas adicionales. Cada guía se puede abrir para revisar todos sus pasos sin iniciar el reloj. Al pulsar Iniciar se presenta un movimiento a la vez, con duración sugerida, alternativa suave, pausa, omisión y avance manual. El tiempo cumplido se avisa con sonido y vibración cuando el dispositivo lo permite. El avance de una guía iniciada se guarda localmente y se recupera al volver a abrir la aplicación. Al terminar se registra en Historial el tiempo activo, pasos realizados u omitidos, sensaciones, molestias y calorías opcionales; también se incluye en el informe semanal. Estas secuencias son generales y deben adaptarse ante dolor o según indicación profesional.
 
 ## Timer
 

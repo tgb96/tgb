@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=66";
-import { addDaysISO, getChileDateISO, weekDays } from "./utils.js?v=65";
+import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
 const byId = id => document.getElementById(id);
 const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
@@ -7,7 +7,7 @@ const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Sa
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
 
-export function createNutritionUI(repository, { showToast = () => {} } = {}) {
+export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }) } = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
   let selectedSlot = "other";
@@ -107,6 +107,56 @@ export function createNutritionUI(repository, { showToast = () => {} } = {}) {
     byId("nutritionProteinTarget").textContent = "Guía del plan: 100–120 g de proteína/día";
     byId("nutritionWaterTarget").textContent = `Guía de agua: ${(plan.waterMinMl / 1000).toLocaleString("es-CL")}–${(plan.waterMaxMl / 1000).toLocaleString("es-CL")} L`;
     byId("nutritionHydrationTip").textContent = plan.hydration;
+    const context = byId("nutritionActivityContext"); context.replaceChildren();
+    const activities = repository.list().filter(item => item.dateISO === selectedDate);
+    const mainActivity = activities.find(item => item.category === "tennis")
+      || activities.find(item => item.category === "physical")
+      || activities.find(item => item.category === "cardio")
+      || activities.find(item => item.category === "rest");
+    const activityLine = document.createElement("p");
+    activityLine.textContent = activities.length
+      ? `Registrado en TGTrain: ${activities.slice(0, 4).map(recordTitle).join(" · ")}${activities.length > 4 ? ` y ${activities.length - 4} más` : ""}.`
+      : "Aún no hay una actividad registrada en TGTrain este día.";
+    context.append(activityLine);
+    const wearable = getWearableData();
+    const dayData = (wearable.days || []).find(item => item.dateISO === selectedDate);
+    const bandLine = document.createElement("p");
+    const bandParts = [];
+    if (dayData && Number.isFinite(Number(dayData.steps))) bandParts.push(`${Number(dayData.steps).toLocaleString("es-CL")} pasos`);
+    if (dayData && Number(dayData.sleepMinutes) > 0) bandParts.push(`${Math.floor(dayData.sleepMinutes / 60)} h ${String(dayData.sleepMinutes % 60).padStart(2, "0")} min de sueño`);
+    bandLine.textContent = bandParts.length ? `Pulsera: ${bandParts.join(" · ")}.` : "Pulsera: sin pasos o sueño compartidos para este día.";
+    context.append(bandLine);
+    const linked = activities.filter(item => item.wearableSnapshot);
+    if (linked.length) {
+      const line = document.createElement("p");
+      line.textContent = linked.map(item => {
+        const band = item.wearableSnapshot;
+        const metrics = [Number.isFinite(Number(band.heartRateAvgBpm)) && band.heartRateAvgBpm !== null ? `${Math.round(band.heartRateAvgBpm)} lpm media` : "",
+          Number.isFinite(Number(band.activeCaloriesKcal)) && band.activeCaloriesKcal !== null ? `${Math.round(band.activeCaloriesKcal)} kcal activas estimadas` : ""].filter(Boolean);
+        return `${recordTitle(item)}: ${metrics.length ? metrics.join(" · ") : "sin pulso ni kcal compartidos"}`;
+      }).join(". ") + ".";
+      context.append(line);
+    }
+    const caveat = document.createElement("small");
+    caveat.textContent = "Estos datos de la pulsera son contexto: no se descuentan de las comidas ni cambian por sí solos tu pauta de alimentación o hidratación.";
+    context.append(caveat);
+    const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
+    const expected = ["recovery", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
+    const actual = mainActivity?.category === "rest" ? "recovery"
+      : mainActivity?.category === "cardio" ? "other"
+        : ["physical", "tennis"].includes(mainActivity?.category) ? mainActivity.category : "";
+    if (actual && actual !== expected && planMode === "default") {
+      const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
+      const message = document.createElement("span");
+      message.textContent = "Tu actividad real cambió respecto a la semana base. Puedes ajustar la guía, sin alterar lo que ya registraste.";
+      const change = document.createElement("button"); change.type = "button"; change.textContent = "Usar guía para hoy";
+      change.addEventListener("click", () => {
+        const id = `nutrition-plan-${selectedDate}`; const now = new Date().toISOString();
+        repository.saveNutritionEntry({ id, dateISO: selectedDate, kind: "plan", planMode: actual, createdAt: now, updatedAt: now });
+        render();
+      });
+      hint.append(message, change); context.append(hint);
+    }
     const entries = allEntries.filter(entry => entry.kind !== "plan");
     const totals = nutritionDayTotals(entries);
     const summary = byId("nutritionSummary");

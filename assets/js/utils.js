@@ -7,8 +7,8 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=63";
-import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=65";
+} from "./data.js?v=67";
+import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=67";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -184,6 +184,7 @@ export function normalizeRecord(record) {
     durationMinutes,
     durationSeconds,
     durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
+    activityStartTime: String(record?.activityStartTime || "").slice(0, 5),
     calories: optionalNumber(record?.calories, { min: 0 }),
     sensations,
     routineCompletedSets: optionalNumber(record?.routineCompletedSets, { min: 0 }),
@@ -203,6 +204,18 @@ export function normalizeRecord(record) {
     routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
+    guidedSessionId: String(record?.guidedSessionId || "").slice(0, 100),
+    guidedSessionName: String(record?.guidedSessionName || "").slice(0, 200),
+    guidedSteps: Array.isArray(record?.guidedSteps) ? record.guidedSteps.slice(0, 30).map(step => ({
+      id: String(step?.id || "").slice(0, 80),
+      title: String(step?.title || "").slice(0, 200),
+      seconds: Math.max(0, Math.min(3600, Math.round(Number(step?.seconds) || 0))),
+      status: step?.status === "done" ? "done" : "skipped"
+    })) : [],
+    guidedStartedAt: String(record?.guidedStartedAt || ""),
+    guidedEndedAt: String(record?.guidedEndedAt || ""),
+    guidedPainScore: optionalNumber(record?.guidedPainScore, { min: 0 }),
+    guidedPainNotes: String(record?.guidedPainNotes || "").slice(0, 2000),
     wearableSessionId: String(record?.wearableSessionId || "").slice(0, 120),
     wearableSnapshot: normalizeWearableSnapshot(record?.wearableSnapshot),
     wearableLinkedAt: String(record?.wearableLinkedAt || ""),
@@ -221,8 +234,14 @@ export function validateRecord(record) {
   const errors = [];
   if (!isValidISODate(normalized.dateISO)) errors.push("Selecciona una fecha válida.");
   if (!categoryById(normalized.category)) errors.push("Selecciona un tipo de entrenamiento.");
+  if (normalized.activityStartTime && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized.activityStartTime)) errors.push("La hora de inicio no es válida.");
   if (normalized.category !== "rest" && (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0)) errors.push("Ingresa una duración mayor que cero.");
-  if (normalized.category !== "rest" && (normalized.calories === "" || normalized.calories === null)) errors.push("Ingresa las calorías quemadas.");
+  if (!["rest", "warmup", "stretching"].includes(normalized.category) && (normalized.calories === "" || normalized.calories === null)) errors.push("Ingresa las calorías quemadas.");
+  if (["warmup", "stretching"].includes(normalized.category)) {
+    if (!normalized.guidedSessionId) errors.push("Selecciona una guía para esta sesión.");
+    if (normalized.calories === null || (normalized.calories !== "" && (!Number.isInteger(normalized.calories) || normalized.calories > 5000))) errors.push("Las calorías deben estar entre 0 y 5000, o dejarse vacías.");
+    if (normalized.guidedPainScore === null || (normalized.guidedPainScore !== "" && normalized.guidedPainScore > 10)) errors.push("La molestia debe estar entre 0 y 10.");
+  }
 
   if (normalized.category === "physical") {
     if (!physicalRoutineById(normalized.routineId) && !normalized.routineName) errors.push("Selecciona una rutina física.");
@@ -259,6 +278,7 @@ export function recordTitle(record) {
   const normalized = normalizeRecord(record);
   if (normalized.category === "rest") return normalized.restTypeId === "discomfort" ? "Descanso por molestia" : "Día de descanso";
   if (normalized.category === "physical") return normalized.routineName || "Entrenamiento físico";
+  if (normalized.category === "warmup" || normalized.category === "stretching") return normalized.guidedSessionName || normalized.categoryName;
   if (normalized.category === "cardio") return normalized.cardioTypeName || "Cardio";
   if (normalized.category === "tennis") {
     if (normalized.tennisTypeName) return `Tenis · ${normalized.tennisTypeName}`;
@@ -276,6 +296,13 @@ export function recordDetails(record) {
     ? formatDuration({ ...normalized, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
     : formatDuration(normalized);
   const details = [displayedDuration, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+  if (normalized.activityStartTime) details.push(`inicio ${normalized.activityStartTime}`);
+  if (normalized.category === "warmup" || normalized.category === "stretching") {
+    const done = normalized.guidedSteps.filter(step => step.status === "done").length;
+    return [displayedDuration, `${done}/${normalized.guidedSteps.length} pasos`,
+      normalized.calories === "" ? "kcal no anotadas" : `${normalized.calories} kcal`,
+      normalized.guidedPainScore === "" ? "" : `molestia ${normalized.guidedPainScore}/10`].filter(Boolean).join(" · ");
+  }
   if (normalized.category === "tennis" && normalized.location) details.push(normalized.location);
   if (normalized.trekkingRoute) details.push(normalized.trekkingRoute);
   if (normalized.ascentDurationSeconds !== "") details.push(`Subida ${formatDuration({ durationSeconds: normalized.ascentDurationSeconds, durationMinutes: normalized.ascentDurationSeconds / 60, durationPrecision: "hm" })}`);
@@ -470,7 +497,7 @@ export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6)
     const startISO = addDaysISO(currentStart, (index - (count - 1)) * 7);
     const week = isoWeekInfo(startISO);
     const weekRecords = normalized.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
-    const trainings = weekRecords.filter(record => record.category !== "rest");
+    const trainings = weekRecords.filter(record => ["physical", "cardio", "tennis"].includes(record.category));
     return {
       ...week,
       sessions: trainings.length,
@@ -572,7 +599,8 @@ export function routineCompletionSummary(sourceRecord, previousRecords = []) {
 
 export function weeklyReport(records, week) {
   const normalized = records.map(normalizeRecord).filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
-  const trainings = normalized.filter(record => record.category !== "rest");
+  const trainings = normalized.filter(record => ["physical", "cardio", "tennis"].includes(record.category));
+  const guided = normalized.filter(record => ["warmup", "stretching"].includes(record.category));
   const restDays = normalized.filter(record => record.category === "rest");
   const totalMinutes = normalized.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
   const totalCalories = normalized.reduce((sum, record) => sum + (Number(record.calories) || 0), 0);
@@ -585,13 +613,14 @@ export function weeklyReport(records, week) {
   const previousWeek = isoWeekInfo(addDaysISO(week.startISO, -7));
   const previous = records.map(normalizeRecord).filter(record => record.dateISO >= previousWeek.startISO && record.dateISO <= previousWeek.endISO && record.category !== "rest");
   const previousMinutes = previous.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0);
-  const sessionDifference = trainings.length - previous.length;
+  const sessionDifference = trainings.length - previous.filter(record => ["physical", "cardio", "tennis"].includes(record.category)).length;
   const minuteDifference = Math.round(totalMinutes - previousMinutes);
 
   let report = `REGISTRO TGTRAIN — SEMANA ${week.weekNumber} DE ${week.weekYear}\n`;
   report += `Periodo: ${week.startISO} a ${week.endISO} (lunes a domingo)\n\n`;
   report += "RESUMEN PARA EL ENTRENADOR\n";
   report += `- Entrenamientos: ${trainings.length}\n`;
+  report += `- Sesiones guiadas complementarias: ${guided.length}\n`;
   report += `- Días de descanso registrados: ${restDays.length}\n`;
   report += `- Tiempo total: ${Math.round(totalMinutes)} min\n`;
   report += `- Calorías registradas: ${totalCalories} kcal\n`;
@@ -615,7 +644,8 @@ export function weeklyReport(records, week) {
       if (record.plannedTitle) report += `   Plan del entrenador: ${record.plannedTitle}\n`;
       if (record.category !== "rest") {
         report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: record.cardioTypeId === "running" ? "hms" : "hm" } : record)}\n`;
-        report += `   Calorías: ${record.calories} kcal\n`;
+        report += `   Calorías: ${record.calories === "" ? "no anotadas" : `${record.calories} kcal`}\n`;
+        if (record.activityStartTime) report += `   Hora aproximada de inicio: ${record.activityStartTime}\n`;
       }
       if (record.wearableSnapshot) {
         report += `   Pulsera vinculada: ${record.wearableSnapshot.title} · ${wearableSummaryText(record.wearableSnapshot)}\n`;
@@ -669,6 +699,15 @@ export function weeklyReport(records, week) {
       } else if (record.category === "physical" && record.routinePlannedSets !== "") {
         report += "   Detalle por ejercicio: no disponible en este registro anterior.\n";
       }
+      if (["warmup", "stretching"].includes(record.category)) {
+        report += `   Guía: ${record.guidedSessionName}\n`;
+        report += `   Pasos: ${record.guidedSteps.filter(step => step.status === "done").length}/${record.guidedSteps.length} realizados\n`;
+        record.guidedSteps.forEach((step, stepIndex) => {
+          report += `     ${stepIndex + 1}. ${step.title}: ${step.status === "done" ? "realizado" : "omitido"} (${step.seconds} s sugeridos)\n`;
+        });
+        if (record.guidedPainScore !== "") report += `   Molestia: ${record.guidedPainScore}/10\n`;
+        if (record.guidedPainNotes) report += `   Detalle de molestia: ${record.guidedPainNotes}\n`;
+      }
       if (record.sensations) report += `   Sensaciones: ${record.sensations}\n`;
     });
   }
@@ -688,6 +727,9 @@ export function recordsToCSV(records) {
     ["lugar", "location"], ["ruta_trekking", "trekkingRoute"], ["superficie", "surface"],
     ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["tiempo_subida_seg", "ascentDurationSeconds"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
     ["precisión_duración", "durationPrecision"], ["calorías", "calories"],
+    ["hora_inicio_manual", "activityStartTime"],
+    ["guía_id", "guidedSessionId"], ["guía_nombre", "guidedSessionName"], ["guía_pasos", "guidedStepsExport"],
+    ["guía_molestia_0_10", "guidedPainScore"], ["guía_detalle_molestia", "guidedPainNotes"], ["guía_inicio", "guidedStartedAt"], ["guía_fin", "guidedEndedAt"],
     ["series_completadas", "routineCompletedSets"], ["series_planificadas", "routinePlannedSets"],
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
@@ -705,6 +747,7 @@ export function recordsToCSV(records) {
       wearableHeartRateMaxBpm: record.wearableSnapshot?.heartRateMaxBpm ?? "",
       wearableActiveCaloriesKcal: record.wearableSnapshot?.activeCaloriesKcal ?? "",
       wearableOriginPackage: record.wearableSnapshot?.originPackage || "",
+      guidedStepsExport: record.guidedSteps.map(step => `${step.title}: ${step.status === "done" ? "realizado" : "omitido"}`).join(" | "),
       routineExercisesExport: record.routineExercises
         .map((exercise, index) => `${index + 1}. ${exercise.name}: ${routineExerciseLine(exercise)}`)
         .join(" | "),

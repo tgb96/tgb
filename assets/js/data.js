@@ -26,6 +26,20 @@ export const trainingCategories = [
     accent: "blue"
   },
   {
+    id: "warmup",
+    name: "Calentamiento para jugar",
+    shortName: "Calentamiento",
+    description: "Abre la guía y prepara cuerpo, pies y golpes antes de entrar a la cancha.",
+    accent: "lime"
+  },
+  {
+    id: "stretching",
+    name: "Estiramientos",
+    shortName: "Estiramientos",
+    description: "Vuelta a la calma guiada después de jugar o entrenar.",
+    accent: "blue"
+  },
+  {
     id: "rest",
     name: "Descanso",
     shortName: "Descanso",
