@@ -98,6 +98,11 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   assert.equal(computer.listTrainingBlocks()[0].title, "Plan del teléfono");
   assert.equal(computer.listCoachQuestions()[0].answer, "Cuida la rodilla.");
   assert.equal(computer.listNutritionEntries()[0].proteinG, 35);
+  assert.equal(phone.clearCoachQuestions(), 1);
+  await phoneCloud.syncNow();
+  await computerCloud.syncNow();
+  assert.equal([...remote.coachQuestions.values()][0].deleted, true);
+  assert.equal(computer.listCoachQuestions().length, 0);
   phoneCloud.destroy();
   computerCloud.destroy();
 });

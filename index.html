@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=70">
+  <link rel="stylesheet" href="assets/css/styles.css?v=71">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -91,7 +91,8 @@
         <h2 id="coachAskTitle">¿Qué quieres preguntarle?</h2>
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Preguntas y respuestas recientes"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
-        <p class="coach-history-note">Tus preguntas no se borran automáticamente: quedan en este dispositivo y en tu cuenta cuando se sincronizan.</p>
+        <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar preguntas y respuestas</button>
+        <p class="coach-history-note">Tus preguntas quedan guardadas hasta que las limpies. El cambio se sincroniza con tu cuenta.</p>
         <form id="coachQuestionForm">
           <label for="coachQuestionText">Tu pregunta</label>
           <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: ¿cómo adapto la próxima sesión si la rodilla sigue molesta?"></textarea>
@@ -224,17 +225,12 @@
           <button type="button" data-water-ml="500">+ 500 ml agua</button>
           <button id="nutritionCustomWater" type="button">Otra cantidad</button>
         </div>
-        <p>Los ejemplos con porciones rellenan kcal y macros orientativos. Si cambias cantidades, ajusta los valores. Los datos faltantes no se inventan.</p>
+        <p>Arma cada comida sumando ingredientes. Solo el pan integral Ideal tiene kcal y macros automáticos por ahora; los demás valores quedan pendientes o puedes anotarlos tú.</p>
       </section>
-      <details class="nutrition-food-catalog">
-        <summary>Ver valores aproximados por alimento</summary>
-        <p>Porciones de referencia, no tus cantidades reales. Envasados, aceite y preparación pueden variar bastante.</p>
-        <div id="nutritionFoodCatalogList"></div>
-      </details>
       <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
       <div id="nutritionSlots" class="nutrition-slots"></div>
       <button id="nutritionExtraMeal" class="nutrition-extra-button" type="button">+ Registrar otra comida o colación</button>
-      <p class="nutrition-disclaimer">La planificación fue entregada por tu entrenador. Las cifras de ejemplos usan porciones genéricas y son solo orientativas; no sustituyen etiquetas ni evaluación nutricional individual.</p>
+      <p class="nutrition-disclaimer">La planificación fue entregada por tu entrenador. Las porciones son orientativas; para ajustar kcal y macros de otros alimentos necesitaremos una etiqueta, cantidad o estimación revisada.</p>
     </section>
 
     <section id="viewTimer" class="view hidden" hidden aria-labelledby="timerHeading">
@@ -357,7 +353,7 @@
       <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
-      <a class="wearable-download" href="downloads/tgtrain-sync-0.3.0.apk" download>Descargar TGTrain Sync para Android</a>
+      <a class="wearable-download" href="downloads/tgtrain-sync-0.4.0.apk" download>Descargar TGTrain Sync para Android</a>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
@@ -455,8 +451,13 @@
       </div>
       <label for="nutritionMealTime">Hora</label>
       <input id="nutritionMealTime" type="time" required>
-      <label for="nutritionMealText">¿Qué comiste y cuánto? <small>(obligatorio)</small></label>
-      <textarea id="nutritionMealText" rows="4" maxlength="1000" placeholder="Ej.: 2 huevos, 2 rebanadas de pan y 1 plátano" required></textarea>
+      <label for="nutritionIngredientSearch">Agrega los ingredientes de a uno; puedes repetirlos</label>
+      <input id="nutritionIngredientSearch" type="search" placeholder="Buscar otro ingrediente, ej.: arroz o plátano">
+      <div id="nutritionIngredientChoices" class="nutrition-ingredient-choices" aria-label="Ingredientes disponibles"></div>
+      <p class="nutrition-selected-title">Tu comida</p>
+      <div id="nutritionSelectedIngredients" class="nutrition-selected-ingredients" aria-live="polite"></div>
+      <label for="nutritionMealText">Nota adicional <small>(opcional)</small></label>
+      <textarea id="nutritionMealText" rows="3" maxlength="1000" placeholder="Marca, preparación, aceite, cantidades distintas o algo que no está en la lista"></textarea>
       <p id="nutritionEstimateNote" class="nutrition-estimate-note">Puedes anotar kcal y macros si conoces las cantidades. Si no, déjalos en blanco.</p>
       <details id="nutritionMacrosDetails" class="nutrition-macros"><summary>Revisar kcal y macros (opcional)</summary>
         <div class="nutrition-macro-grid">
@@ -491,6 +492,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=69"></script>
+  <script type="module" src="assets/js/app.js?v=71"></script>
 </body>
 </html>

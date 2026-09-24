@@ -271,7 +271,7 @@ export function createCloudSync({
       const value = item.data();
       if (value?.id) remoteQuestions.set(String(value.id), value);
     });
-    const localQuestions = new Map(repository.listCoachQuestions().map(question => [question.id, question]));
+    const localQuestions = new Map(repository.listCoachQuestions({ includeDeleted: true }).map(question => [question.id, question]));
     const questionUploads = [];
     remoteQuestions.forEach((cloudQuestion, id) => {
       const localQuestion = localQuestions.get(id);

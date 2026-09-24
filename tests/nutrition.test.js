@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionPlanForDate, normalizeNutritionEntries } from "../assets/js/nutrition.js";
-import { estimatePreset, foodCatalog, mealPresets, presetsForSlot } from "../assets/js/nutrition-presets.js";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
 
 function memoryStorage() {
@@ -19,15 +19,25 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.match(nutritionPlanForDate("2026-09-26", "early").detail, /no un partido programado/);
   assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
   assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
+  for (const mode of ["default", "physical", "tennis", "recovery", "early", "late", "other"]) {
+    assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún/i);
+  }
 });
 
-test("cada ejemplo concreto tiene porción y nutrientes orientativos", () => {
-  assert.ok(Object.values(foodCatalog).every(food => food.portion && food.kcal > 0 && food.proteinG >= 0 && food.carbsG >= 0 && food.fatG >= 0));
-  assert.deepEqual(estimatePreset(mealPresets.hamCheeseSandwich), { caloriesKcal: 305, proteinG: 21, carbsG: 28, fatG: 12 });
-  for (const slotId of ["breakfast", "morning", "lunch", "pre", "snack", "post", "dinner"]) {
-    assert.ok(presetsForSlot(slotId).length >= 4);
-    assert.ok(presetsForSlot(slotId).every(preset => estimatePreset(preset)?.caloriesKcal > 0));
-  }
+test("los ingredientes se suman por unidad y solo el pan Ideal tiene macros confirmados", () => {
+  assert.equal(foodCatalog.integralBread.kcal, 73);
+  assert.ok(Object.values(foodCatalog).every(food => food.portion));
+  assert.equal(Object.values(foodCatalog).filter(food => food.kcal != null).length, 1);
+  assert.equal(foodCatalog.arepa, undefined);
+  assert.equal(foodCatalog.tuna, undefined);
+  assert.deepEqual(estimateParts({ integralBread: 3 }), { caloriesKcal: 219, proteinG: 11.3, carbsG: 36.9, fatG: 2.9 });
+  assert.equal(estimateParts({ integralBread: 3, avocado: 2, hamSlice: 1 }), null);
+  assert.equal(knownPartsSubtotal({ integralBread: 3, avocado: 2 }).caloriesKcal, 219);
+  assert.match(describeParts({ integralBread: 3, avocado: 2 }), /3 × pan integral/);
+  assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
+  assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
+  assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
+  assert.ok(!foodsForSlot("lunch").some(food => food.name.includes("Atún")));
 });
 
 test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => {
@@ -51,7 +61,7 @@ test("comidas, agua, cambio de plan y eliminaciones viajan en respaldo", () => {
   const repository = createRepository(memoryStorage());
   const dateISO = "2026-09-23";
   const createdAt = "2026-09-23T14:00:00.000Z";
-  repository.saveNutritionEntry({ id: "meal-1", dateISO, kind: "meal", slotId: "lunch", text: "Arroz y pollo", proteinG: 30, createdAt, updatedAt: createdAt });
+  repository.saveNutritionEntry({ id: "meal-1", dateISO, kind: "meal", slotId: "lunch", text: "2 × arroz · pollo", note: "Sin aceite", parts: { rice: 2, chicken: 1 }, proteinG: 30, createdAt, updatedAt: createdAt });
   repository.saveNutritionEntry({ id: "water-1", dateISO, kind: "water", amountMl: 250, createdAt, updatedAt: createdAt });
   repository.saveNutritionEntry({ id: `nutrition-plan-${dateISO}`, dateISO, kind: "plan", planMode: "recovery", createdAt, updatedAt: createdAt });
   const backup = repository.backup();
@@ -59,6 +69,8 @@ test("comidas, agua, cambio de plan y eliminaciones viajan en respaldo", () => {
   restored.importMerge(backup);
   assert.equal(restored.listNutritionEntries(dateISO).length, 3);
   assert.equal(restored.getNutritionEntry("meal-1").proteinG, 30);
+  assert.deepEqual(restored.getNutritionEntry("meal-1").parts, { rice: 2, chicken: 1 });
+  assert.equal(restored.getNutritionEntry("meal-1").note, "Sin aceite");
   assert.equal(restored.getNutritionEntry(`nutrition-plan-${dateISO}`).planMode, "recovery");
   restored.saveNutritionEntry({ ...restored.getNutritionEntry("meal-1"), deleted: true, updatedAt: "2026-09-23T15:00:00.000Z" });
   assert.equal(nutritionDayTotals(restored.listNutritionEntries(dateISO)).meals, 0);

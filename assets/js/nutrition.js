@@ -1,10 +1,10 @@
 // Guía entregada por el entrenador de Tomás. Es una plantilla, no una medición.
 const slot = (id, time, title, options, tip = "") => ({ id, time, title, options, tip });
-const breakfast = (options = ["2–3 huevos + pan o arepa + fruta", "Yogurt alto en proteína + granola + fruta"], time = "08:00–08:30") =>
+const breakfast = (options = ["2–3 huevos + pan + fruta", "Yogurt alto en proteína + granola + fruta"], time = "08:00–08:30") =>
   slot("breakfast", time, "Desayuno", [...new Set([...options,
-    "Pan integral con jamón y queso", "Avena + leche + fruta", "Arepa con huevo + fruta", "Protein+ + pan con jamón, queso o huevo"])]);
+    "Pan integral con jamón y queso", "Avena + leche + fruta", "Protein+ + pan con jamón, queso o huevo"])]);
 const morning = (options = ["Yogurt alto en proteína + fruta", "Protein+ + fruta"]) =>
-  slot("morning", "11:00–12:00", "Colación de mañana", [...new Set([...options,
+  slot("morning", "11:00–12:00", "Merienda de mañana", [...new Set([...options,
     "Fruta + 20–30 g de frutos secos", "Pan integral pequeño con jamón y queso", "Fruta + yogurt alto en proteína"])]);
 const lunch = (options = ["Pollo o carne + arroz, papas o fideos + verduras"]) =>
   slot("lunch", "14:00", "Almuerzo", options, "Guía de tu plan: aprox. 150–200 g de proteína cruda, 1 taza de arroz/fideos cocidos o 1–2 papas, más verduras.");
@@ -15,7 +15,7 @@ const physical = (name, detail, extras = {}) => ({
   name, detail, waterMinMl: 2000, waterMaxMl: 2500,
   slots: [
     breakfast(extras.breakfast), morning(), lunch(extras.lunch),
-    slot("pre", "16:45–17:30", "Antes del físico", ["Pan o arepa + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano"]),
+    slot("pre", "16:45–17:30", "Merienda de tarde · antes del físico", ["Pan + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano"]),
     dinner(extras.dinner)
   ],
   hydration: extras.hydration || "Mañana 500 ml · mediodía/tarde 1 L · durante el físico 500–750 ml · noche 500 ml."
@@ -27,9 +27,9 @@ const tennis = {
     breakfast(["Yogurt alto en proteína + granola + fruta", "2 huevos + pan + fruta"]),
     morning(["Fruta + 20–30 g de frutos secos", "Protein+ o yogurt alto en proteína"]),
     lunch(["Carne o pollo + arroz, fideos o papas + verduras"]),
-    slot("pre", "17:30–18:30", "Comida pre-tenis", ["Pan o arepa + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano", "Plato chico de arroz, papas o fideos + pollo"]),
+    slot("pre", "17:30–18:30", "Merienda de tarde · pre-tenis", ["Pan + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano", "Plato chico de arroz, papas o fideos + pollo"]),
     slot("snack", "19:30–20:00", "Snack opcional", ["Plátano", "Barra de cereal simple", "Fruta", "Galletas de agua con miel o mermelada"], "Solo si tienes hambre o baja energía."),
-    slot("post", "22:15–22:45", "Cena post-tenis", ["Protein+ + sándwich simple", "Yogurt alto en proteína + granola + fruta", "Atún + pan o galletas + tomate", "Pollo + porción moderada de arroz o papas"])
+    slot("post", "22:15–22:45", "Cena post-tenis", ["Protein+ + sándwich simple", "Yogurt alto en proteína + granola + fruta", "Huevo + pan + tomate", "Pollo + porción moderada de arroz o papas"])
   ],
   hydration: "Mañana 500 ml · hasta almuerzo 500 ml · tarde 750 ml · durante tenis 750 ml–1 L · después 300–500 ml."
 };
@@ -101,11 +101,15 @@ export function normalizeNutritionEntries(value) {
     if (kind === "water" && (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 3000)) return [];
     const text = String(item?.text || "").trim().slice(0, 1000);
     if (kind === "meal" && !text) return [];
+    const parts = Object.fromEntries(Object.entries(item?.parts && typeof item.parts === "object" && !Array.isArray(item.parts) ? item.parts : {})
+      .filter(([id, count]) => /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(id) && Number.isInteger(count) && count >= 1 && count <= 99)
+      .slice(0, 50));
     const optional = key => item?.[key] === "" || item?.[key] == null ? null : Number(item[key]);
     const metrics = Object.fromEntries(["caloriesKcal", "proteinG", "carbsG", "fatG"].map(key => [key, kind === "meal" ? optional(key) : null]));
     if (Object.values(metrics).some(n => n !== null && (!Number.isFinite(n) || n < 0 || n > 10000))) return [];
     return [[id, { id, dateISO, kind, slotId: kind === "meal" ? String(item?.slotId || "other").slice(0, 40) : "",
-      time: String(item?.time || "").slice(0, 5), text, amountMl, planMode, ...metrics,
+      time: String(item?.time || "").slice(0, 5), text, note: kind === "meal" ? String(item?.note || "").trim().slice(0, 1000) : "",
+      parts: kind === "meal" ? parts : {}, amountMl, planMode, ...metrics,
       deleted: Boolean(item?.deleted), createdAt: String(item?.createdAt || ""), updatedAt: String(item?.updatedAt || item?.createdAt || "") }]];
   }));
 }

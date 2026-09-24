@@ -1,6 +1,6 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=67";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=67";
-import { normalizeNutritionEntries } from "./nutrition.js?v=68";
+import { normalizeNutritionEntries } from "./nutrition.js?v=71";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
@@ -71,6 +71,7 @@ export function normalizeCoachQuestions(value) {
       id,
       question,
       answer: String(item?.answer || "").trim().slice(0, 6000),
+      deleted: Boolean(item?.deleted),
       source: item?.source === "voice" ? "voice" : "text",
       createdAt: String(item?.createdAt || ""),
       updatedAt: String(item?.updatedAt || item?.createdAt || "")
@@ -318,8 +319,19 @@ export function createRepository(storage) {
       persist({ coachProfile: next });
       return true;
     },
-    listCoachQuestions() {
-      return Object.values(state.coachQuestions).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    listCoachQuestions({ includeDeleted = false } = {}) {
+      return Object.values(state.coachQuestions).filter(item => includeDeleted || !item.deleted)
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    },
+    clearCoachQuestions() {
+      const live = this.listCoachQuestions();
+      if (!live.length) return 0;
+      const updatedAt = new Date().toISOString();
+      const coachQuestions = { ...state.coachQuestions };
+      for (const question of live) coachQuestions[question.id] = { ...question, deleted: true, updatedAt };
+      persist({ coachQuestions });
+      for (const question of live) notify({ type: "coach-question-upsert", question: coachQuestions[question.id] });
+      return live.length;
     },
     saveCoachQuestion(question, { silent = false } = {}) {
       const next = Object.values(normalizeCoachQuestions([question]))[0];

@@ -226,7 +226,9 @@ class MainActivity : ComponentActivity() {
                     report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
                     else -> "${report.sessionsWithHeartRate} entrenamientos con LPM (${report.heartRateSamples} mediciones)."
                 }
-                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $heartRateStatus Abre TGTrain para verlos."
+                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. " +
+                    (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
+                    "$heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo sincronizar: ${error.localizedMessage}"
             } finally { setBusy(false) }

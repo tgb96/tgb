@@ -22,9 +22,9 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=68";
-import { createCloudSync } from "./cloud.js?v=66";
-import { createNutritionUI } from "./nutrition-ui.js?v=68";
+import { createRepository } from "./storage.js?v=71";
+import { createCloudSync } from "./cloud.js?v=71";
+import { createNutritionUI } from "./nutrition-ui.js?v=71";
 import { createGuidedUI } from "./guided-ui.js?v=68";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=67";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=67";
@@ -855,6 +855,7 @@ function renderCoachQuestions() {
   const allQuestions = repository.listCoachQuestions();
   const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 5)).reverse();
   const toggle = $("coachHistoryToggle");
+  $("coachHistoryClear").classList.toggle("hidden", allQuestions.length === 0);
   toggle.classList.toggle("hidden", allQuestions.length <= 5);
   toggle.textContent = coachHistoryExpanded ? "Mostrar solo las 5 más recientes" : `Ver todas las preguntas (${allQuestions.length})`;
   if (!questions.length) {
@@ -2489,7 +2490,7 @@ function renderWearable() {
   const days = wearableData.days || [];
   const sessions = wearableData.sessions || [];
   const todayData = days.find(day => day.dateISO === today);
-  const lastSleep = days.filter(day => Number(day.sleepMinutes) > 0)
+  const lastSleep = days.filter(day => day.dateISO >= addDaysISO(today, -1) && day.dateISO <= today && Number(day.sleepMinutes) > 0)
     .sort((a, b) => String(b.dateISO).localeCompare(String(a.dateISO)))[0];
   $("wearableSteps").textContent = todayData ? new Intl.NumberFormat("es-CL").format(Number(todayData.steps) || 0) : "—";
   if (lastSleep) {
@@ -2498,7 +2499,7 @@ function renderWearable() {
     $("wearableSleepDate").textContent = formatShortDate(lastSleep.dateISO);
   } else {
     $("wearableSleep").textContent = "—";
-    $("wearableSleepDate").textContent = "";
+    $("wearableSleepDate").textContent = days.length ? "Sin sueño reciente compartido por Mi Fitness" : "";
   }
   const newestSync = days.map(day => day.syncedAt).filter(Boolean).sort().at(-1);
   $("wearableSyncTime").textContent = newestSync
@@ -4679,6 +4680,14 @@ function bindEvents() {
   $("coachHistoryToggle").addEventListener("click", () => {
     coachHistoryExpanded = !coachHistoryExpanded;
     renderCoachQuestions();
+  });
+  $("coachHistoryClear").addEventListener("click", () => {
+    const count = repository.listCoachQuestions().length;
+    if (!count || !window.confirm(`¿Limpiar ${count} pregunta${count === 1 ? "" : "s"} y sus respuestas? También desaparecerán de tus otros dispositivos al sincronizar.`)) return;
+    repository.clearCoachQuestions();
+    coachHistoryExpanded = false;
+    renderCoachQuestions();
+    $("coachQuestionStatus").textContent = "Preguntas y respuestas limpiadas. El cambio se sincronizará con tu cuenta.";
   });
   if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
     $("coachVoiceButton").classList.add("hidden");

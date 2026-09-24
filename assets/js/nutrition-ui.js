@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=68";
-import { estimatePreset, foodCatalog, presetsForSlot } from "./nutrition-presets.js?v=68";
+import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=71";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal } from "./nutrition-presets.js?v=71";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
 const byId = id => document.getElementById(id);
@@ -7,44 +7,103 @@ const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.
 const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
-const estimateLine = value => `≈ ${value.caloriesKcal} kcal · proteína ${value.proteinG} g · carbos ${value.carbsG} g · grasas ${value.fatG} g`;
 
 export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }) } = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
   let selectedSlot = "other";
+  let selectedParts = {};
   const dialog = byId("nutritionEntryDialog");
 
-  function openMeal(slotId = "other", suggestion = "", entry = null, estimate = null) {
+  function refreshPartEstimate() {
+    const estimate = estimateParts(selectedParts);
+    const subtotal = knownPartsSubtotal(selectedParts);
+    for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
+      byId(field).value = estimate?.[key] ?? "";
+    }
+    byId("nutritionMacrosDetails").open = Boolean(estimate);
+    byId("nutritionEstimateNote").textContent = subtotal.unknownItems
+      ? `${subtotal.knownItems ? `Subtotal comprobado del pan integral: ${Math.round(subtotal.caloriesKcal)} kcal. ` : ""}Los demás ingredientes aún no tienen una cantidad o etiqueta confirmada: no calculamos un total ficticio. Puedes anotarlo manualmente si lo conoces.`
+      : estimate ? `Total basado en la etiqueta del pan Ideal 100% Integral: ${estimate.caloriesKcal} kcal. Puedes corregir las cifras antes de guardar.`
+        : "Agrega ingredientes. Por ahora solo el pan integral Ideal tiene kcal y macros automáticos.";
+  }
+
+  function renderSelectedParts({ updateEstimate = true } = {}) {
+    const list = byId("nutritionSelectedIngredients"); list.replaceChildren();
+    const entries = Object.entries(selectedParts).filter(([id, count]) => foodCatalog[id] && count > 0);
+    if (!entries.length) list.append(label("Aún no agregas ingredientes."));
+    for (const [id, count] of entries) {
+      const row = document.createElement("div"); row.className = "nutrition-selected-row";
+      const name = document.createElement("span"); name.textContent = `${foodCatalog[id].name} · ${foodCatalog[id].portion}`;
+      const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−";
+      minus.setAttribute("aria-label", `Quitar una unidad de ${foodCatalog[id].name}`);
+      minus.addEventListener("click", () => changePart(id, -1));
+      const amount = document.createElement("strong"); amount.textContent = String(count);
+      const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+";
+      plus.setAttribute("aria-label", `Agregar una unidad de ${foodCatalog[id].name}`);
+      plus.addEventListener("click", () => changePart(id, 1));
+      row.append(name, minus, amount, plus); list.append(row);
+    }
+    if (updateEstimate) refreshPartEstimate();
+  }
+
+  function changePart(id, delta) {
+    const count = Math.max(0, Math.min(99, (selectedParts[id] || 0) + delta));
+    if (count) selectedParts[id] = count;
+    else delete selectedParts[id];
+    renderSelectedParts();
+  }
+
+  function renderIngredientChoices() {
+    const list = byId("nutritionIngredientChoices"); list.replaceChildren();
+    const foods = foodsForSlot(selectedSlot, byId("nutritionIngredientSearch").value);
+    if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
+    for (const item of foods) {
+      const button = document.createElement("button"); button.type = "button";
+      const name = document.createElement("strong"); name.textContent = `${item.name}  +`;
+      const detail = document.createElement("small"); detail.textContent = `${item.portion}${item.kcal == null ? "" : ` · ${item.kcal} kcal`}`;
+      button.append(name, detail);
+      button.addEventListener("click", () => changePart(item.id, 1));
+      list.append(button);
+    }
+  }
+
+  function openMeal(slotId = "other", entry = null, initialParts = {}) {
     selectedSlot = slotId;
     editingId = entry?.id || "";
+    selectedParts = { ...(entry?.parts || initialParts) };
     byId("nutritionEntryTitle").textContent = entry ? "Editar comida registrada" : "Registrar lo que comiste";
     byId("nutritionEntryMessage").classList.add("hidden");
     byId("nutritionMealTime").value = entry?.time || localTime();
-    byId("nutritionMealText").value = entry?.text || suggestion;
+    byId("nutritionMealText").value = entry ? (entry.parts && Object.keys(entry.parts).length ? entry.note || "" : entry.text) : "";
+    byId("nutritionIngredientSearch").value = "";
+    renderIngredientChoices();
+    renderSelectedParts({ updateEstimate: false });
     for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
-      byId(field).value = entry?.[key] ?? estimate?.[key] ?? "";
+      byId(field).value = entry?.[key] ?? estimateParts(selectedParts)?.[key] ?? "";
     }
-    byId("nutritionMacrosDetails").open = Boolean(estimate || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
-    byId("nutritionEstimateNote").textContent = estimate
-      ? "Valores orientativos para la porción descrita. Si cambias cantidad, marca o preparación, corrige también los números antes de guardar."
-      : "Puedes anotar kcal y macros si conoces las cantidades. Si no, déjalos en blanco.";
+    byId("nutritionMacrosDetails").open = Boolean(estimateParts(selectedParts) || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
+    const subtotal = knownPartsSubtotal(selectedParts);
+    byId("nutritionEstimateNote").textContent = subtotal.unknownItems
+      ? `${subtotal.knownItems ? `Subtotal comprobado del pan integral: ${Math.round(subtotal.caloriesKcal)} kcal. ` : ""}Los otros ingredientes no tienen cifras automáticas todavía.`
+      : "Solo el pan integral Ideal tiene kcal y macros automáticos. Revisa cualquier cifra manual antes de guardar.";
     dialog.showModal();
-    byId("nutritionMealText").focus();
+    byId("nutritionIngredientSearch").focus();
   }
 
   function saveMeal(event) {
     event.preventDefault();
-    const text = byId("nutritionMealText").value.trim();
+    const note = byId("nutritionMealText").value.trim();
+    const text = [describeParts(selectedParts), note].filter(Boolean).join(" · ");
     if (!text) {
-      byId("nutritionEntryMessage").textContent = "Describe lo que realmente comiste y, si puedes, la cantidad.";
+      byId("nutritionEntryMessage").textContent = "Agrega al menos un ingrediente o describe lo que comiste en la nota.";
       byId("nutritionEntryMessage").classList.remove("hidden");
       return;
     }
     const previous = editingId ? repository.getNutritionEntry(editingId) : null;
     try {
       repository.saveNutritionEntry({ id: editingId || newId(), dateISO: selectedDate, kind: "meal", slotId: selectedSlot,
-        time: byId("nutritionMealTime").value, text,
+        time: byId("nutritionMealTime").value, text, note, parts: selectedParts,
         caloriesKcal: numberValue("nutritionMealCalories"), proteinG: numberValue("nutritionMealProtein"),
         carbsG: numberValue("nutritionMealCarbs"), fatG: numberValue("nutritionMealFat"),
         createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -82,28 +141,23 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const parts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
         .filter(([key]) => entry[key] !== null).map(([key, unit]) => `${entry[key]} ${unit}`);
       if (parts.length) { const small = document.createElement("small"); small.textContent = parts.join(" · "); body.append(small); }
+      else {
+        const subtotal = knownPartsSubtotal(entry.parts);
+        if (subtotal.knownItems) {
+          const small = document.createElement("small");
+          small.textContent = `Pan integral: ${Math.round(subtotal.caloriesKcal)} kcal conocidas · total de la comida sin estimar`;
+          body.append(small);
+        }
+      }
     }
     row.append(body);
     if (entry.kind === "meal") {
       const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Editar";
-      edit.addEventListener("click", () => openMeal(entry.slotId, "", entry)); row.append(edit);
+      edit.addEventListener("click", () => openMeal(entry.slotId, entry)); row.append(edit);
     }
     const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Quitar";
     remove.addEventListener("click", () => deleteEntry(entry)); row.append(remove);
     container.append(row);
-  }
-
-  function renderFoodCatalog() {
-    const list = byId("nutritionFoodCatalogList"); list.replaceChildren();
-    Object.values(foodCatalog).forEach(food => {
-      const button = document.createElement("button"); button.type = "button";
-      const name = document.createElement("strong"); name.textContent = `${food.name} · ${food.portion}`;
-      const estimate = { caloriesKcal: food.kcal, proteinG: food.proteinG, carbsG: food.carbsG, fatG: food.fatG };
-      const metrics = document.createElement("small"); metrics.textContent = estimateLine(estimate);
-      button.append(name, metrics);
-      button.addEventListener("click", () => openMeal("other", `${food.name} · ${food.portion}`, null, estimate));
-      list.append(button);
-    });
   }
 
   function render() {
@@ -193,37 +247,21 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const title = document.createElement("h3"); title.textContent = item.title;
       heading.append(label(item.time), title); card.append(heading);
       if (item.tip) { const tip = document.createElement("p"); tip.textContent = item.tip; card.append(tip); }
-      const options = document.createElement("div"); options.className = "nutrition-options";
-      item.options.forEach(option => {
-        const button = document.createElement("button"); button.type = "button"; button.textContent = `${option}  ＋`;
-        button.setAttribute("aria-label", `Registrar: ${option}`);
-        button.addEventListener("click", () => openMeal(item.id, option)); options.append(button);
-      });
-      card.append(options);
-      const presets = presetsForSlot(item.id);
-      if (presets.length) {
-        const examples = document.createElement("details"); examples.className = "nutrition-preset-options";
-        examples.open = ["breakfast", "morning"].includes(item.id);
-        const summary = document.createElement("summary"); summary.textContent = `Ejemplos con porción y nutrientes aproximados (${presets.length})`;
-        examples.append(summary);
-        const list = document.createElement("div"); list.className = "nutrition-preset-list";
-        presets.forEach(preset => {
-          const estimate = estimatePreset(preset);
-          const button = document.createElement("button"); button.type = "button";
-          const title = document.createElement("strong"); title.textContent = preset.title;
-          const metrics = document.createElement("small"); metrics.textContent = estimateLine(estimate);
-          button.append(title, metrics);
-          button.addEventListener("click", () => openMeal(item.id, preset.title, null, estimate));
-          list.append(button);
-        });
-        examples.append(list); card.append(examples);
+      const add = document.createElement("button"); add.type = "button"; add.className = "nutrition-build-button";
+      add.textContent = `+ Armar ${item.title.toLowerCase()} por ingredientes`;
+      add.addEventListener("click", () => openMeal(item.id)); card.append(add);
+      if (item.options.length) {
+        const guide = document.createElement("details"); guide.className = "nutrition-plan-suggestions";
+        const summary = document.createElement("summary"); summary.textContent = "Ver ideas de tu planificación";
+        const list = document.createElement("ul");
+        item.options.forEach(option => { const line = document.createElement("li"); line.textContent = option; list.append(line); });
+        guide.append(summary, list); card.append(guide);
       }
-      const other = document.createElement("button"); other.type = "button"; other.className = "nutrition-other-button";
-      other.textContent = "+ Anotar algo diferente"; other.addEventListener("click", () => openMeal(item.id)); card.append(other);
       entries.filter(entry => entry.kind === "meal" && entry.slotId === item.id).forEach(entry => appendEntry(card, entry));
       slots.append(card);
     });
-    const extras = entries.filter(entry => entry.slotId === "other" && entry.kind === "meal");
+    const visibleSlotIds = new Set(plan.slots.map(item => item.id));
+    const extras = entries.filter(entry => entry.kind === "meal" && !visibleSlotIds.has(entry.slotId));
     if (extras.length) {
       const card = document.createElement("article"); card.className = "nutrition-slot";
       const title = document.createElement("h3"); title.textContent = "Otras comidas registradas"; card.append(title);
@@ -238,7 +276,6 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
   }
 
   function initialize() {
-    renderFoodCatalog();
     byId("nutritionPreviousDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, -1); render(); });
     byId("nutritionNextDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, 1); render(); });
     byId("nutritionDate").addEventListener("change", event => { if (event.target.value) { selectedDate = event.target.value; render(); } });
@@ -254,6 +291,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const value = window.prompt("¿Cuántos ml de agua bebiste?", "300"); if (value !== null) addWater(value);
     });
     byId("nutritionExtraMeal").addEventListener("click", () => openMeal());
+    byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
     byId("nutritionEntryClose").addEventListener("click", () => dialog.close());
     byId("nutritionEntryForm").addEventListener("submit", saveMeal);
     render();

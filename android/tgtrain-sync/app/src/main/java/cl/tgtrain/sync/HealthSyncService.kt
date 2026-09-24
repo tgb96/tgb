@@ -88,9 +88,20 @@ class HealthSyncService(private val context: Context) {
         val start = firstDay.atStartOfDay(zone).toInstant()
         val end = today.plusDays(1).atStartOfDay(zone).toInstant()
         val origin = setOf(DataOrigin(sourcePackage))
-        val sleep = readAll(SleepSessionRecord::class, start, end, origin)
+        // Mi Fitness may publish sleep under a different Xiaomi package than steps.
+        // For each night choose one origin, so duplicate providers cannot double the duration.
+        val sleepCandidates = readAll(SleepSessionRecord::class, start, end).filter { record ->
+            val packageName = record.metadata.dataOrigin.packageName
+            packageName == sourcePackage || (isMiFitnessSource(sourcePackage) && isMiFitnessSource(packageName))
+        }
         val workouts = readAll(ExerciseSessionRecord::class, start, end, origin)
-        val sleepByDay = sleep.groupBy { it.endTime.atZone(zone).toLocalDate() }
+        val sleepByDay = sleepCandidates.groupBy { it.endTime.atZone(zone).toLocalDate() }
+            .mapValues { (_, records) ->
+                records.groupBy { it.metadata.dataOrigin.packageName }.values.maxBy { sourceRecords ->
+                    sourceRecords.sumOf { Duration.between(it.startTime, it.endTime).seconds.coerceAtLeast(0) }
+                }
+            }
+        val sleep = sleepByDay.values.flatten()
         val firestore = FirebaseFirestore.getInstance()
         val batch = firestore.batch()
         val syncedAt = Instant.now().toString()
@@ -113,10 +124,6 @@ class HealthSyncService(private val context: Context) {
             val dayData = hashMapOf<String, Any>(
                 "dateISO" to day.toString(),
                 "steps" to steps,
-                "sleepMinutes" to 0L,
-                "sleepStart" to "",
-                "sleepEnd" to "",
-                "sleepSessions" to 0,
                 "source" to "health_connect",
                 "originPackage" to sourcePackage,
                 "syncedAt" to syncedAt
@@ -128,6 +135,7 @@ class HealthSyncService(private val context: Context) {
                 dayData["sleepStart"] = night.minOf { it.startTime }.toString()
                 dayData["sleepEnd"] = night.maxOf { it.endTime }.toString()
                 dayData["sleepSessions"] = night.size
+                dayData["sleepOriginPackage"] = night.first().metadata.dataOrigin.packageName
             }
             batch.set(
                 firestore.collection("users").document(uid).collection("wearableDays")
@@ -234,6 +242,9 @@ class HealthSyncService(private val context: Context) {
             .digest("$origin|$recordId".toByteArray(Charsets.UTF_8))
         return bytes.take(16).joinToString("") { String.format(Locale.ROOT, "%02x", it.toInt() and 0xff) }
     }
+
+    private fun isMiFitnessSource(packageName: String) =
+        packageName.contains("xiaomi", ignoreCase = true) || packageName.contains("mifitness", ignoreCase = true)
 
     private fun exerciseTitle(type: Int) = when (type) {
         ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "Trote"

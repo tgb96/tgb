@@ -165,3 +165,14 @@ test("guarda preguntas de la guía, permite reintentar y las incluye en el respa
   restored.importMerge(repository.backup());
   assert.equal(restored.listCoachQuestions()[0].answer, "Descansa si persiste el dolor.");
 });
+
+test("limpiar preguntas deja marcas de borrado para que no reaparezcan desde la nube", () => {
+  const repository = createRepository(new FakeStorage());
+  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo voy?", createdAt: "2026-09-23T12:00:00.000Z" });
+  assert.equal(repository.clearCoachQuestions(), 1);
+  assert.equal(repository.listCoachQuestions().length, 0);
+  assert.equal(repository.listCoachQuestions({ includeDeleted: true })[0].deleted, true);
+  assert.equal(repository.applyCloudCoachQuestion({ id: "q-1", question: "¿Cómo voy?", updatedAt: "2026-09-23T12:00:00.000Z" }), false);
+  assert.equal(repository.listCoachQuestions().length, 0);
+  assert.equal(repository.clearCoachQuestions(), 0);
+});
