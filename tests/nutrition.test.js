@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionPlanForDate, normalizeNutritionEntries } from "../assets/js/nutrition.js";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal, nutritionEntryWithEstimate } from "../assets/js/nutrition-presets.js";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
 
 function memoryStorage() {
@@ -20,7 +20,7 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
   assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
   for (const mode of ["default", "physical", "tennis", "recovery", "early", "late", "other"]) {
-    assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún/i);
+    assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún|avena|miel|kiwi/i);
   }
 });
 
@@ -42,6 +42,14 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
   assert.ok(!foodsForSlot("lunch").some(food => food.name.includes("Atún")));
+  for (const id of ["oats", "honey", "kiwi"]) {
+    assert.equal(isSelectableFood(id), false);
+    assert.ok(!foodsForSlot("breakfast").some(food => food.id === id));
+    assert.ok(!foodsForSlot("breakfast", foodCatalog[id].name).some(food => food.id === id));
+    assert.ok(!foodsForSlot("lunch", foodCatalog[id].name).some(food => food.id === id));
+  }
+  assert.deepEqual(estimateParts({ kiwi: 1, oats: 1, honey: 1 }),
+    { caloriesKcal: 106, proteinG: 2.5, carbsG: 23.3, fatG: 1.1 });
 });
 
 test("una comida ya guardada recibe la estimación visible sin modificar el registro original", () => {

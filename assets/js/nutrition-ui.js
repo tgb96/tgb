@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=73";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=73";
+import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=75";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=75";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
@@ -53,7 +53,9 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+";
       plus.setAttribute("aria-label", `Agregar una unidad de ${foodCatalog[id].name}`);
       plus.addEventListener("click", () => changePart(id, 1));
-      row.append(name, minus, amount, plus); list.append(row);
+      row.append(name, minus, amount);
+      if (isSelectableFood(id)) row.append(plus);
+      list.append(row);
     }
     if (updateEstimate) refreshPartEstimate();
   }

@@ -5,6 +5,9 @@
 // Referencia general para alimentos sin marca: https://fdc.nal.usda.gov/
 const food = (name, portion, kcal, proteinG, carbsG, fatG, source = "generic") =>
   ({ name, portion, kcal, proteinG, carbsG, fatG, source });
+// Se conservan solo para leer comidas antiguas; no se pueden agregar a registros nuevos.
+const retiredFoodIds = new Set(["kiwi", "oats", "honey"]);
+export const isSelectableFood = id => Boolean(foodCatalog[id]) && !retiredFoodIds.has(id);
 
 export const foodCatalog = {
   integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
@@ -40,7 +43,7 @@ export const foodCatalog = {
   cerealBar: food("Barra de cereal", "1 unidad · aprox. 35 g", 140, 2, 25, 4)
 };
 
-const breakfast = ["integralBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola", "oats"];
+const breakfast = ["integralBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
 const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread"];
 
@@ -48,7 +51,7 @@ export function foodsForSlot(slotId, query = "") {
   const preferred = slotId === "breakfast" ? breakfast : ["morning", "pre", "snack", "during"].includes(slotId) ? snack : main;
   const search = String(query).trim().toLocaleLowerCase("es-CL");
   const ids = search ? Object.keys(foodCatalog) : preferred;
-  return ids.filter(id => !search || `${foodCatalog[id].name} ${foodCatalog[id].portion}`.toLocaleLowerCase("es-CL").includes(search))
+  return ids.filter(id => isSelectableFood(id) && (!search || `${foodCatalog[id].name} ${foodCatalog[id].portion}`.toLocaleLowerCase("es-CL").includes(search)))
     .map(id => ({ id, ...foodCatalog[id] }));
 }
 
