@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=72">
+  <link rel="stylesheet" href="assets/css/styles.css?v=73">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -199,20 +199,20 @@
         <p id="nutritionDayDescription"></p>
         <label class="nutrition-saturday-row" for="nutritionDayMode">Ajustar guía si cambió el entrenamiento
           <select id="nutritionDayMode">
-            <option value="default">Según el plan semanal</option>
+            <option value="default">Según tu planificación deportiva</option>
             <option value="physical">Entrenamiento físico</option>
             <option value="tennis">Tenis grupal</option>
             <option value="recovery">Descanso / recuperación</option>
-            <option value="early">Escenario: partido temprano (ej. 13:45)</option>
-            <option value="late">Escenario: partido tarde (ej. 17:15)</option>
+            <option value="match">Partido (sin hora definida)</option>
+            <option value="early">Partido temprano</option>
+            <option value="late">Partido en la tarde</option>
             <option value="other">Trekking / cardio sin partido</option>
             <option value="tennisLight">Tenis suave sin partido</option>
             <option value="trekking">Trekking largo</option>
             <option value="cardioSoft">Cardio suave</option>
           </select>
         </label>
-        <p class="nutrition-scenario-note">Los horarios de partido son ejemplos de la planificación, no eventos de tu calendario.</p>
-        <div class="nutrition-calorie-target"><small>Objetivo calórico orientativo del día</small><strong id="nutritionCalorieTarget"></strong><span id="nutritionCalorieContext"></span></div>
+        <div class="nutrition-calorie-target"><small>Objetivo calórico orientativo del día</small><strong id="nutritionCalorieTarget"></strong></div>
         <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
         <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
       </section>
@@ -230,7 +230,6 @@
           <button type="button" data-water-ml="500">+ 500 ml agua</button>
           <button id="nutritionCustomWater" type="button">Otra cantidad</button>
         </div>
-        <p>Arma cada comida sumando ingredientes. Verás kcal y macros aproximados según porciones promedio; el pan Ideal usa la etiqueta de su envase. Puedes corregir cualquier cifra.</p>
       </section>
       <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
       <div id="nutritionSlots" class="nutrition-slots"></div>
@@ -497,6 +496,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=76"></script>
+  <script type="module" src="assets/js/app.js?v=77"></script>
 </body>
 </html>

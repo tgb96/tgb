@@ -183,8 +183,9 @@ test("integra el bloque de cuatro semanas del entrenador con sesiones y alternat
 
 test("normaliza una respuesta compacta sin campos vacíos", async () => {
   const { normalizeTrainingBlock } = await import("../assets/js/training-plan.js");
-  const block = normalizeTrainingBlock({ title: "Plan compacto", weeks: [{ weekKey: "2026-W39", sessions: [{ dateISO: "2026-09-22", options: [{ title: "Trote 5K", category: "cardio", cardioTypeId: "running", distanceKm: 5 }] }] }] });
+  const block = normalizeTrainingBlock({ title: "Plan compacto", weeks: [{ weekKey: "2026-W39", sessions: [{ dateISO: "2026-09-22", startTime: "20:30", options: [{ title: "Trote 5K", category: "cardio", cardioTypeId: "running", distanceKm: 5 }] }] }] });
   assert.equal(block.title, "Plan compacto");
+  assert.equal(block.weeks[0].sessions[0].startTime, "20:30");
   assert.equal(block.weeks[0].sessions[0].options[0].prefill.cardioTypeId, "running");
   assert.equal(block.weeks[0].sessions[0].options[0].prefill.distanceKm, 5);
 });

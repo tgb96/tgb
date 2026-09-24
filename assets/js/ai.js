@@ -57,6 +57,7 @@ const planSchema = {
               properties: {
                 id: stringSchema,
                 dateISO: stringSchema,
+                startTime: stringSchema,
                 objective: stringSchema,
                 primaryOptionId: stringSchema,
                 options: {
@@ -67,6 +68,7 @@ const planSchema = {
                     properties: {
                       id: stringSchema,
                       title: stringSchema,
+                      startTime: stringSchema,
                       category: { type: "string", enum: ["physical", "cardio", "tennis", "rest"] },
                       summary: stringSchema,
                       details: { type: "array", items: stringSchema, maxItems: 20 },
@@ -270,6 +272,7 @@ export function createAiClient() {
         "Eres el importador de planificaciones de TGTrain, una aplicación personal de entrenamiento.",
         "Convierte fielmente el texto del entrenador en un calendario estructurado; no inventes entrenamientos ausentes.",
         "Usa fechas YYYY-MM-DD y semanas ISO YYYY-WNN. Conserva alternativas dentro de options y deja como primaria la primera o la indicada explícitamente.",
+        "Si el texto indica una hora de inicio, consérvala en startTime con formato HH:MM. No inventes horarios cuando no estén escritos.",
         "Para entrenamiento físico usa routineId y exerciseId del catálogo solo si realmente corresponde a una de esas rutinas. Si es una sesión distinta, omite routineId y conserva sus ejercicios, series, repeticiones, cargas y límites en details. Nunca la reemplaces por una rutina parecida.",
         "Para cardio, tenis y descanso usa exclusivamente los identificadores del catálogo. Los campos que no correspondan deben ir vacíos, las distancias desconocidas deben ser null y las listas pueden quedar vacías.",
         "Escribe todo en español claro. No incluyas explicaciones fuera del JSON.",

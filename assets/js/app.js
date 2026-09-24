@@ -22,12 +22,12 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=75";
+import { createRepository } from "./storage.js?v=76";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=76";
+import { createNutritionUI } from "./nutrition-ui.js?v=77";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=67";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=67";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=68";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=68";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
@@ -82,7 +82,8 @@ const cloudSync = createCloudSync({
 });
 const nutritionUI = createNutritionUI(repository, {
   showToast: message => showToast(message),
-  getWearableData: () => wearableData
+  getWearableData: () => wearableData,
+  getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock())
 });
 const guidedUI = createGuidedUI(repository, {
   showView: name => showView(name),

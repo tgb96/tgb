@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=76";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=75";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=77";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=77";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
@@ -9,7 +9,7 @@ const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Sa
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
 
-export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }) } = {}) {
+export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }), getTrainingSession = () => null } = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
   let selectedSlot = "other";
@@ -148,17 +148,23 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     row.className = "nutrition-entry";
     const body = document.createElement("div");
     const title = document.createElement("strong");
-    const mealText = Object.keys(entry.parts || {}).length ? [describeParts(entry.parts), entry.note].filter(Boolean).join(" · ") : entry.text;
+    const hasParts = Object.keys(entry.parts || {}).length > 0;
+    const mealText = hasParts ? [summarizeParts(entry.parts), entry.note].filter(Boolean).join(" · ") : entry.text;
     title.textContent = `${entry.time || "—"} · ${entry.kind === "water" ? `${entry.amountMl} ml agua` : mealText}`;
     body.append(title);
     if (entry.kind === "meal") {
       const metrics = nutritionEntryWithEstimate(entry);
-      if (["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => metrics[key] != null)) {
-        const parts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
-          .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
-        const small = document.createElement("small");
-        small.textContent = `${metrics.estimateSource === "generic" ? "≈ " : ""}${parts.join(" · ")}`;
-        body.append(small);
+      const metricParts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
+        .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
+      const quick = document.createElement("small");
+      quick.textContent = metricParts.length ? `${metrics.estimateSource === "generic" ? "≈ " : ""}${metricParts.slice(0, 2).join(" · ")}` : "Sin kcal ni macros estimados";
+      body.append(quick);
+      if (hasParts || metricParts.length > 2) {
+        const details = document.createElement("details"); details.className = "nutrition-entry-details";
+        const summary = document.createElement("summary"); summary.textContent = "Ver detalle"; details.append(summary);
+        if (hasParts) { const exact = document.createElement("p"); exact.textContent = describeParts(entry.parts); details.append(exact); }
+        if (metricParts.length) { const macros = document.createElement("small"); macros.textContent = `${metrics.estimateSource === "generic" ? "Valores aproximados · " : ""}${metricParts.join(" · ")}`; details.append(macros); }
+        body.append(details);
       }
     }
     row.append(body);
@@ -184,13 +190,21 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     });
     const allEntries = repository.listNutritionEntries(selectedDate).filter(entry => !entry.deleted);
     const planMode = allEntries.find(entry => entry.kind === "plan")?.planMode || "default";
-    const plan = nutritionPlanForDate(selectedDate, planMode);
+    const plannedActivity = plannedNutritionContext(getTrainingSession(selectedDate));
+    const effectiveMode = planMode === "default" && plannedActivity?.mode ? plannedActivity.mode : planMode;
+    const plan = nutritionPlanForDate(selectedDate, effectiveMode);
     byId("nutritionDayMode").value = planMode;
-    byId("nutritionDayTitle").textContent = plan.name;
-    byId("nutritionDayDescription").textContent = plan.detail;
+    const plannedTitle = plannedActivity && plannedActivity.time && !plannedActivity.title.includes(plannedActivity.time)
+      ? `${plannedActivity.title} · ${plannedActivity.time}` : plannedActivity?.title;
+    byId("nutritionDayTitle").textContent = plannedActivity && planMode === "default"
+      ? plannedTitle : plan.name;
+    byId("nutritionDayDescription").textContent = plannedActivity && planMode === "default"
+      ? plannedActivity.isMatch
+        ? [plannedActivity.summary, `Pauta ajustada a tu partido programado${plannedActivity.time ? ` a las ${plannedActivity.time}` : ""}.`].filter(Boolean).join(" · ")
+        : [plannedActivity.summary, plan.detail].filter(Boolean).join(" · ")
+      : plan.detail;
     const calorieRange = `${plan.caloriesMinKcal.toLocaleString("es-CL")}–${plan.caloriesMaxKcal.toLocaleString("es-CL")} kcal`;
     byId("nutritionCalorieTarget").textContent = calorieRange;
-    byId("nutritionCalorieContext").textContent = "Rango estimado por tu entrenador, no una cifra exacta ni calorías a descontar de la pulsera.";
     byId("nutritionProteinTarget").textContent = "Guía del plan: 110–125 g de proteína/día";
     byId("nutritionWaterTarget").textContent = `Guía de agua: ${(plan.waterMinMl / 1000).toLocaleString("es-CL")}–${(plan.waterMaxMl / 1000).toLocaleString("es-CL")} L`;
     byId("nutritionHydrationTip").textContent = plan.hydration;
@@ -231,18 +245,13 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     caveat.textContent = "Estos datos de la pulsera son contexto: no se descuentan de las comidas ni cambian por sí solos tu pauta de alimentación o hidratación.";
     context.append(caveat);
     const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
-    const expected = ["cardioSoft", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
+    const expected = plannedActivity?.mode || ["cardioSoft", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
     const actual = mainActivity?.category === "rest" ? "recovery"
       : mainActivity?.cardioTypeId === "trekking" ? "trekking"
         : mainActivity?.category === "cardio" ? "cardioSoft"
           : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId !== "match" ? "tennisLight"
             : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId === "match" ? ""
             : ["physical", "tennis"].includes(mainActivity?.category) ? mainActivity.category : "";
-    if (day === 6 && mainActivity?.category === "tennis" && mainActivity.tennisTypeId === "match" && planMode === "default") {
-      const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
-      hint.textContent = "Registraste un partido. Elige arriba el escenario de partido temprano o tarde para ver el rango correspondiente (2.500–2.700 kcal).";
-      context.append(hint);
-    }
     if (actual && actual !== expected && planMode === "default") {
       const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
       const message = document.createElement("span");

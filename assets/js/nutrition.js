@@ -37,8 +37,18 @@ const tennis = {
 };
 
 const saturdayPlans = {
+  match: {
+    name: "Día de partido", detail: "Prioriza energía, hidratación y recuperación según la hora real del partido.", waterMinMl: 2500, waterMaxMl: 3000,
+    caloriesMinKcal: 2500, caloriesMaxKcal: 2700,
+    slots: [breakfast(undefined, "Al comenzar el día"),
+      slot("pre", "2–3 h antes", "Comida prepartido", ["Pan, arroz, papas o fideos + proteína liviana", "Yogurt alto en proteína + granola + fruta"]),
+      slot("snack", "30–60 min antes", "Snack opcional", ["Plátano", "Barra simple", "Galletas de agua"], "Solo si tienes hambre o necesitas energía."),
+      slot("during", "Durante", "En el partido", ["Agua y electrolitos según tu plan", "Si dura más de 75–90 min: plátano o barra simple"]),
+      slot("post", "Después", "Comida postpartido", ["Proteína + carbohidrato + verduras"])],
+    hydration: "Tu plan propone aprox. 1 L con electrolitos durante el partido; ajusta según condiciones y tolerancia."
+  },
   early: {
-    name: "Escenario: partido temprano (ej. 13:45)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
+    name: "Partido temprano", detail: "Pauta para llegar con energía al partido y recuperar después.", waterMinMl: 2500, waterMaxMl: 3000,
     caloriesMinKcal: 2500, caloriesMaxKcal: 2700,
     slots: [
       breakfast(["Huevos + pan + fruta", "Yogurt alto en proteína + granola + fruta"], "08:30–09:30"),
@@ -48,7 +58,7 @@ const saturdayPlans = {
     ], hydration: "Tu plan propone aprox. 1 L con electrolitos durante el partido; ajusta según condiciones y tolerancia."
   },
   late: {
-    name: "Escenario: partido tarde (ej. 17:15)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
+    name: "Partido en la tarde", detail: "Pauta para sostener energía durante el día y llegar liviano al partido.", waterMinMl: 2500, waterMaxMl: 3000,
     caloriesMinKcal: 2500, caloriesMaxKcal: 2700,
     slots: [breakfast(undefined, "08:30"), morning(), lunch(),
       slot("pre", "16:00", "Snack prepartido", ["Plátano", "Barra simple", "Pan con fruta", "Yogurt"]),
@@ -87,7 +97,39 @@ const saturdayTrekking = { ...saturdayPlans.other, name: "Sábado · trekking la
   caloriesMinKcal: 2400, caloriesMaxKcal: 2700 };
 const softCardio = { ...week[0], name: "Cardio suave", detail: "Comer normal y recuperar tras una actividad suave." };
 
-export const nutritionModes = ["default", "physical", "tennis", "recovery", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"];
+export const nutritionModes = ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"];
+
+function primaryPlannedOption(session) {
+  return session?.options?.find(option => option.id === session.primaryOptionId) || session?.options?.[0] || null;
+}
+
+export function plannedActivityTime(session) {
+  const option = primaryPlannedOption(session);
+  const explicit = String(session?.startTime || option?.startTime || "").trim();
+  if (/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(explicit)) return explicit;
+  const source = [option?.title, option?.summary, session?.objective, ...(option?.details || [])].join(" ");
+  return source.match(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/)?.[0]?.padStart(5, "0") || "";
+}
+
+export function nutritionModeForPlannedSession(session) {
+  const option = primaryPlannedOption(session);
+  if (!option) return "";
+  if (option.category === "rest") return "recovery";
+  if (option.category === "physical") return "physical";
+  if (option.category === "cardio") return option.prefill?.cardioTypeId === "trekking" ? "trekking" : "cardioSoft";
+  if (option.category !== "tennis") return "";
+  if (option.prefill?.tennisTypeId !== "match") return new Date(`${session.dateISO}T12:00:00Z`).getUTCDay() === 6 ? "tennisLight" : "tennis";
+  const time = plannedActivityTime(session);
+  if (!time) return "match";
+  return Number(time.slice(0, 2)) < 16 ? "early" : "late";
+}
+
+export function plannedNutritionContext(session) {
+  const option = primaryPlannedOption(session);
+  if (!option) return null;
+  return { mode: nutritionModeForPlannedSession(session), title: option.title, summary: option.summary, time: plannedActivityTime(session), category: option.category,
+    isMatch: option.category === "tennis" && option.prefill?.tennisTypeId === "match" };
+}
 
 export function nutritionPlanForDate(dateISO, mode = "default") {
   const day = new Date(`${dateISO}T12:00:00Z`).getUTCDay();
@@ -99,7 +141,7 @@ export function nutritionPlanForDate(dateISO, mode = "default") {
   if (mode === "cardioSoft") return softCardio;
   if (mode === "tennisLight") return saturdayTennis;
   if (mode === "trekking") return saturdayTrekking;
-  if (mode === "early" || mode === "late" || mode === "other") return saturdayPlans[mode];
+  if (["match", "early", "late", "other"].includes(mode)) return saturdayPlans[mode];
   return day === 6 ? saturdayPlans.other : week[day];
 }
 

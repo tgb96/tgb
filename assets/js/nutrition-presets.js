@@ -60,6 +60,34 @@ export function describeParts(parts) {
     .map(([id, count]) => `${count} × ${foodCatalog[id].name.toLowerCase()} (${foodCatalog[id].portion})`).join(" · ");
 }
 
+const compactFoodNames = {
+  integralBread: "rebanada de pan integral", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta",
+  cheeseSlice: "lámina de queso", hamSlice: "lámina de jamón", butter: "mantequilla", applePortion: "½ manzana",
+  bananaPortion: "½ plátano"
+};
+
+const pluralize = (text, count) => count === 1 ? text : text
+  .replace("rebanada", "rebanadas").replace("lámina", "láminas").replace("huevo", "huevos").replace("porción", "porciones");
+
+export function summarizeParts(parts) {
+  const counts = Object.fromEntries(Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && Number.isInteger(count) && count > 0));
+  const breadId = counts.integralBread ? "integralBread" : counts.whiteBread ? "whiteBread" : "";
+  const pieces = [];
+  if (breadId) {
+    const breadCount = counts[breadId];
+    const bread = `${breadCount} ${pluralize(compactFoodNames[breadId], breadCount)}`;
+    const toppings = ["avocado", "cheeseSlice", "hamSlice", "butter"].filter(id => counts[id]).map(id => foodCatalog[id].name.toLocaleLowerCase("es-CL"));
+    pieces.push(`${bread}${toppings.length ? ` con ${new Intl.ListFormat("es", { style: "long", type: "conjunction" }).format(toppings)}` : ""}`);
+    delete counts[breadId];
+    ["avocado", "cheeseSlice", "hamSlice", "butter"].forEach(id => delete counts[id]);
+  }
+  for (const [id, count] of Object.entries(counts)) {
+    const compact = compactFoodNames[id] || foodCatalog[id].name.toLocaleLowerCase("es-CL");
+    pieces.push(`${count === 1 && ["applePortion", "bananaPortion"].includes(id) ? "" : `${count} `}${pluralize(compact, count)}`.trim());
+  }
+  return pieces.join(" · ");
+}
+
 export function knownPartsSubtotal(parts) {
   const totals = { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0, knownItems: 0, unknownItems: 0, genericItems: 0, labelItems: 0 };
   for (const [id, count] of Object.entries(parts || {})) {

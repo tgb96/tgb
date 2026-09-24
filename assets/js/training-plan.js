@@ -77,10 +77,12 @@ function normalizeOption(raw, index, sessionId) {
   };
   if (category === "cardio" && !prefill.cardioTypeId) return null;
   if (category === "tennis" && !prefill.tennisTypeId) prefill.tennisTypeId = "group-training";
+  const startTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(raw?.startTime || "").trim()) ? String(raw.startTime).trim() : "";
   return {
     id,
     title,
     category,
+    startTime,
     summary: text(raw?.summary, 300) || title,
     details: list(raw?.details, 20, 500),
     prefill
@@ -97,9 +99,11 @@ function normalizeSession(raw, index, blockId) {
     .filter(Boolean);
   if (!options.length) return null;
   const requestedPrimary = text(raw?.primaryOptionId, 100);
+  const startTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(raw?.startTime || "").trim()) ? String(raw.startTime).trim() : "";
   return {
     id: sessionId,
     dateISO,
+    startTime,
     objective: text(raw?.objective, 500) || options[0].summary,
     primaryOptionId: options.some(option => option.id === requestedPrimary) ? requestedPrimary : options[0].id,
     options

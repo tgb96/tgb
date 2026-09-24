@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nutritionDayTotals, nutritionPlanForDate, normalizeNutritionEntries } from "../assets/js/nutrition.js";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate } from "../assets/js/nutrition-presets.js";
+import { nutritionDayTotals, nutritionModeForPlannedSession, nutritionPlanForDate, normalizeNutritionEntries, plannedActivityTime, plannedNutritionContext } from "../assets/js/nutrition.js";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
 
 function memoryStorage() {
@@ -15,13 +15,24 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.ok(tuesday.slots.some(slot => slot.id === "post" && slot.time.includes("22:15")));
   assert.ok(nutritionPlanForDate("2026-09-21").slots.some(slot => slot.id === "pre"));
   assert.equal(nutritionPlanForDate("2026-09-26").name, "Sin partido · trekking o cardio");
-  assert.equal(nutritionPlanForDate("2026-09-26", "late").name, "Escenario: partido tarde (ej. 17:15)");
-  assert.match(nutritionPlanForDate("2026-09-26", "early").detail, /no un partido programado/);
+  assert.equal(nutritionPlanForDate("2026-09-26", "late").name, "Partido en la tarde");
+  assert.doesNotMatch(nutritionPlanForDate("2026-09-26", "early").detail, /ejemplo|no un partido programado/);
   assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
   assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
-  for (const mode of ["default", "physical", "tennis", "recovery", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
+  for (const mode of ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
     assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún|avena|miel|kiwi/i);
   }
+});
+
+test("la nutrición sigue la actividad y la hora de la planificación deportiva", () => {
+  const match = time => ({ startTime: time, primaryOptionId: "match", options: [{ id: "match", title: "Partido de escalerilla", category: "tennis", prefill: { tennisTypeId: "match" } }] });
+  assert.equal(plannedActivityTime(match("13:45")), "13:45");
+  assert.equal(nutritionModeForPlannedSession(match("13:45")), "early");
+  assert.equal(nutritionModeForPlannedSession(match("17:15")), "late");
+  assert.equal(nutritionModeForPlannedSession(match("")), "match");
+  assert.deepEqual(plannedNutritionContext(match("13:45")), { mode: "early", title: "Partido de escalerilla", summary: undefined, time: "13:45", category: "tennis", isMatch: true });
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "rest", options: [{ id: "rest", category: "rest" }] }), "recovery");
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "trek", options: [{ id: "trek", category: "cardio", prefill: { cardioTypeId: "trekking" } }] }), "trekking");
 });
 
 test("los rangos de kcal del entrenador dependen del día y del escenario real", () => {
@@ -60,6 +71,8 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(knownPartsSubtotal({ integralBread: 3, avocado: 2 }).caloriesKcal, 379);
   assert.equal(estimateParts({ integralBread: 3, futureFood: 1 }), null);
   assert.match(describeParts({ integralBread: 3, avocado: 2 }), /3 × pan integral/);
+  assert.equal(summarizeParts({ integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1 }),
+    "3 rebanadas de pan integral con palta, queso, jamón y mantequilla · ½ manzana");
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
