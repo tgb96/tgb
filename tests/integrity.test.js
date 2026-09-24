@@ -11,6 +11,8 @@ test("el enlace de Android entrega un APK y no lo guarda en la caché PWA", asyn
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
   const apk = html.match(/href="(downloads\/tgtrain-sync-\d+\.\d+\.\d+\.apk)" download/);
   assert.ok(apk, "La descarga debe apuntar a un APK versionado");
+  assert.ok(html.indexOf(apk[0]) > html.indexOf('id="cloudDialog"'), "La descarga debe estar dentro de Cuenta y respaldo");
+  assert.ok(html.indexOf(apk[0]) < html.indexOf('</dialog>', html.indexOf('id="cloudDialog"')), "La descarga no debe estar en Inicio");
   assert.match(worker, /url\.pathname\.endsWith\("\.apk"\)/);
   assert.ok((await stat(resolve(root, apk[1]))).size > 1_000_000);
 });
