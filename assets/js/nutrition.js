@@ -109,7 +109,8 @@ export function normalizeNutritionEntries(value) {
     if (Object.values(metrics).some(n => n !== null && (!Number.isFinite(n) || n < 0 || n > 10000))) return [];
     return [[id, { id, dateISO, kind, slotId: kind === "meal" ? String(item?.slotId || "other").slice(0, 40) : "",
       time: String(item?.time || "").slice(0, 5), text, note: kind === "meal" ? String(item?.note || "").trim().slice(0, 1000) : "",
-      parts: kind === "meal" ? parts : {}, amountMl, planMode, ...metrics,
+      parts: kind === "meal" ? parts : {}, estimateSource: kind === "meal" && ["label", "generic", "manual"].includes(item?.estimateSource) ? item.estimateSource : "",
+      amountMl, planMode, ...metrics,
       deleted: Boolean(item?.deleted), createdAt: String(item?.createdAt || ""), updatedAt: String(item?.updatedAt || item?.createdAt || "") }]];
   }));
 }

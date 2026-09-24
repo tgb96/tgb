@@ -1,40 +1,43 @@
-// Cada elemento es una unidad repetible. Solo el pan Ideal 100% Integral tiene
-// nutrientes automáticos: 2 rebanadas (63 g) = 146 kcal, 7,56 P, 24,57 C, 1,95 G.
-// Fuente: https://www.jumbo.cl/pan-molde-100-int-2087389/p
-const food = (name, portion, metrics = null) => ({ name, portion, ...metrics });
+// Porciones repetibles y valores orientativos redondeados. El pan Ideal usa su etiqueta
+// (2 rebanadas de 63 g = 146,16 kcal). El resto son referencias genéricas: cambian por
+// marca, variedad y preparación; no representan una medición del plato del usuario.
+// Etiqueta: https://www.jumbo.cl/pan-molde-100-int-2087389/p
+// Referencia general para alimentos sin marca: https://fdc.nal.usda.gov/
+const food = (name, portion, kcal, proteinG, carbsG, fatG, source = "generic") =>
+  ({ name, portion, kcal, proteinG, carbsG, fatG, source });
 
 export const foodCatalog = {
-  integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", { kcal: 73, proteinG: 3.78, carbsG: 12.285, fatG: 0.975 }),
-  whiteBread: food("Pan de molde normal", "1 rebanada"),
-  egg: food("Huevo", "1 unidad"),
-  avocado: food("Palta", "1 porción pequeña"),
-  cheeseSlice: food("Queso", "1 lámina"),
-  hamSlice: food("Jamón", "1 lámina"),
-  butter: food("Mantequilla", "1 untada pequeña"),
-  yogurtPlain: food("Yogur normal", "1 envase"),
-  yogurtProtein: food("Yogur alto en proteína", "1 envase"),
-  milk: food("Leche", "1 vaso"),
-  proteinDrink: food("Bebida proteica", "1 envase"),
-  applePortion: food("Manzana", "1 porción · aprox. ½ unidad"),
-  bananaPortion: food("Plátano", "1 porción · aprox. ½ unidad"),
-  kiwi: food("Kiwi", "1 unidad"),
-  granola: food("Granola", "1 cucharada · aprox. 10 g"),
-  oats: food("Avena", "1 cucharada · aprox. 10 g"),
-  nuts: food("Frutos secos", "1 puñado pequeño"),
-  rice: food("Arroz cocido", "1 porción · aprox. ½ taza"),
-  pasta: food("Fideos cocidos", "1 porción · aprox. ½ taza"),
-  potato: food("Papa", "1 unidad mediana"),
-  chicken: food("Pollo", "1 porción · aprox. 100 g cocidos"),
-  beef: food("Carne de vacuno", "1 porción · aprox. 100 g cocidos"),
-  pork: food("Cerdo", "1 porción · aprox. 100 g cocidos"),
-  fish: food("Pescado", "1 porción · aprox. 100 g cocidos"),
-  tomatoSauce: food("Salsa de tomate", "1 porción · aprox. ½ taza"),
-  bolognese: food("Salsa boloñesa", "1 porción · aprox. ½ taza"),
-  vegetables: food("Verduras", "1 porción · aprox. ½ taza"),
-  tomato: food("Tomate", "1 porción · aprox. ½ unidad"),
-  crackers: food("Galletas de agua", "1 porción"),
-  honey: food("Miel", "1 cucharadita"),
-  cerealBar: food("Barra de cereal", "1 unidad")
+  integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
+  whiteBread: food("Pan de molde normal", "1 rebanada · aprox. 30 g", 80, 2.5, 15, 1),
+  egg: food("Huevo", "1 unidad · aprox. 50 g", 72, 6.3, 0.4, 4.8),
+  avocado: food("Palta", "1 porción normal · aprox. 50 g", 80, 1, 4.3, 7.3),
+  cheeseSlice: food("Queso", "1 lámina · aprox. 20 g", 80, 5, 0.3, 6.7),
+  hamSlice: food("Jamón", "1 lámina · aprox. 20 g", 25, 4, 0.5, 1),
+  butter: food("Mantequilla", "1 untada · aprox. 5 g", 36, 0, 0, 4.1),
+  yogurtPlain: food("Yogur normal", "1 envase · aprox. 170 g", 110, 6, 9, 5),
+  yogurtProtein: food("Yogur alto en proteína", "1 envase · aprox. 170 g", 120, 17, 10, 1),
+  milk: food("Leche", "1 vaso · aprox. 200 ml", 120, 6.4, 9.6, 6.4),
+  proteinDrink: food("Bebida proteica", "1 envase · aprox. 250 ml", 160, 25, 13, 2),
+  applePortion: food("Manzana", "1 porción · aprox. ½ unidad (75 g)", 39, 0.2, 10.5, 0.1),
+  bananaPortion: food("Plátano", "1 porción · aprox. ½ unidad (60 g)", 53, 0.7, 13.7, 0.2),
+  kiwi: food("Kiwi", "1 unidad · aprox. 75 g", 46, 0.8, 11, 0.4),
+  granola: food("Granola", "1 cucharada · aprox. 10 g", 45, 1, 6.5, 1.8),
+  oats: food("Avena", "1 cucharada · aprox. 10 g", 39, 1.7, 6.6, 0.7),
+  nuts: food("Frutos secos", "1 puñado pequeño · aprox. 25 g", 150, 5, 5, 13),
+  rice: food("Arroz cocido", "1 porción · aprox. ½ taza (100 g)", 130, 2.7, 28, 0.3),
+  pasta: food("Fideos cocidos", "1 porción · aprox. ½ taza (100 g)", 158, 5.8, 30.9, 0.9),
+  potato: food("Papa", "1 unidad mediana · aprox. 150 g", 130, 3, 30, 0.2),
+  chicken: food("Pollo", "1 porción · aprox. 100 g cocidos", 165, 31, 0, 3.6),
+  beef: food("Carne de vacuno", "1 porción · aprox. 100 g cocidos", 200, 27, 0, 10),
+  pork: food("Cerdo", "1 porción · aprox. 100 g cocidos", 200, 27, 0, 10),
+  fish: food("Pescado", "1 porción · aprox. 100 g cocidos", 130, 26, 0, 3),
+  tomatoSauce: food("Salsa de tomate", "1 porción · aprox. ½ taza (120 g)", 70, 2, 12, 2),
+  bolognese: food("Salsa boloñesa", "1 porción · aprox. ½ taza (120 g)", 180, 10, 10, 10),
+  vegetables: food("Verduras", "1 porción · aprox. ½ taza (80 g)", 35, 2, 6, 0.3),
+  tomato: food("Tomate", "1 porción · aprox. ½ unidad (60 g)", 11, 0.5, 2.4, 0.1),
+  crackers: food("Galletas de agua", "1 porción · aprox. 30 g", 120, 2, 23, 2),
+  honey: food("Miel", "1 cucharadita · aprox. 7 g", 21, 0, 5.7, 0),
+  cerealBar: food("Barra de cereal", "1 unidad · aprox. 35 g", 140, 2, 25, 4)
 };
 
 const breakfast = ["integralBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola", "oats"];
@@ -55,12 +58,15 @@ export function describeParts(parts) {
 }
 
 export function knownPartsSubtotal(parts) {
-  const totals = { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0, knownItems: 0, unknownItems: 0 };
+  const totals = { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0, knownItems: 0, unknownItems: 0, genericItems: 0, labelItems: 0 };
   for (const [id, count] of Object.entries(parts || {})) {
     const item = foodCatalog[id];
-    if (!item || !Number.isInteger(count) || count <= 0) continue;
+    if (!Number.isInteger(count) || count <= 0) continue;
+    if (!item) { totals.unknownItems += count; continue; }
     if (item.kcal == null) { totals.unknownItems += count; continue; }
     totals.knownItems += count;
+    if (item.source === "label") totals.labelItems += count;
+    else totals.genericItems += count;
     totals.caloriesKcal += item.kcal * count;
     totals.proteinG += item.proteinG * count;
     totals.carbsG += item.carbsG * count;
@@ -74,4 +80,11 @@ export function estimateParts(parts) {
   if (!subtotal.knownItems || subtotal.unknownItems) return null;
   return Object.fromEntries(["caloriesKcal", "proteinG", "carbsG", "fatG"]
     .map(key => [key, Math.round(subtotal[key] * 10) / 10]));
+}
+
+export function nutritionEntryWithEstimate(entry) {
+  if (entry?.kind !== "meal" || ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] != null)) return entry;
+  const estimate = estimateParts(entry.parts);
+  if (!estimate) return entry;
+  return { ...entry, ...estimate, estimateSource: knownPartsSubtotal(entry.parts).genericItems ? "generic" : "label" };
 }

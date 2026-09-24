@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=71";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal } from "./nutrition-presets.js?v=71";
+import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=73";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, knownPartsSubtotal, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=73";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
@@ -14,7 +14,19 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
   let editingId = "";
   let selectedSlot = "other";
   let selectedParts = {};
+  let estimateSource = "";
   const dialog = byId("nutritionEntryDialog");
+
+  function estimateNote(parts) {
+    const subtotal = knownPartsSubtotal(parts);
+    const estimate = estimateParts(parts);
+    if (!estimate) return subtotal.unknownItems
+      ? "Faltan datos para algunos ingredientes. Puedes completar las cifras manualmente."
+      : "Agrega ingredientes para ver una estimación.";
+    return subtotal.genericItems
+      ? `≈ ${Math.round(estimate.caloriesKcal)} kcal para las porciones indicadas. El pan Ideal usa su etiqueta; los demás alimentos son referencias promedio. Revisa marcas y cantidades antes de guardar.`
+      : `${Math.round(estimate.caloriesKcal)} kcal según la etiqueta del pan Ideal para estas rebanadas.`;
+  }
 
   function refreshPartEstimate() {
     const estimate = estimateParts(selectedParts);
@@ -22,11 +34,9 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
       byId(field).value = estimate?.[key] ?? "";
     }
+    estimateSource = estimate ? (subtotal.genericItems ? "generic" : "label") : "";
     byId("nutritionMacrosDetails").open = Boolean(estimate);
-    byId("nutritionEstimateNote").textContent = subtotal.unknownItems
-      ? `${subtotal.knownItems ? `Subtotal comprobado del pan integral: ${Math.round(subtotal.caloriesKcal)} kcal. ` : ""}Los demás ingredientes aún no tienen una cantidad o etiqueta confirmada: no calculamos un total ficticio. Puedes anotarlo manualmente si lo conoces.`
-      : estimate ? `Total basado en la etiqueta del pan Ideal 100% Integral: ${estimate.caloriesKcal} kcal. Puedes corregir las cifras antes de guardar.`
-        : "Agrega ingredientes. Por ahora solo el pan integral Ideal tiene kcal y macros automáticos.";
+    byId("nutritionEstimateNote").textContent = estimateNote(selectedParts);
   }
 
   function renderSelectedParts({ updateEstimate = true } = {}) {
@@ -62,7 +72,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
       const name = document.createElement("strong"); name.textContent = `${item.name}  +`;
-      const detail = document.createElement("small"); detail.textContent = `${item.portion}${item.kcal == null ? "" : ` · ${item.kcal} kcal`}`;
+      const detail = document.createElement("small"); detail.textContent = `${item.portion} · ${item.source === "label" ? "" : "≈ "}${item.kcal} kcal`;
       button.append(name, detail);
       button.addEventListener("click", () => changePart(item.id, 1));
       list.append(button);
@@ -80,14 +90,14 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     byId("nutritionIngredientSearch").value = "";
     renderIngredientChoices();
     renderSelectedParts({ updateEstimate: false });
-    for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
-      byId(field).value = entry?.[key] ?? estimateParts(selectedParts)?.[key] ?? "";
-    }
-    byId("nutritionMacrosDetails").open = Boolean(estimateParts(selectedParts) || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
+    const estimate = estimateParts(selectedParts);
     const subtotal = knownPartsSubtotal(selectedParts);
-    byId("nutritionEstimateNote").textContent = subtotal.unknownItems
-      ? `${subtotal.knownItems ? `Subtotal comprobado del pan integral: ${Math.round(subtotal.caloriesKcal)} kcal. ` : ""}Los otros ingredientes no tienen cifras automáticas todavía.`
-      : "Solo el pan integral Ideal tiene kcal y macros automáticos. Revisa cualquier cifra manual antes de guardar.";
+    estimateSource = entry?.estimateSource || (estimate ? (subtotal.genericItems ? "generic" : "label") : "");
+    for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
+      byId(field).value = entry?.[key] ?? estimate?.[key] ?? "";
+    }
+    byId("nutritionMacrosDetails").open = Boolean(estimate || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
+    byId("nutritionEstimateNote").textContent = estimateNote(selectedParts);
     dialog.showModal();
     byId("nutritionIngredientSearch").focus();
   }
@@ -104,7 +114,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     const previous = editingId ? repository.getNutritionEntry(editingId) : null;
     try {
       repository.saveNutritionEntry({ id: editingId || newId(), dateISO: selectedDate, kind: "meal", slotId: selectedSlot,
-        time: byId("nutritionMealTime").value, text, note, parts: selectedParts,
+        time: byId("nutritionMealTime").value, text, note, parts: selectedParts, estimateSource,
         caloriesKcal: numberValue("nutritionMealCalories"), proteinG: numberValue("nutritionMealProtein"),
         carbsG: numberValue("nutritionMealCarbs"), fatG: numberValue("nutritionMealFat"),
         createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -136,19 +146,18 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     row.className = "nutrition-entry";
     const body = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = `${entry.time || "—"} · ${entry.kind === "water" ? `${entry.amountMl} ml agua` : entry.text}`;
+    const mealText = Object.keys(entry.parts || {}).length ? [describeParts(entry.parts), entry.note].filter(Boolean).join(" · ") : entry.text;
+    title.textContent = `${entry.time || "—"} · ${entry.kind === "water" ? `${entry.amountMl} ml agua` : mealText}`;
     body.append(title);
     if (entry.kind === "meal") {
-      const parts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
-        .filter(([key]) => entry[key] !== null).map(([key, unit]) => `${entry[key]} ${unit}`);
-      if (parts.length) { const small = document.createElement("small"); small.textContent = parts.join(" · "); body.append(small); }
-      else {
-        const subtotal = knownPartsSubtotal(entry.parts);
-        if (subtotal.knownItems) {
-          const small = document.createElement("small");
-          small.textContent = `Pan integral: ${Math.round(subtotal.caloriesKcal)} kcal conocidas · total de la comida sin estimar`;
-          body.append(small);
-        }
+      const storedMetrics = ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null);
+      const metrics = nutritionEntryWithEstimate(entry);
+      if (["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => metrics[key] != null)) {
+        const parts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
+          .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
+        const small = document.createElement("small");
+        small.textContent = `${metrics.estimateSource === "generic" ? "≈ " : ""}${parts.join(" · ")}${!storedMetrics ? " · estimación nueva; abre Editar para guardarla" : ""}`;
+        body.append(small);
       }
     }
     row.append(body);
@@ -235,12 +244,12 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       hint.append(message, change); context.append(hint);
     }
     const entries = allEntries.filter(entry => entry.kind !== "plan");
-    const totals = nutritionDayTotals(entries);
+    const totals = nutritionDayTotals(entries.map(nutritionEntryWithEstimate));
     const summary = byId("nutritionSummary");
     summary.replaceChildren();
     for (const [value, title] of [[totals.meals, "Comidas"], [`${(totals.waterMl / 1000).toLocaleString("es-CL")} L`, "Agua anotada"],
-      [totals.proteinKnownMeals ? `${Math.round(totals.proteinG)} g` : "—", `Proteína anotada${totals.proteinKnownMeals < totals.meals ? " (parcial)" : ""}`],
-      [totals.caloriesKnownMeals ? Math.round(totals.caloriesKcal) : "—", `kcal anotadas${totals.caloriesKnownMeals < totals.meals ? " (parcial)" : ""}`]]) {
+      [totals.proteinKnownMeals ? `${Math.round(totals.proteinG)} g` : "—", `Proteína estimada/anotada${totals.proteinKnownMeals < totals.meals ? " (parcial)" : ""}`],
+      [totals.caloriesKnownMeals ? Math.round(totals.caloriesKcal) : "—", `kcal estimadas/anotadas${totals.caloriesKnownMeals < totals.meals ? " (parcial)" : ""}`]]) {
       const tile = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = value;
       tile.append(strong, label(title)); summary.append(tile);
     }
@@ -296,6 +305,8 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     });
     byId("nutritionExtraMeal").addEventListener("click", () => openMeal());
     byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
+    for (const id of ["nutritionMealCalories", "nutritionMealProtein", "nutritionMealCarbs", "nutritionMealFat"])
+      byId(id).addEventListener("input", () => { estimateSource = "manual"; });
     byId("nutritionEntryClose").addEventListener("click", () => dialog.close());
     byId("nutritionEntryForm").addEventListener("submit", saveMeal);
     render();

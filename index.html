@@ -225,7 +225,7 @@
           <button type="button" data-water-ml="500">+ 500 ml agua</button>
           <button id="nutritionCustomWater" type="button">Otra cantidad</button>
         </div>
-        <p>Arma cada comida sumando ingredientes. Solo el pan integral Ideal tiene kcal y macros automáticos por ahora; los demás valores quedan pendientes o puedes anotarlos tú.</p>
+        <p>Arma cada comida sumando ingredientes. Verás kcal y macros aproximados según porciones promedio; el pan Ideal usa la etiqueta de su envase. Puedes corregir cualquier cifra.</p>
       </section>
       <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
       <div id="nutritionSlots" class="nutrition-slots"></div>
@@ -458,7 +458,7 @@
       <div id="nutritionSelectedIngredients" class="nutrition-selected-ingredients" aria-live="polite"></div>
       <label for="nutritionMealText">Nota adicional <small>(opcional)</small></label>
       <textarea id="nutritionMealText" rows="3" maxlength="1000" placeholder="Marca, preparación, aceite, cantidades distintas o algo que no está en la lista"></textarea>
-      <p id="nutritionEstimateNote" class="nutrition-estimate-note">Puedes anotar kcal y macros si conoces las cantidades. Si no, déjalos en blanco.</p>
+      <p id="nutritionEstimateNote" class="nutrition-estimate-note">Las porciones y sus kcal son aproximadas salvo que usemos una etiqueta concreta.</p>
       <details id="nutritionMacrosDetails" class="nutrition-macros"><summary>Revisar kcal y macros (opcional)</summary>
         <div class="nutrition-macro-grid">
           <label>kcal<input id="nutritionMealCalories" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
@@ -492,6 +492,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=72"></script>
+  <script type="module" src="assets/js/app.js?v=73"></script>
 </body>
 </html>
