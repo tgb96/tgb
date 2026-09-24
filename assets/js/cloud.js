@@ -289,6 +289,7 @@ export function createCloudSync({
       const value = item.data();
       if (value?.id) remoteNutrition.set(String(value.id), value);
     });
+    repository.fillMissingNutritionEstimates();
     const localNutrition = new Map(repository.listNutritionEntries().map(entry => [entry.id, entry]));
     const nutritionUploads = [];
     remoteNutrition.forEach((cloudEntry, id) => {
@@ -299,6 +300,10 @@ export function createCloudSync({
     });
     localNutrition.forEach((localEntry, id) => {
       if (!remoteNutrition.has(id)) nutritionUploads.push({ type: "nutrition-upsert", entry: localEntry });
+    });
+    repository.fillMissingNutritionEstimates().forEach(entry => {
+      nutritionUploads.push({ type: "nutrition-upsert", entry });
+      localChanged = true;
     });
     for (const change of nutritionUploads) await writeChange(change);
     await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
@@ -393,6 +398,7 @@ export function createCloudSync({
         if (change.type === "removed") return;
         changed = repository.applyCloudNutritionEntry(change.doc.data()) || changed;
       });
+      if (changed) repository.fillMissingNutritionEstimates();
       if (changed) onDataChanged();
     }, () => {
       syncError = true;

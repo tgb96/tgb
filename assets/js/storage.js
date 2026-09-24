@@ -1,6 +1,7 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=67";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=67";
 import { normalizeNutritionEntries } from "./nutrition.js?v=73";
+import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=73";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
@@ -354,6 +355,24 @@ export function createRepository(storage) {
     },
     getNutritionEntry(id) {
       return state.nutritionEntries[String(id)] || null;
+    },
+    fillMissingNutritionEstimates() {
+      const nutritionEntries = { ...state.nutritionEntries };
+      const updated = [];
+      for (const entry of Object.values(nutritionEntries)) {
+        if (entry.deleted) continue;
+        const estimated = nutritionEntryWithEstimate(entry);
+        if (estimated === entry) continue;
+        const text = [describeParts(entry.parts), entry.note].filter(Boolean).join(" · ").slice(0, 1000);
+        const updatedAt = new Date(Math.max(Date.now(), (Date.parse(entry.updatedAt) || 0) + 1)).toISOString();
+        const next = { ...estimated, text: text || entry.text, updatedAt };
+        nutritionEntries[entry.id] = next;
+        updated.push(next);
+      }
+      if (!updated.length) return [];
+      persist({ nutritionEntries });
+      updated.forEach(entry => notify({ type: "nutrition-upsert", entry }));
+      return updated;
     },
     saveNutritionEntry(entry, { silent = false } = {}) {
       const next = Object.values(normalizeNutritionEntries([entry]))[0];

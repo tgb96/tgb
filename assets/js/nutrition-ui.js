@@ -24,7 +24,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       ? "Faltan datos para algunos ingredientes. Puedes completar las cifras manualmente."
       : "Agrega ingredientes para ver una estimación.";
     return subtotal.genericItems
-      ? `≈ ${Math.round(estimate.caloriesKcal)} kcal para las porciones indicadas. El pan Ideal usa su etiqueta; los demás alimentos son referencias promedio. Revisa marcas y cantidades antes de guardar.`
+      ? `≈ ${Math.round(estimate.caloriesKcal)} kcal para las porciones indicadas. El pan Ideal usa su etiqueta; los demás alimentos son referencias promedio. Si luego revisamos una foto o aclaras cantidades, puedes corregir esta comida en Editar.`
       : `${Math.round(estimate.caloriesKcal)} kcal según la etiqueta del pan Ideal para estas rebanadas.`;
   }
 
@@ -150,13 +150,12 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     title.textContent = `${entry.time || "—"} · ${entry.kind === "water" ? `${entry.amountMl} ml agua` : mealText}`;
     body.append(title);
     if (entry.kind === "meal") {
-      const storedMetrics = ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null);
       const metrics = nutritionEntryWithEstimate(entry);
       if (["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => metrics[key] != null)) {
         const parts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
           .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
         const small = document.createElement("small");
-        small.textContent = `${metrics.estimateSource === "generic" ? "≈ " : ""}${parts.join(" · ")}${!storedMetrics ? " · estimación nueva; abre Editar para guardarla" : ""}`;
+        small.textContent = `${metrics.estimateSource === "generic" ? "≈ " : ""}${parts.join(" · ")}`;
         body.append(small);
       }
     }
@@ -289,6 +288,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
   }
 
   function initialize() {
+    repository.fillMissingNutritionEstimates();
     byId("nutritionPreviousDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, -1); render(); });
     byId("nutritionNextDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, 1); render(); });
     byId("nutritionDate").addEventListener("change", event => { if (event.target.value) { selectedDate = event.target.value; render(); } });

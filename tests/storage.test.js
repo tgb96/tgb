@@ -86,6 +86,27 @@ test("notifica cambios locales y aplica cambios de la nube sin duplicarlos", () 
   unsubscribe();
 });
 
+test("guarda estimaciones faltantes una sola vez sin sobrescribir cifras manuales", () => {
+  const repository = createRepository(new FakeStorage());
+  const old = "2026-09-24T09:00:00.000Z";
+  repository.saveNutritionEntry({ id: "breakfast", dateISO: "2026-09-24", kind: "meal", text: "Desayuno", parts: {
+    integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1
+  }, createdAt: old, updatedAt: old });
+  repository.saveNutritionEntry({ id: "corrected", dateISO: "2026-09-24", kind: "meal", text: "Desayuno corregido", parts: {
+    integralBread: 3, avocado: 2
+  }, caloriesKcal: 410, estimateSource: "manual", createdAt: old, updatedAt: old });
+  const changes = [];
+  repository.subscribe(change => changes.push(change));
+  assert.equal(repository.fillMissingNutritionEstimates().length, 1);
+  assert.equal(repository.getNutritionEntry("breakfast").caloriesKcal, 559);
+  assert.equal(repository.getNutritionEntry("breakfast").estimateSource, "generic");
+  assert.match(repository.getNutritionEntry("breakfast").text, /porción normal/);
+  assert.equal(repository.getNutritionEntry("corrected").caloriesKcal, 410);
+  assert.equal(repository.fillMissingNutritionEstimates().length, 0);
+  assert.equal(changes.filter(change => change.type === "nutrition-upsert").length, 1);
+  assert.match(repository.backup(), /"caloriesKcal": 559/);
+});
+
 test("guarda el plan semanal, lo respalda y acepta actualizaciones de la nube", () => {
   const repository = createRepository(new FakeStorage());
   const changes = [];

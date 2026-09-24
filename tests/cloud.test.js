@@ -88,10 +88,15 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   }));
   phone.saveCoachQuestion({ id: "question-1", question: "¿Cómo estuvo mi trote?", answer: "Cuida la rodilla.", createdAt: "2026-09-23T12:00:00.000Z", updatedAt: "2026-09-23T12:01:00.000Z" });
   phone.saveNutritionEntry({ id: "food-1", dateISO: "2026-09-23", kind: "meal", slotId: "lunch", text: "Pollo y arroz", proteinG: 35, createdAt: "2026-09-23T13:00:00.000Z", updatedAt: "2026-09-23T13:00:00.000Z" });
+  remote.nutritionEntries.set(Buffer.from("old-breakfast").toString("base64url"), { id: "old-breakfast", dateISO: "2026-09-24", kind: "meal", slotId: "breakfast", text: "Pan con palta", parts: {
+    integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1
+  }, createdAt: "2026-09-24T09:00:00.000Z", updatedAt: "2026-09-24T09:00:00.000Z" });
   const phoneCloud = await connect(phone, phoneStorage);
   assert.equal(remote.trainingBlocks.get(block.id).title, "Plan del teléfono");
   assert.equal([...remote.coachQuestions.values()][0].answer, "Cuida la rodilla.");
-  assert.equal([...remote.nutritionEntries.values()][0].text, "Pollo y arroz");
+  assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "food-1")?.text, "Pollo y arroz");
+  assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.caloriesKcal, 559);
+  assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.estimateSource, "generic");
   const computerStorage = makeStorage();
   const computer = createRepository(computerStorage);
   const computerCloud = await connect(computer, computerStorage);
