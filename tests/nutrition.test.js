@@ -19,9 +19,31 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.match(nutritionPlanForDate("2026-09-26", "early").detail, /no un partido programado/);
   assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
   assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
-  for (const mode of ["default", "physical", "tennis", "recovery", "early", "late", "other"]) {
+  for (const mode of ["default", "physical", "tennis", "recovery", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
     assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún|avena|miel|kiwi/i);
   }
+});
+
+test("los rangos de kcal del entrenador dependen del día y del escenario real", () => {
+  const target = (date, mode) => {
+    const { caloriesMinKcal, caloriesMaxKcal } = nutritionPlanForDate(date, mode);
+    return [caloriesMinKcal, caloriesMaxKcal];
+  };
+  assert.deepEqual(target("2026-09-21"), [2200, 2400]);
+  assert.deepEqual(target("2026-09-22"), [2400, 2600]);
+  assert.deepEqual(target("2026-09-23"), [2100, 2300]);
+  assert.deepEqual(target("2026-09-24"), [2400, 2600]);
+  assert.deepEqual(target("2026-09-25"), [2200, 2400]);
+  assert.deepEqual(target("2026-09-26", "early"), [2500, 2700]);
+  assert.deepEqual(target("2026-09-26", "late"), [2500, 2700]);
+  assert.deepEqual(target("2026-09-26", "tennisLight"), [2300, 2500]);
+  assert.deepEqual(target("2026-09-26", "trekking"), [2400, 2700]);
+  assert.deepEqual(target("2026-09-26", "recovery"), [2000, 2200]);
+  assert.deepEqual(target("2026-09-27"), [2000, 2200]);
+  assert.deepEqual(target("2026-09-23", "physical"), [2100, 2300]);
+  assert.deepEqual(target("2026-09-22", "physical"), [2200, 2400]);
+  assert.deepEqual(target("2026-09-22", "cardioSoft"), [2000, 2200]);
+  assert.equal(Object.values(normalizeNutritionEntries([{ id: "scenario", dateISO: "2026-09-26", kind: "plan", planMode: "trekking" }]))[0].planMode, "trekking");
 });
 
 test("los ingredientes se suman por unidad con etiqueta o porciones promedio", () => {

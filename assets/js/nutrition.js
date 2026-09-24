@@ -13,6 +13,7 @@ const dinner = (options = ["Proteína + carbohidrato + verduras"]) =>
 
 const physical = (name, detail, extras = {}) => ({
   name, detail, waterMinMl: 2000, waterMaxMl: 2500,
+  caloriesMinKcal: extras.caloriesMinKcal ?? 2200, caloriesMaxKcal: extras.caloriesMaxKcal ?? 2400,
   slots: [
     breakfast(extras.breakfast), morning(), lunch(extras.lunch),
     slot("pre", "16:45–17:30", "Merienda de tarde · antes del físico", ["Pan + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano"]),
@@ -23,6 +24,7 @@ const physical = (name, detail, extras = {}) => ({
 
 const tennis = {
   name: "Día de tenis", detail: "Llegar con energía sin sentirse pesado; recuperar después.", waterMinMl: 2500, waterMaxMl: 3000,
+  caloriesMinKcal: 2400, caloriesMaxKcal: 2600,
   slots: [
     breakfast(["Yogurt alto en proteína + granola + fruta", "2 huevos + pan + fruta"]),
     morning(["Fruta + 20–30 g de frutos secos", "Protein+ o yogurt alto en proteína"]),
@@ -37,6 +39,7 @@ const tennis = {
 const saturdayPlans = {
   early: {
     name: "Escenario: partido temprano (ej. 13:45)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
+    caloriesMinKcal: 2500, caloriesMaxKcal: 2700,
     slots: [
       breakfast(["Huevos + pan + fruta", "Yogurt alto en proteína + granola + fruta"], "08:30–09:30"),
       slot("pre", "11:45–12:30", "Prepartido", ["Plátano", "Pan con fruta", "Barra simple"]),
@@ -46,6 +49,7 @@ const saturdayPlans = {
   },
   late: {
     name: "Escenario: partido tarde (ej. 17:15)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
+    caloriesMinKcal: 2500, caloriesMaxKcal: 2700,
     slots: [breakfast(undefined, "08:30"), morning(), lunch(),
       slot("pre", "16:00", "Snack prepartido", ["Plátano", "Barra simple", "Pan con fruta", "Yogurt"]),
       slot("during", "Durante", "En el partido", ["Agua y electrolitos según tu plan"]),
@@ -53,7 +57,8 @@ const saturdayPlans = {
     ], hydration: "Tu plan propone aprox. 1 L con electrolitos durante el partido; ajusta según condiciones y tolerancia."
   },
   other: {
-    name: "Sin partido · trekking o cardio", detail: "Comidas habituales y más atención al agua si caminas mucho.", waterMinMl: 2500, waterMaxMl: 3000,
+    name: "Sin partido · trekking o cardio", detail: "El sábado la meta depende de si haces tenis, trekking o descansas. Selecciona el escenario para afinarla.", waterMinMl: 2500, waterMaxMl: 3000,
+    caloriesMinKcal: 2300, caloriesMaxKcal: 2700,
     slots: [breakfast(), morning(), lunch(), dinner(["Cena con proteína + verduras + carbohidrato según apetito"])],
     hydration: "Si hay trekking largo o mucho calor, tu plan contempla más agua y electrolitos."
   }
@@ -61,27 +66,39 @@ const saturdayPlans = {
 
 const week = [
   { name: "Recuperación y cardio suave", detail: "Comer normal y recuperar.", waterMinMl: 2000, waterMaxMl: 2500,
+    caloriesMinKcal: 2000, caloriesMaxKcal: 2200,
     slots: [breakfast(["Huevos, yogurt o Protein+ + pan o fruta"]), morning(["Fruta + yogurt", "Fruta + frutos secos"]), lunch(["Proteína + carbohidrato moderado + verduras"]),
       slot("post", "Después del cardio", "Si fue trekking largo", ["Protein+ o yogurt + fruta"], "Si el cardio fue suave, basta con la comida normal."),
       dinner(["Proteína + verduras + carbohidrato moderado"])],
     hydration: "Si haces trekking largo, tu plan sugiere 2,5–3 L y considerar electrolitos." },
   physical("Día 1 · fuerza de piernas", "Energía para piernas y recuperación."),
   tennis,
-  physical("Día 2 · tren superior", "Estabilidad sin llegar con hambre ni pesado.", { dinner: ["Tortilla de 2–3 huevos + pan + tomate", "Pollo o carne + arroz o papas + ensalada"] }),
+  physical("Día 2 · tren superior", "Estabilidad sin llegar con hambre ni pesado.", { caloriesMinKcal: 2100, caloriesMaxKcal: 2300,
+    dinner: ["Tortilla de 2–3 huevos + pan + tomate", "Pollo o carne + arroz o papas + ensalada"] }),
   tennis,
   physical("Día 3 · potencia", "Preparar el sábado si hay partido.", { dinner: ["Pollo o carne + arroz, papas o fideos + verduras"],
     hydration: "Si hay partido el sábado, tu plan agrega aprox. 500 ml en la tarde/noche. Durante el físico: 500–750 ml." }),
   saturdayPlans.other
 ];
 
-export const nutritionModes = ["default", "physical", "tennis", "recovery", "early", "late", "other"];
+const saturdayTennis = { ...saturdayPlans.other, name: "Sábado · tenis suave o entrenamiento", detail: "Tenis sin partido: energía para jugar y recuperar.",
+  caloriesMinKcal: 2300, caloriesMaxKcal: 2500 };
+const saturdayTrekking = { ...saturdayPlans.other, name: "Sábado · trekking largo", detail: "El rango depende de la duración y exigencia del recorrido.",
+  caloriesMinKcal: 2400, caloriesMaxKcal: 2700 };
+const softCardio = { ...week[0], name: "Cardio suave", detail: "Comer normal y recuperar tras una actividad suave." };
+
+export const nutritionModes = ["default", "physical", "tennis", "recovery", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"];
 
 export function nutritionPlanForDate(dateISO, mode = "default") {
   const day = new Date(`${dateISO}T12:00:00Z`).getUTCDay();
   if (!Number.isFinite(day)) return null;
-  if (mode === "physical") return physical("Día de entrenamiento físico", "Comer antes y recuperar después.");
+  if (mode === "physical") return physical("Día de entrenamiento físico", "Comer antes y recuperar después.",
+    day === 3 ? { caloriesMinKcal: 2100, caloriesMaxKcal: 2300 } : {});
   if (mode === "tennis") return tennis;
   if (mode === "recovery") return week[0];
+  if (mode === "cardioSoft") return softCardio;
+  if (mode === "tennisLight") return saturdayTennis;
+  if (mode === "trekking") return saturdayTrekking;
   if (mode === "early" || mode === "late" || mode === "other") return saturdayPlans[mode];
   return day === 6 ? saturdayPlans.other : week[day];
 }

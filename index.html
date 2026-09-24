@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=71">
+  <link rel="stylesheet" href="assets/css/styles.css?v=72">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -206,9 +206,13 @@
             <option value="early">Escenario: partido temprano (ej. 13:45)</option>
             <option value="late">Escenario: partido tarde (ej. 17:15)</option>
             <option value="other">Trekking / cardio sin partido</option>
+            <option value="tennisLight">Tenis suave sin partido</option>
+            <option value="trekking">Trekking largo</option>
+            <option value="cardioSoft">Cardio suave</option>
           </select>
         </label>
         <p class="nutrition-scenario-note">Los horarios de partido son ejemplos de la planificación, no eventos de tu calendario.</p>
+        <div class="nutrition-calorie-target"><small>Objetivo calórico orientativo del día</small><strong id="nutritionCalorieTarget"></strong><span id="nutritionCalorieContext"></span></div>
         <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
         <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
       </section>
@@ -220,6 +224,7 @@
       <section class="nutrition-summary-card" aria-labelledby="nutritionSummaryTitle">
         <h2 id="nutritionSummaryTitle">Lo que llevas registrado</h2>
         <div id="nutritionSummary" class="nutrition-summary"></div>
+        <div id="nutritionCalorieProgress" class="nutrition-calorie-progress"></div>
         <div class="nutrition-water-actions">
           <button type="button" data-water-ml="250">+ 250 ml agua</button>
           <button type="button" data-water-ml="500">+ 500 ml agua</button>
@@ -492,6 +497,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=75"></script>
+  <script type="module" src="assets/js/app.js?v=76"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=75";
+import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=76";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=75";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
@@ -188,7 +188,10 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     byId("nutritionDayMode").value = planMode;
     byId("nutritionDayTitle").textContent = plan.name;
     byId("nutritionDayDescription").textContent = plan.detail;
-    byId("nutritionProteinTarget").textContent = "Guía del plan: 100–120 g de proteína/día";
+    const calorieRange = `${plan.caloriesMinKcal.toLocaleString("es-CL")}–${plan.caloriesMaxKcal.toLocaleString("es-CL")} kcal`;
+    byId("nutritionCalorieTarget").textContent = calorieRange;
+    byId("nutritionCalorieContext").textContent = "Rango estimado por tu entrenador, no una cifra exacta ni calorías a descontar de la pulsera.";
+    byId("nutritionProteinTarget").textContent = "Guía del plan: 110–125 g de proteína/día";
     byId("nutritionWaterTarget").textContent = `Guía de agua: ${(plan.waterMinMl / 1000).toLocaleString("es-CL")}–${(plan.waterMaxMl / 1000).toLocaleString("es-CL")} L`;
     byId("nutritionHydrationTip").textContent = plan.hydration;
     const context = byId("nutritionActivityContext"); context.replaceChildren();
@@ -228,10 +231,18 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     caveat.textContent = "Estos datos de la pulsera son contexto: no se descuentan de las comidas ni cambian por sí solos tu pauta de alimentación o hidratación.";
     context.append(caveat);
     const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
-    const expected = ["recovery", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
+    const expected = ["cardioSoft", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
     const actual = mainActivity?.category === "rest" ? "recovery"
-      : mainActivity?.category === "cardio" ? "other"
-        : ["physical", "tennis"].includes(mainActivity?.category) ? mainActivity.category : "";
+      : mainActivity?.cardioTypeId === "trekking" ? "trekking"
+        : mainActivity?.category === "cardio" ? "cardioSoft"
+          : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId !== "match" ? "tennisLight"
+            : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId === "match" ? ""
+            : ["physical", "tennis"].includes(mainActivity?.category) ? mainActivity.category : "";
+    if (day === 6 && mainActivity?.category === "tennis" && mainActivity.tennisTypeId === "match" && planMode === "default") {
+      const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
+      hint.textContent = "Registraste un partido. Elige arriba el escenario de partido temprano o tarde para ver el rango correspondiente (2.500–2.700 kcal).";
+      context.append(hint);
+    }
     if (actual && actual !== expected && planMode === "default") {
       const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
       const message = document.createElement("span");
@@ -254,6 +265,24 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const tile = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = value;
       tile.append(strong, label(title)); summary.append(tile);
     }
+    const progress = byId("nutritionCalorieProgress"); progress.replaceChildren();
+    const progressTitle = document.createElement("strong");
+    progressTitle.textContent = totals.caloriesKnownMeals
+      ? `${Math.round(totals.caloriesKcal).toLocaleString("es-CL")} kcal registradas · objetivo ${calorieRange}`
+      : `Objetivo ${calorieRange} · sin comidas con kcal registradas`;
+    progress.append(progressTitle);
+    if (totals.caloriesKnownMeals) {
+      const bar = document.createElement("progress");
+      bar.max = plan.caloriesMaxKcal;
+      bar.value = Math.min(totals.caloriesKcal, plan.caloriesMaxKcal);
+      bar.setAttribute("aria-label", "Calorías registradas respecto al máximo orientativo del día");
+      progress.append(bar);
+    }
+    const progressNote = document.createElement("small");
+    progressNote.textContent = totals.caloriesKnownMeals < totals.meals
+      ? `Faltan estimaciones en ${totals.meals - totals.caloriesKnownMeals} comida${totals.meals - totals.caloriesKnownMeals === 1 ? "" : "s"}; el total es parcial. Las kcal son aproximadas y no incluyen gastos de la pulsera.`
+      : "Estimación orientativa: las porciones registradas pueden diferir de lo consumido realmente.";
+    progress.append(progressNote);
     const slots = byId("nutritionSlots"); slots.replaceChildren();
     plan.slots.forEach(item => {
       const card = document.createElement("article"); card.className = "nutrition-slot";
