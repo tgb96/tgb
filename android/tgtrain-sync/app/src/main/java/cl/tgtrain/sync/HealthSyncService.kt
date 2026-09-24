@@ -6,6 +6,7 @@ import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
@@ -38,7 +39,8 @@ class HealthSyncService(private val context: Context) {
         )
         val optionalPermissions = setOf(
             androidx.health.connect.client.permission.HealthPermission.getReadPermission(DistanceRecord::class),
-            androidx.health.connect.client.permission.HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
+            androidx.health.connect.client.permission.HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+            androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class)
         )
         val allPermissions = essentialPermissions + optionalPermissions
     }
@@ -80,6 +82,9 @@ class HealthSyncService(private val context: Context) {
         val firestore = FirebaseFirestore.getInstance()
         val batch = firestore.batch()
         val syncedAt = Instant.now().toString()
+        val heartRateGranted = granted.contains(androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class))
+        var sessionsWithHeartRate = 0
+        var heartRateSamples = 0
 
         for (offset in 0L..13L) {
             val day = firstDay.plusDays(offset)
@@ -123,7 +128,7 @@ class HealthSyncService(private val context: Context) {
         for (workout in workouts) {
             if (!workout.endTime.isAfter(workout.startTime)) continue
             val externalId = stableId(sourcePackage, workout.metadata.id)
-            val details = hashMapOf<String, Any>(
+            val details = hashMapOf<String, Any?>(
                 "id" to externalId,
                 "dateISO" to workout.startTime.atZone(zone).toLocalDate().toString(),
                 "startTime" to workout.startTime.toString(),
@@ -131,6 +136,12 @@ class HealthSyncService(private val context: Context) {
                 "durationSeconds" to Duration.between(workout.startTime, workout.endTime).seconds,
                 "exerciseType" to workout.exerciseType,
                 "title" to exerciseTitle(workout.exerciseType),
+                "distanceMeters" to null,
+                "caloriesKcal" to null,
+                "heartRateSampleCount" to null,
+                "heartRateAvgBpm" to null,
+                "heartRateMaxBpm" to null,
+                "heartRateMinBpm" to null,
                 "source" to "health_connect",
                 "originPackage" to sourcePackage,
                 "syncedAt" to syncedAt
@@ -155,6 +166,19 @@ class HealthSyncService(private val context: Context) {
                 )
                 calories[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { details["caloriesKcal"] = it.inKilocalories }
             }
+            if (heartRateGranted) {
+                val samples = readAll(HeartRateRecord::class, workout.startTime, workout.endTime, origin)
+                    .flatMap { it.samples }
+                    .filter { !it.time.isBefore(workout.startTime) && it.time.isBefore(workout.endTime) }
+                details["heartRateSampleCount"] = samples.size
+                if (samples.isNotEmpty()) {
+                    sessionsWithHeartRate++
+                    heartRateSamples += samples.size
+                    details["heartRateAvgBpm"] = samples.map { it.beatsPerMinute }.average()
+                    details["heartRateMaxBpm"] = samples.maxOf { it.beatsPerMinute }
+                    details["heartRateMinBpm"] = samples.minOf { it.beatsPerMinute }
+                }
+            }
             batch.set(
                 firestore.collection("users").document(uid).collection("wearableSessions")
                     .document(externalId),
@@ -163,7 +187,7 @@ class HealthSyncService(private val context: Context) {
             )
         }
         batch.commit().await()
-        return SyncReport(14, sleep.size, workouts.size, syncedAt)
+        return SyncReport(14, sleep.size, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
     }
 
     private suspend fun <T : Record> readAll(
@@ -212,4 +236,12 @@ class HealthSyncService(private val context: Context) {
     }
 }
 
-data class SyncReport(val days: Int, val sleepSessions: Int, val workouts: Int, val syncedAt: String)
+data class SyncReport(
+    val days: Int,
+    val sleepSessions: Int,
+    val workouts: Int,
+    val sessionsWithHeartRate: Int,
+    val heartRateSamples: Int,
+    val heartRateGranted: Boolean,
+    val syncedAt: String
+)

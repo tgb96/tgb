@@ -1,6 +1,6 @@
 # TGTrain · Entrenamiento semanal
 
-La integración personal con Xiaomi Smart Band mediante Health Connect está en [TGTrain Sync para Android](android/tgtrain-sync/README.md). [Descarga el APK instalable](downloads/tgtrain-sync-0.1.0.apk), inicia sesión con la misma cuenta de TGTrain y sincroniza desde la app puente. Los datos aparecen en Inicio, separados del historial manual.
+La integración personal con Xiaomi Smart Band mediante Health Connect está en [TGTrain Sync para Android](android/tgtrain-sync/README.md). [Descarga el APK instalable](downloads/tgtrain-sync-0.2.0.apk), inicia sesión con la misma cuenta de TGTrain y sincroniza desde la app puente. Los datos aparecen en Inicio y puedes vincular cada sesión de la pulsera con el entrenamiento manual correspondiente desde Historial, sin duplicarlo. La versión 0.2.0 añade la frecuencia cardíaca media, máxima y mínima si Mi Fitness la comparte.
 
 PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, organizada por semanas ISO de lunes a domingo y preparada para sincronizar el historial mediante una cuenta de Google.
 

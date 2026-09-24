@@ -22,12 +22,13 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=63";
+import { createRepository } from "./storage.js?v=65";
 import { createCloudSync } from "./cloud.js?v=64";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=63";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=63";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=65";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=65";
 import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=63";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableSummaryText } from "./wearable-link.js?v=65";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -52,7 +53,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=63";
+} from "./utils.js?v=65";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -65,6 +66,8 @@ const cloudSync = createCloudSync({
   onWearableChanged: data => {
     wearableData = data;
     renderWearable();
+    renderHistory();
+    if (loadRoutineSession()?.status === "complete") renderRoutines();
   },
   onDataChanged: () => {
     renderHome();
@@ -864,6 +867,8 @@ function coachQuestionContext() {
     coachProfile: String(repository.getCoachProfile()?.profileText || "").slice(0, 14000),
     equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
     recentActivities: records.slice(0, 6).map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
+    wearableRecovery: wearableData.days.filter(day => day.dateISO >= addDaysISO(todayISO, -6))
+      .map(day => ({ dateISO: day.dateISO, steps: day.steps, sleepMinutes: day.sleepMinutes })),
     latestAnalysis: latest ? {
       activity: recordTitle(latest),
       dateISO: latest.dateISO,
@@ -2172,6 +2177,9 @@ function formRecord() {
     routineAiAnalysis: null,
     routineStartedAt: plannedRegistrationContext?.startedAt || (preserveRoutineBalance || customPhysical ? existing?.routineStartedAt || "" : ""),
     routineEndedAt: plannedRegistrationContext?.endedAt || (preserveRoutineBalance || customPhysical ? existing?.routineEndedAt || "" : ""),
+    wearableSessionId: existing?.wearableSessionId || "",
+    wearableSnapshot: existing?.wearableSnapshot || null,
+    wearableLinkedAt: existing?.wearableLinkedAt || "",
     planBlockId: plannedRegistrationContext?.blockId || existing?.planBlockId || "",
     planWeekKey: plannedRegistrationContext?.weekKey || existing?.planWeekKey || "",
     planSessionId: plannedRegistrationContext?.sessionId || existing?.planSessionId || "",
@@ -2475,7 +2483,8 @@ function renderWearable() {
     const minutes = Math.round((Number(session.durationSeconds) || 0) / 60);
     const distance = Number(session.distanceMeters) > 0 ? ` · ${(Number(session.distanceMeters) / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} km` : "";
     const calories = Number(session.caloriesKcal) > 0 ? ` · ${Math.round(Number(session.caloriesKcal))} kcal` : "";
-    details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}`;
+    const bpm = Number(session.heartRateAvgBpm) > 0 ? ` · ${Math.round(Number(session.heartRateAvgBpm))} lpm media` : "";
+    details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}${bpm}`;
     row.append(title, details);
     list.append(row);
   }
@@ -2713,6 +2722,7 @@ function routineForAi(record) {
     routineName: record.routineName,
     durationMinutes: timing.durationMinutes,
     calories: record.calories,
+    wearable: record.wearableSnapshot,
     sensations: record.sensations,
     routineSummary: record.routineSummary,
     effortRpe: record.routineEffort,
@@ -2758,7 +2768,9 @@ function routineAiContext(record) {
       effortRpe: item.routineEffort,
       painScore: item.routinePain,
       painDetail: item.routinePainDetail,
-      volumeKg: Number(item.routineVolumeKg) || 0
+      volumeKg: Number(item.routineVolumeKg) || 0,
+      wearableHeartRateAvgBpm: item.wearableSnapshot?.heartRateAvgBpm ?? null,
+      wearableActiveCaloriesKcal: item.wearableSnapshot?.activeCaloriesKcal ?? null
     }));
   const block = activeTrainingBlock();
   const next48Hours = (block?.weeks || []).flatMap(week => week.sessions || [])
@@ -2793,7 +2805,15 @@ function routineAiContext(record) {
     weekContext: match.week.context,
     rules: block.rules || []
   } : null;
-  return { coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan };
+  const lastNight = wearableData.days.find(day => day.dateISO === record.dateISO && Number(day.sleepMinutes) > 0);
+  return {
+    coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan,
+    wearableContext: {
+      linkedSession: record.wearableSnapshot,
+      precedingSleepMinutes: lastNight ? Number(lastNight.sleepMinutes) : null,
+      dailySteps: wearableData.days.find(day => day.dateISO === record.dateISO)?.steps ?? null
+    }
+  };
 }
 
 async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactive = true } = {}) {
@@ -2954,6 +2974,9 @@ function finishRoutineSession(routine) {
     routineDefaultsSaved: saveSettingsForNextTime,
     routineStartedAt: session.startedAt,
     routineEndedAt: endedAt,
+    wearableSessionId: "",
+    wearableSnapshot: null,
+    wearableLinkedAt: "",
     planBlockId: session.planBlockId || "",
     planWeekKey: session.planWeekKey || "",
     planSessionId: session.planSessionId || "",
@@ -3577,6 +3600,12 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     automaticSummary.textContent = session.routineSummary || "Tu balance completo quedó guardado para comparar la próxima sesión.";
     panel.append(automaticSummary);
     const completedRecord = repository.get(session.recordId);
+    if (completedRecord?.wearableSnapshot) {
+      const wearable = document.createElement("p");
+      wearable.className = "routine-auto-summary";
+      wearable.textContent = `Pulsera vinculada · ${wearableSummaryText(completedRecord.wearableSnapshot)}. Las kcal de la pulsera son estimadas y no se suman a las anotadas.`;
+      panel.append(wearable);
+    }
     if (completedRecord) panel.append(createRoutineAiCard(completedRecord));
     const note = document.createElement("small");
     note.textContent = session.settingsChangeCount > 0
@@ -3588,8 +3617,16 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     history.type = "button";
     history.className = "routine-history-button";
     history.textContent = "Ver en historial";
-    history.addEventListener("click", () => showView("history"));
-    panel.append(note, history);
+    history.addEventListener("click", () => {
+      showView("history");
+      requestAnimationFrame(() => [...document.querySelectorAll(".history-entry")]
+        .find(entry => entry.dataset.recordId === session.recordId)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    });
+    const wearableHint = document.createElement("small");
+    wearableHint.textContent = completedRecord?.wearableSessionId
+      ? "Pulsera vinculada. Puedes actualizar o corregir el vínculo desde Historial."
+      : "Cuando Mi Fitness termine de sincronizar, abre TGTrain Sync y vincula la sesión de la pulsera desde Historial.";
+    panel.append(note, wearableHint, history);
     return panel;
   }
 
@@ -4250,10 +4287,113 @@ function renderHistory() {
   });
 }
 
+function linkWearableSession(recordId, sessionId) {
+  const record = repository.get(recordId);
+  const session = wearableData.sessions.find(item => item.id === sessionId);
+  if (!record || !session || record.category === "rest") return showToast("No se encontró esta sesión de la pulsera.");
+  if (repository.list().some(item => item.id !== recordId && item.wearableSessionId === sessionId))
+    return showToast("Esta sesión de la pulsera ya está vinculada a otro entrenamiento.");
+  const snapshot = normalizeWearableSnapshot(session);
+  if (!snapshot) return showToast("Los datos de la pulsera están incompletos.");
+  const updated = {
+    ...record,
+    wearableSessionId: sessionId,
+    wearableSnapshot: snapshot,
+    wearableLinkedAt: new Date().toISOString(),
+    routineAiAnalysis: null,
+    updatedAt: new Date().toISOString()
+  };
+  try { repository.upsert(updated); }
+  catch (error) { return showToast(error.message || "No se pudo guardar el vínculo."); }
+  renderHistory();
+  renderHome();
+  if (loadRoutineSession()?.status === "complete") renderRoutines();
+  showToast("Sesión vinculada. El registro manual y la pulsera siguen siendo una sola actividad.");
+  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(recordId, [], { interactive: false });
+}
+
+function unlinkWearableSession(recordId) {
+  if (!window.confirm("¿Desvincular la pulsera de este entrenamiento? Tus datos de la pulsera no se borrarán.")) return;
+  const record = repository.get(recordId);
+  if (!record) return;
+  try {
+    repository.upsert({ ...record, wearableSessionId: "", wearableSnapshot: null, wearableLinkedAt: "", routineAiAnalysis: null, updatedAt: new Date().toISOString() });
+  } catch (error) { return showToast(error.message || "No se pudo desvincular."); }
+  renderHistory();
+  renderHome();
+  if (loadRoutineSession()?.status === "complete") renderRoutines();
+  showToast("Vínculo retirado. El entrenamiento y las mediciones originales se conservan.");
+}
+
+function createWearableLinkPanel(record) {
+  if (record.category === "rest") return null;
+  const panel = document.createElement("div");
+  panel.className = "history-wearable";
+  const candidates = wearableCandidates(record, wearableData.sessions, repository.list());
+  if (record.wearableSnapshot) {
+    const title = document.createElement("strong");
+    title.textContent = "Pulsera vinculada · " + record.wearableSnapshot.title;
+    const metrics = document.createElement("p");
+    metrics.textContent = wearableSummaryText(record.wearableSnapshot);
+    const note = document.createElement("small");
+    note.textContent = `TGTrain: ${record.calories} kcal anotadas · Pulsera: ${record.wearableSnapshot.activeCaloriesKcal === null ? "sin kcal activas" : `${Math.round(record.wearableSnapshot.activeCaloriesKcal)} kcal activas estimadas`}. No se suman.`;
+    panel.append(title, metrics, note);
+    const comparison = wearableComparison(record, repository.list());
+    if (comparison) {
+      const reading = document.createElement("p");
+      reading.className = "wearable-comparison";
+      reading.textContent = comparison;
+      panel.append(reading);
+    }
+    const current = wearableData.sessions.find(item => item.id === record.wearableSessionId);
+    if (current && JSON.stringify(normalizeWearableSnapshot(current)) !== JSON.stringify(record.wearableSnapshot)) {
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.textContent = "Actualizar mediciones";
+      refresh.addEventListener("click", () => linkWearableSession(record.id, current.id));
+      panel.append(refresh);
+    }
+    const unlink = document.createElement("button");
+    unlink.type = "button";
+    unlink.textContent = "Desvincular";
+    unlink.addEventListener("click", () => unlinkWearableSession(record.id));
+    panel.append(unlink);
+  }
+  const alternatives = candidates.filter(item => item.session.id !== record.wearableSessionId);
+  if (alternatives.length) {
+    const choices = document.createElement("details");
+    choices.className = "wearable-link-choices";
+    const summary = document.createElement("summary");
+    summary.textContent = record.wearableSessionId ? "Cambiar sesión vinculada" : `Vincular pulsera · ${alternatives.length} ${alternatives.length === 1 ? "opción" : "opciones"}`;
+    choices.append(summary);
+    alternatives.forEach(({ session, match }) => {
+      const option = document.createElement("div");
+      option.className = "wearable-link-option";
+      const description = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = session.title || "Entrenamiento detectado";
+      const details = document.createElement("small");
+      const start = new Date(session.startTime);
+      const hour = Number.isFinite(start.getTime()) ? start.toLocaleTimeString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit" }) : "hora no disponible";
+      details.textContent = `${hour} · ${Math.round((Number(session.durationSeconds) || 0) / 60)} min · ${match.reason}. ${wearableSummaryText(session)}`;
+      description.append(name, details);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Vincular";
+      button.addEventListener("click", () => linkWearableSession(record.id, session.id));
+      option.append(description, button);
+      choices.append(option);
+    });
+    panel.append(choices);
+  }
+  return panel.childElementCount ? panel : null;
+}
+
 function createHistoryEntry(sourceRecord) {
   const record = normalizeRecord(sourceRecord);
   const entry = document.createElement("article");
   entry.className = "history-entry";
+  entry.dataset.recordId = record.id;
   const top = document.createElement("div");
   top.className = "history-entry-top";
   const copy = document.createElement("div");
@@ -4299,6 +4439,8 @@ function createHistoryEntry(sourceRecord) {
       copy.append(automaticSummary);
     }
   }
+  const wearablePanel = createWearableLinkPanel(record);
+  if (wearablePanel) copy.append(wearablePanel);
   if (record.category === "physical" && record.routinePlannedSets === "" && record.routineSummary) {
     const notes = document.createElement("p");
     notes.className = "history-auto-summary";

@@ -646,6 +646,19 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .history-exercise-details li strong, .history-exercise-details li span { display: block; }
 .history-exercise-details li span { margin-top: 3px; color: var(--muted); }
 .history-entry .history-plan-link { display: inline-block; margin-top: 7px; padding: 5px 8px; border-radius: 999px; background: #eff8d4; color: #496800; font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
+.history-wearable { margin-top: 10px; padding: 12px; border: 1px solid #cdd7ff; border-radius: 14px; background: #f4f7ff; }
+.history-wearable > strong { display: block; color: var(--blue-dark); font-size: 13px; }
+.history-wearable p { margin-top: 5px; color: var(--ink); font-size: 12px; font-weight: 750; }
+.history-wearable .wearable-comparison { margin-top: 9px; padding-top: 8px; border-top: 1px solid #dce3ff; font-weight: 600; }
+.history-wearable small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.history-wearable > button, .wearable-link-option button { min-height: 38px; margin-top: 8px; padding: 7px 11px; border: 0; border-radius: 10px; background: var(--blue); color: white; font-size: 11px; font-weight: 850; }
+.history-wearable > button + button { margin-left: 6px; background: white; color: var(--blue-dark); }
+.wearable-link-choices { margin-top: 3px; }
+.wearable-link-choices summary { padding: 8px 0; color: var(--blue-dark); font-size: 12px; font-weight: 850; cursor: pointer; }
+.wearable-link-option { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px; padding: 9px 0; border-top: 1px solid #dce3ff; }
+.wearable-link-option > div { min-width: 180px; flex: 1; }
+.wearable-link-option strong { display: block; font-size: 12px; }
+.wearable-link-option button { margin-top: 0; }
 .entry-actions { display: flex; gap: 5px; }
 .entry-actions button { min-width: 40px; min-height: 40px; border: 0; border-radius: 12px; background: white; color: var(--muted); font-size: 11px; font-weight: 850; }
 .entry-actions .delete { color: var(--danger); }

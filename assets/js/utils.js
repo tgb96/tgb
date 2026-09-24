@@ -8,6 +8,7 @@ import {
   trekkingRoutes,
   TZ
 } from "./data.js?v=63";
+import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=65";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -202,6 +203,9 @@ export function normalizeRecord(record) {
     routineDefaultsSaved: Boolean(record?.routineDefaultsSaved),
     routineStartedAt: String(record?.routineStartedAt || ""),
     routineEndedAt: String(record?.routineEndedAt || ""),
+    wearableSessionId: String(record?.wearableSessionId || "").slice(0, 120),
+    wearableSnapshot: normalizeWearableSnapshot(record?.wearableSnapshot),
+    wearableLinkedAt: String(record?.wearableLinkedAt || ""),
     planBlockId: String(record?.planBlockId || "").slice(0, 200),
     planWeekKey: String(record?.planWeekKey || "").slice(0, 20),
     planSessionId: String(record?.planSessionId || "").slice(0, 100),
@@ -613,6 +617,11 @@ export function weeklyReport(records, week) {
         report += `   Duración: ${formatDuration(record.category === "cardio" ? { ...record, durationPrecision: record.cardioTypeId === "running" ? "hms" : "hm" } : record)}\n`;
         report += `   Calorías: ${record.calories} kcal\n`;
       }
+      if (record.wearableSnapshot) {
+        report += `   Pulsera vinculada: ${record.wearableSnapshot.title} · ${wearableSummaryText(record.wearableSnapshot)}\n`;
+        report += `   Fuente de la pulsera: ${record.wearableSnapshot.originPackage || "Health Connect"}\n`;
+        report += "   Las kcal activas de la pulsera son una estimación separada de las kcal anotadas en TGTrain.\n";
+      }
       if (record.category === "tennis" && record.tennisTypeName) report += `   Tipo de tenis: ${record.tennisTypeName}\n`;
       if (record.category === "rest" && record.restTypeId === "discomfort") report += `   Molestia: ${record.restDetail}\n`;
       if (record.distanceKm !== "") report += `   Distancia: ${formatDistance(record.distanceKm)}\n`;
@@ -683,6 +692,7 @@ export function recordsToCSV(records) {
     ["ejercicios_completados", "routineCompletedExercises"], ["ejercicios_iniciados", "routineStartedExercises"],
     ["ejercicios_totales", "routineTotalExercises"], ["repeticiones", "routineTotalReps"],
     ["volumen_kg", "routineVolumeKg"], ["abdominales_finales", "routineAbsCount"], ["esfuerzo_rpe", "routineEffort"], ["dolor_0_10", "routinePain"], ["detalle_dolor", "routinePainDetail"], ["inicio_rutina", "routineStartedAt"], ["fin_rutina", "routineEndedAt"],
+    ["pulsera_sesion_id", "wearableSessionId"], ["pulsera_fc_media_lpm", "wearableHeartRateAvgBpm"], ["pulsera_fc_max_lpm", "wearableHeartRateMaxBpm"], ["pulsera_kcal_activas", "wearableActiveCaloriesKcal"], ["pulsera_fuente", "wearableOriginPackage"],
     ["resumen_automatico", "routineSummary"], ["analisis_gpt", "routineAiAnalysisExport"], ["detalle_ejercicios", "routineExercisesExport"],
     ["plan_entrenador", "plannedTitle"], ["plan_semana", "planWeekKey"], ["plan_sesion", "planSessionId"],
     ["sensaciones", "sensations"]
@@ -691,6 +701,10 @@ export function recordsToCSV(records) {
   for (const record of records.map(normalizeRecord)) {
     const csvRecord = {
       ...record,
+      wearableHeartRateAvgBpm: record.wearableSnapshot?.heartRateAvgBpm ?? "",
+      wearableHeartRateMaxBpm: record.wearableSnapshot?.heartRateMaxBpm ?? "",
+      wearableActiveCaloriesKcal: record.wearableSnapshot?.activeCaloriesKcal ?? "",
+      wearableOriginPackage: record.wearableSnapshot?.originPackage || "",
       routineExercisesExport: record.routineExercises
         .map((exercise, index) => `${index + 1}. ${exercise.name}: ${routineExerciseLine(exercise)}`)
         .join(" | "),

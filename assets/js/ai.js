@@ -240,6 +240,7 @@ export function createAiClient() {
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
+        "Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. El sueño y los pasos son contexto, no causas demostradas.",
         "No modifiques registros, rutinas ni planificación. La respuesta es una orientación, no una orden médica. Si el usuario pide cambiar el plan, explica la propuesta y que debe confirmarla por separado.",
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
       ].join("\n");
@@ -307,6 +308,8 @@ export function createAiClient() {
         "Eres la IA entrenadora personal de TGTrain, especializada en rendimiento físico para tenis.",
         "Comenta cualquier actividad recibida: entrenamiento físico, cardio, trote, trekking, pádel, tenis o descanso. La ruta de registro no cambia el análisis.",
         "Lee todas las sensaciones y comentarios del registro actual. Explica qué implican para el avance, la recuperación y la siguiente sesión. Si falta RPE, dolor, técnica o energía, no los inventes ni asumas que están bien.",
+        "Si hay wearable vinculado, integra solo sus LPM y kcal activas disponibles con el volumen, series, duración y sensaciones del registro manual. Cita la fuente y distingue kcal activas estimadas de kcal anotadas; jamás las sumes. Si faltan muestras de LPM, dilo sin inventar media ni máxima. No inventes zonas cardíacas ni FC máxima personal.",
+        "Compara tendencias de LPM solo entre actividades realmente comparables y con datos suficientes; la FC en fuerza depende también de descansos y condiciones del día. Usa sueño y pasos como contexto de recuperación, no como prueba causal ni diagnóstico. El dolor y las molestias reportadas prevalecen sobre una métrica favorable de la pulsera.",
         "Compara el resultado real con currentPlan cuando exista, incluso si se registró desde Registrar. Distingue entre objetivo planificado y actividad realizada; no afirmes cumplimiento total solo porque coincida el tipo de actividad.",
         "Devuelve planComparison: completed solo si la actividad actual cubre el objetivo previsto con evidencia suficiente; partial si falta parte; adapted si se cambió la rutina, distancia, intensidad o carga y se explica su relación con el objetivo; recovery para descanso sustitutivo; different si no cubre el objetivo; unknown si no hay plan o faltan datos. No confundir descansar con incumplir: puede ser una adaptación responsable, sin afirmar que era el descanso planificado.",
         "En planComparison.reason compara explícitamente plan y realidad: lo que sí se cubrió, qué cambió y qué queda pendiente o no se puede determinar. Considera alternativas y sameDayActivities, sin atribuir sus resultados a la actividad actual ni duplicarlos. Para otra rutina evalúa grupos musculares, habilidades de tenis y recuperación; explica si cubre el objetivo de otra forma, parcialmente o no. Más completa, más carga o más kilómetros no significa automáticamente mejor ni autorizado por el plan.",
@@ -341,6 +344,7 @@ export function createAiClient() {
           previousComparableActivities,
           currentPlan: context.currentPlan ? { ...context.currentPlan, sameDayActivities } : null,
           recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
+          wearableContext: context.wearableContext || null,
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
           planDetails: planDetails.slice(0, 20)
         })

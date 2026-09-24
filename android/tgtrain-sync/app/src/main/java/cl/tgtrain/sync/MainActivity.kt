@@ -14,6 +14,8 @@ import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.permission.HealthPermission
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -104,7 +106,7 @@ class MainActivity : ComponentActivity() {
         card.addView(signInButton)
 
         card.addView(text("2 · Permiso de salud", 17f, ink, true).apply { setPadding(0, dp(20), 0, 0) })
-        card.addView(text("Solo leerá pasos, sueño y sesiones. Distancia y calorías son opcionales.", 13f, Color.DKGRAY))
+        card.addView(text("Solo leerá pasos, sueño y sesiones. LPM, distancia y calorías son opcionales.", 13f, Color.DKGRAY))
         permissionButton = action("Permitir acceso a Health Connect") {
             permissionLauncher.launch(HealthSyncService.allPermissions)
         }
@@ -192,7 +194,8 @@ class MainActivity : ComponentActivity() {
                 if (selected >= 0) sourcePicker.setSelection(selected)
                 status.text = if (sources.isEmpty())
                     "No encontré registros recientes. Abre Mi Fitness, sincroniza la pulsera y vuelve a buscar."
-                else "${sources.size} fuente(s) encontrada(s). Elige Mi Fitness y sincroniza."
+                else "${sources.size} fuente(s) encontrada(s). Elige Mi Fitness y sincroniza." +
+                    if (granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) " LPM habilitadas." else " Para incluir LPM, pulsa Permitir acceso otra vez."
                 refreshAccount()
             } catch (error: Exception) {
                 status.text = "No se pudieron buscar fuentes: ${error.localizedMessage}"
@@ -208,7 +211,12 @@ class MainActivity : ComponentActivity() {
             try {
                 val report = service.sync(source)
                 getPreferences(MODE_PRIVATE).edit().putString("sourcePackage", source).apply()
-                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. Abre TGTrain para verlos."
+                val heartRateStatus = when {
+                    !report.heartRateGranted -> "Las LPM no están autorizadas; pulsa Permitir acceso para incluirlas."
+                    report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
+                    else -> "${report.sessionsWithHeartRate} entrenamientos con LPM (${report.heartRateSamples} mediciones)."
+                }
+                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo sincronizar: ${error.localizedMessage}"
             } finally { setBusy(false) }
