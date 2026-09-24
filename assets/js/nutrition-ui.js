@@ -292,6 +292,24 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       ? `Faltan estimaciones en ${totals.meals - totals.caloriesKnownMeals} comida${totals.meals - totals.caloriesKnownMeals === 1 ? "" : "s"}; el total es parcial. Las kcal son aproximadas y no incluyen gastos de la pulsera.`
       : "Estimación orientativa: las porciones registradas pueden diferir de lo consumido realmente.";
     progress.append(progressNote);
+    const proteinProgress = byId("nutritionProteinProgress"); proteinProgress.replaceChildren();
+    const proteinTitle = document.createElement("strong");
+    proteinTitle.textContent = totals.proteinKnownMeals
+      ? `${Math.round(totals.proteinG).toLocaleString("es-CL")} g de proteína registrados · objetivo 110–125 g`
+      : "Objetivo 110–125 g de proteína · sin comidas con proteína estimada";
+    proteinProgress.append(proteinTitle);
+    if (totals.proteinKnownMeals) {
+      const proteinBar = document.createElement("progress");
+      proteinBar.max = 125;
+      proteinBar.value = Math.min(totals.proteinG, 125);
+      proteinBar.setAttribute("aria-label", "Proteína registrada respecto al máximo orientativo del día");
+      proteinProgress.append(proteinBar);
+    }
+    const proteinNote = document.createElement("small");
+    proteinNote.textContent = totals.proteinKnownMeals < totals.meals
+      ? `Falta estimar la proteína de ${totals.meals - totals.proteinKnownMeals} comida${totals.meals - totals.proteinKnownMeals === 1 ? "" : "s"}; el total es parcial.`
+      : "Proteína aproximada según los ingredientes y porciones registrados.";
+    proteinProgress.append(proteinNote);
     const slots = byId("nutritionSlots"); slots.replaceChildren();
     plan.slots.forEach(item => {
       const card = document.createElement("article"); card.className = "nutrition-slot";

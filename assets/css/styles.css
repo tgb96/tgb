@@ -769,6 +769,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-calorie-progress strong { font-size: 13px; }
 .nutrition-calorie-progress small { color: var(--muted); font-size: 11px; line-height: 1.4; }
 .nutrition-calorie-progress progress { width: 100%; height: 11px; accent-color: var(--blue); }
+.nutrition-protein-progress { margin-top: 8px; }
+.nutrition-protein-progress progress { accent-color: #75a913; }
 .nutrition-water-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 13px; }
 .nutrition-water-actions button { min-height: 45px; padding: 6px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
 .nutrition-summary-card > p, .nutrition-disclaimer { color: var(--muted); font-size: 11px; line-height: 1.5; }
