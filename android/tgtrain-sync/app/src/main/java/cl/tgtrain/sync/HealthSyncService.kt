@@ -2,6 +2,7 @@ package cl.tgtrain.sync
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.aggregate.AggregationResult
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
@@ -11,6 +12,7 @@ import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
+import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -30,6 +32,15 @@ import kotlinx.coroutines.tasks.await
 class HealthSyncService(private val context: Context) {
     private val client get() = HealthConnectClient.getOrCreate(context)
     private val zone get() = ZoneId.systemDefault()
+
+    val backgroundReadAvailable: Boolean
+        get() = client.features.getFeatureStatus(
+            HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND
+        ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+
+    val requestedPermissions: Set<String>
+        get() = allPermissions + if (backgroundReadAvailable)
+            setOf(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND) else emptySet()
 
     companion object {
         val essentialPermissions = setOf(
@@ -64,15 +75,16 @@ class HealthSyncService(private val context: Context) {
         )
     }
 
-    suspend fun sync(sourcePackage: String): SyncReport {
+    suspend fun sync(sourcePackage: String, days: Int = 14): SyncReport {
         require(sourcePackage.isNotBlank()) { "Elige la fuente Mi Fitness antes de sincronizar." }
+        require(days in 1..14) { "El período de sincronización debe estar entre 1 y 14 días." }
         val uid = FirebaseAuth.getInstance().currentUser?.uid
             ?: error("Inicia sesión con la misma cuenta de Google que usas en TGTrain.")
         val granted = grantedPermissions()
         check(granted.containsAll(essentialPermissions)) { "Faltan permisos de pasos, sueño o ejercicio." }
 
         val today = LocalDate.now(zone)
-        val firstDay = today.minusDays(13)
+        val firstDay = today.minusDays((days - 1).toLong())
         val start = firstDay.atStartOfDay(zone).toInstant()
         val end = today.plusDays(1).atStartOfDay(zone).toInstant()
         val origin = setOf(DataOrigin(sourcePackage))
@@ -86,8 +98,8 @@ class HealthSyncService(private val context: Context) {
         var sessionsWithHeartRate = 0
         var heartRateSamples = 0
 
-        for (offset in 0L..13L) {
-            val day = firstDay.plusDays(offset)
+        for (offset in 0 until days) {
+            val day = firstDay.plusDays(offset.toLong())
             val dayStart = day.atStartOfDay(zone).toInstant()
             val dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant()
             val steps = client.aggregate(
@@ -187,7 +199,7 @@ class HealthSyncService(private val context: Context) {
             )
         }
         batch.commit().await()
-        return SyncReport(14, sleep.size, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
+        return SyncReport(days, sleep.size, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
     }
 
     private suspend fun <T : Record> readAll(

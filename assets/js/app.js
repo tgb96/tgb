@@ -2506,7 +2506,7 @@ function renderWearable() {
     : "Sin sincronizar";
   $("wearableHelp").textContent = days.length
     ? "Datos medidos por la pulsera. Las sesiones detectadas no se suman automáticamente al historial para evitar duplicados."
-    : "Instala TGTrain Sync, elige Mi Fitness y pulsa Sincronizar ahora para ver tus datos aquí.";
+    : "Instala TGTrain Sync, elige Mi Fitness y sincroniza una vez; después se actualizará automáticamente si concedes el permiso de segundo plano.";
   const list = $("wearableSessions");
   list.replaceChildren();
   const recent = sessions.filter(session => session.startTime && session.endTime)
@@ -3700,7 +3700,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
       ? "Pulsera vinculada. Puedes actualizar o corregir el vínculo desde Historial."
       : availableBandSessions.length
         ? "Hay una sesión de la pulsera del mismo día. Revisa el horario antes de confirmar el vínculo."
-        : "Cuando Mi Fitness termine de sincronizar, abre TGTrain Sync y vincula la sesión de la pulsera desde Historial.";
+        : "Cuando Mi Fitness termine de sincronizar, espera la actualización automática de TGTrain Sync o ábrela, y vincula la sesión desde Historial.";
     panel.append(note, wearableHint, history);
     return panel;
   }

@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
             "Faltan permisos para leer pasos, sueño o ejercicios."
         }
         if (granted.containsAll(HealthSyncService.essentialPermissions)) discoverSources()
+        else lifecycleScope.launch { AutomaticSync.refresh(this@MainActivity) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +79,11 @@ class MainActivity : ComponentActivity() {
                 status.text = "No se pudo consultar Health Connect: ${error.localizedMessage}"
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::status.isInitialized && sources.isNotEmpty()) maybeSyncOnOpen()
     }
 
     private fun buildScreen() {
@@ -106,9 +112,9 @@ class MainActivity : ComponentActivity() {
         card.addView(signInButton)
 
         card.addView(text("2 · Permiso de salud", 17f, ink, true).apply { setPadding(0, dp(20), 0, 0) })
-        card.addView(text("Solo leerá pasos, sueño y sesiones. LPM, distancia y calorías son opcionales.", 13f, Color.DKGRAY))
+        card.addView(text("Solo leerá pasos, sueño y sesiones. LPM, distancia y calorías son opcionales. El acceso en segundo plano permite actualizar sin abrir esta app.", 13f, Color.DKGRAY))
         permissionButton = action("Permitir acceso a Health Connect") {
-            permissionLauncher.launch(HealthSyncService.allPermissions)
+            permissionLauncher.launch(service.requestedPermissions)
         }
         card.addView(permissionButton)
 
@@ -128,13 +134,14 @@ class MainActivity : ComponentActivity() {
         signOutButton = action("Cerrar sesión") {
             auth.signOut()
             lifecycleScope.launch {
+                try { AutomaticSync.refresh(this@MainActivity) } catch (_: Exception) { }
                 try { credentials.clearCredentialState(ClearCredentialStateRequest()) } catch (_: Exception) { }
                 refreshAccount()
                 status.text = "Sesión cerrada. Los datos ya enviados permanecen en tu cuenta de TGTrain."
             }
         }
         root.addView(signOutButton)
-        root.addView(text("TGTrain Sync no modifica tus entrenamientos manuales. Al abrir esta app, puedes actualizar los últimos 14 días; los entrenamientos detectados se guardan aparte para evitar duplicados.", 12f, Color.LTGRAY).apply {
+        root.addView(text("Con el permiso en segundo plano, se intentará actualizar automáticamente cada 30 minutos con internet; Android puede retrasarlo para ahorrar batería. Al abrir la app también se actualizarán los datos recientes. El botón manual recupera los últimos 14 días. Primero sincroniza la pulsera con Mi Fitness; TGTrain Sync no puede forzar esa transferencia.", 12f, Color.LTGRAY).apply {
             setPadding(0, dp(12), 0, 0)
         })
     }
@@ -168,7 +175,7 @@ class MainActivity : ComponentActivity() {
                 status.text = "Cuenta conectada. Usa el mismo Gmail que en TGTrain."
             } catch (error: Exception) {
                 status.text = "No se pudo iniciar sesión: ${error.localizedMessage}"
-            } finally { setBusy(false) }
+            } finally { setBusy(false); maybeSyncOnOpen() }
         }
     }
 
@@ -188,18 +195,20 @@ class MainActivity : ComponentActivity() {
                 }
                 sourcePicker.adapter = ArrayAdapter(this@MainActivity,
                     android.R.layout.simple_spinner_dropdown_item, labels)
-                val saved = getPreferences(MODE_PRIVATE).getString("sourcePackage", "")
+                val saved = SyncPreferences.source(this@MainActivity)
                 val selected = sources.indexOf(saved).takeIf { it >= 0 }
                     ?: sources.indexOfFirst { it.contains("xiaomi", true) || it.contains("mifitness", true) }
                 if (selected >= 0) sourcePicker.setSelection(selected)
                 status.text = if (sources.isEmpty())
                     "No encontré registros recientes. Abre Mi Fitness, sincroniza la pulsera y vuelve a buscar."
                 else "${sources.size} fuente(s) encontrada(s). Elige Mi Fitness y sincroniza." +
-                    if (granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) " LPM habilitadas." else " Para incluir LPM, pulsa Permitir acceso otra vez."
+                    (if (granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) " LPM habilitadas." else " Para incluir LPM, pulsa Permitir acceso otra vez.") +
+                    (if (service.backgroundReadAvailable && !granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND))
+                        " Para sincronizar con la app cerrada, pulsa Permitir acceso y habilita el segundo plano." else "")
                 refreshAccount()
             } catch (error: Exception) {
                 status.text = "No se pudieron buscar fuentes: ${error.localizedMessage}"
-            } finally { setBusy(false) }
+            } finally { setBusy(false); maybeSyncOnOpen() }
         }
     }
 
@@ -210,7 +219,8 @@ class MainActivity : ComponentActivity() {
             setBusy(true, "Leyendo Health Connect y subiendo datos a tu cuenta…")
             try {
                 val report = service.sync(source)
-                getPreferences(MODE_PRIVATE).edit().putString("sourcePackage", source).apply()
+                SyncPreferences.markSuccess(this@MainActivity, source)
+                AutomaticSync.refresh(this@MainActivity)
                 val heartRateStatus = when {
                     !report.heartRateGranted -> "Las LPM no están autorizadas; pulsa Permitir acceso para incluirlas."
                     report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
@@ -219,6 +229,25 @@ class MainActivity : ComponentActivity() {
                 status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo sincronizar: ${error.localizedMessage}"
+            } finally { setBusy(false) }
+        }
+    }
+
+    private fun maybeSyncOnOpen() {
+        if (busy || auth.currentUser == null) return
+        val source = SyncPreferences.source(this)
+        if (source.isBlank() || source !in sources) return
+        lifecycleScope.launch {
+            try { AutomaticSync.refresh(this@MainActivity) } catch (_: Exception) { }
+            val elapsed = System.currentTimeMillis() - SyncPreferences.lastSuccess(this@MainActivity)
+            if (busy || elapsed in 0 until 15 * 60 * 1000L) return@launch
+            setBusy(true, "Actualizando automáticamente los datos recientes…")
+            try {
+                val report = service.sync(source, days = 2)
+                SyncPreferences.markSuccess(this@MainActivity, source)
+                status.text = "Actualización automática completa: ${report.workouts} entrenamientos recientes. Abre TGTrain para verlos."
+            } catch (error: Exception) {
+                status.text = "No se pudo actualizar automáticamente: ${error.localizedMessage}. Puedes usar Sincronizar ahora."
             } finally { setBusy(false) }
         }
     }
