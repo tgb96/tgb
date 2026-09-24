@@ -40,6 +40,7 @@ export function createCloudSync({
   storage,
   onStatus = () => {},
   onDataChanged = () => {},
+  onWearableChanged = () => {},
   configuration = firebaseConfig,
   isConfigured = firebaseConfigured,
   firebaseModules = null
@@ -55,6 +56,8 @@ export function createCloudSync({
   let unsubscribeTrainingBlocks = null;
   let unsubscribeCoachProfile = null;
   let unsubscribeCoachQuestions = null;
+  let unsubscribeWearableDays = null;
+  let unsubscribeWearableSessions = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
   let mergePromise = null;
@@ -91,6 +94,7 @@ export function createCloudSync({
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
+        observeCloudWearable();
         emit("synced", "Entrenamientos y planificación sincronizados con Google.");
       } catch {
         syncError = true;
@@ -121,6 +125,11 @@ export function createCloudSync({
   const coachProfileDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "settings", "coachProfile");
   const coachQuestionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "coachQuestions");
   const coachQuestionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "coachQuestions", cloudDocumentId(id));
+  const wearableDaysCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableDays");
+  const wearableSessionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableSessions");
+  let wearableDays = [];
+  let wearableSessions = [];
+  const emitWearable = () => onWearableChanged({ days: wearableDays, sessions: wearableSessions });
 
   const setCloudDoc = (reference, value) => awaitServer(modules.firestoreModule.setDoc(reference, firestoreDocument(value)));
 
@@ -350,6 +359,19 @@ export function createCloudSync({
     });
   }
 
+  function observeCloudWearable() {
+    unsubscribeWearableDays?.();
+    unsubscribeWearableSessions?.();
+    unsubscribeWearableDays = modules.firestoreModule.onSnapshot(wearableDaysCollectionReference(), snapshot => {
+      wearableDays = snapshot.docs.map(item => item.data());
+      emitWearable();
+    }, () => emit("offline", "No se pudieron cargar los datos de la pulsera."));
+    unsubscribeWearableSessions = modules.firestoreModule.onSnapshot(wearableSessionsCollectionReference(), snapshot => {
+      wearableSessions = snapshot.docs.map(item => item.data());
+      emitWearable();
+    }, () => emit("offline", "No se pudieron cargar las sesiones de la pulsera."));
+  }
+
   async function connect(currentUser) {
     user = currentUser;
     if (retryTimer) clearTimeout(retryTimer);
@@ -366,6 +388,13 @@ export function createCloudSync({
     unsubscribeCoachProfile = null;
     unsubscribeCoachQuestions?.();
     unsubscribeCoachQuestions = null;
+    unsubscribeWearableDays?.();
+    unsubscribeWearableDays = null;
+    unsubscribeWearableSessions?.();
+    unsubscribeWearableSessions = null;
+    wearableDays = [];
+    wearableSessions = [];
+    emitWearable();
     if (!user) {
       emit("signed-out", "Inicia sesión para guardar tus entrenamientos en la nube.");
       return;
@@ -388,6 +417,7 @@ export function createCloudSync({
       observeCloudTrainingBlocks();
       observeCloudCoachProfile();
       observeCloudCoachQuestions();
+      observeCloudWearable();
       emit("synced", "Entrenamientos y planificación sincronizados con Google.");
     } catch {
       syncError = true;
@@ -444,6 +474,7 @@ export function createCloudSync({
         observeCloudTrainingBlocks();
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
+        observeCloudWearable();
         emit("synced", "Entrenamientos y planificación sincronizados con Google.");
       } catch (error) {
         syncError = true;
@@ -460,6 +491,8 @@ export function createCloudSync({
       unsubscribeTrainingBlocks?.();
       unsubscribeCoachProfile?.();
       unsubscribeCoachQuestions?.();
+      unsubscribeWearableDays?.();
+      unsubscribeWearableSessions?.();
       unsubscribeRepository?.();
     }
   };

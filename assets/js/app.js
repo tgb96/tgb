@@ -23,7 +23,7 @@ import {
   coachWeekForDate
 } from "./coach-plan.js?v=63";
 import { createRepository } from "./storage.js?v=63";
-import { createCloudSync } from "./cloud.js?v=63";
+import { createCloudSync } from "./cloud.js?v=64";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=63";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=63";
 import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=63";
@@ -57,10 +57,15 @@ import {
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
 const aiClient = createAiClient();
+let wearableData = { days: [], sessions: [] };
 const cloudSync = createCloudSync({
   repository,
   storage: window.localStorage,
   onStatus: updateCloudStatus,
+  onWearableChanged: data => {
+    wearableData = data;
+    renderWearable();
+  },
   onDataChanged: () => {
     renderHome();
     renderHistory();
@@ -1061,6 +1066,7 @@ function renderHome() {
     feedback.append(empty);
   }
   renderCoachQuestions();
+  renderWearable();
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
@@ -2427,6 +2433,52 @@ function currentExerciseSettings(routine, exercise, settings) {
   const numericWeight = rawWeight === "" ? "" : Number(rawWeight);
   const weightKg = numericWeight === "" || (Number.isFinite(numericWeight) && numericWeight >= 0) ? numericWeight : exercise.weightKg;
   return { sets, target, weightKg };
+}
+
+function renderWearable() {
+  const today = getChileDateISO();
+  const days = wearableData.days || [];
+  const sessions = wearableData.sessions || [];
+  const todayData = days.find(day => day.dateISO === today);
+  const lastSleep = days.filter(day => Number(day.sleepMinutes) > 0)
+    .sort((a, b) => String(b.dateISO).localeCompare(String(a.dateISO)))[0];
+  $("wearableSteps").textContent = todayData ? new Intl.NumberFormat("es-CL").format(Number(todayData.steps) || 0) : "—";
+  if (lastSleep) {
+    const minutes = Number(lastSleep.sleepMinutes) || 0;
+    $("wearableSleep").textContent = `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+    $("wearableSleepDate").textContent = formatShortDate(lastSleep.dateISO);
+  } else {
+    $("wearableSleep").textContent = "—";
+    $("wearableSleepDate").textContent = "";
+  }
+  const newestSync = days.map(day => day.syncedAt).filter(Boolean).sort().at(-1);
+  $("wearableSyncTime").textContent = newestSync
+    ? `Actualizado ${new Date(newestSync).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}`
+    : "Sin sincronizar";
+  $("wearableHelp").textContent = days.length
+    ? "Datos medidos por la pulsera. Las sesiones detectadas no se suman automáticamente al historial para evitar duplicados."
+    : "Instala TGTrain Sync, elige Mi Fitness y pulsa Sincronizar ahora para ver tus datos aquí.";
+  const list = $("wearableSessions");
+  list.replaceChildren();
+  const recent = sessions.filter(session => session.startTime && session.endTime)
+    .sort((a, b) => String(b.startTime).localeCompare(String(a.startTime))).slice(0, 3);
+  if (!recent.length) return;
+  const heading = document.createElement("strong");
+  heading.textContent = "Entrenamientos detectados";
+  list.append(heading);
+  for (const session of recent) {
+    const row = document.createElement("div");
+    row.className = "wearable-session";
+    const title = document.createElement("strong");
+    title.textContent = session.title || "Entrenamiento";
+    const details = document.createElement("span");
+    const minutes = Math.round((Number(session.durationSeconds) || 0) / 60);
+    const distance = Number(session.distanceMeters) > 0 ? ` · ${(Number(session.distanceMeters) / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} km` : "";
+    const calories = Number(session.caloriesKcal) > 0 ? ` · ${Math.round(Number(session.caloriesKcal))} kcal` : "";
+    details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}`;
+    row.append(title, details);
+    list.append(row);
+  }
 }
 
 function renderHeroEvolution(records) {

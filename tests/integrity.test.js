@@ -1,10 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("el enlace de Android entrega un APK y no lo guarda en la caché PWA", async () => {
+  const html = await readFile(resolve(root, "index.html"), "utf8");
+  const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
+  assert.match(html, /href="downloads\/tgtrain-sync-0\.1\.0\.apk" download/);
+  assert.match(worker, /url\.pathname\.endsWith\("\.apk"\)/);
+  assert.ok((await stat(resolve(root, "downloads/tgtrain-sync-0.1.0.apk"))).size > 1_000_000);
+});
 
 test("la interfaz usa módulos, cuatro pestañas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
@@ -181,7 +189,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
   for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v63/);
+  assert.match(worker, /tgtrain-shell-v64/);
   assert.match(worker, /coach-tracking\.js\?v=63/);
 });
 

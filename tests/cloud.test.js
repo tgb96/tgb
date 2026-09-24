@@ -98,3 +98,55 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   phoneCloud.destroy();
   computerCloud.destroy();
 });
+
+test("lee las mediciones de la pulsera por cuenta y las limpia al cerrar sesión", async () => {
+  const emptyStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const repository = createRepository(emptyStorage);
+  const updates = [];
+  let authListener;
+  let synced;
+  const ready = new Promise(resolve => { synced = resolve; });
+  const firestoreModule = {
+    collection: (_database, ...path) => ({ kind: path.at(-1) }),
+    doc: (_database, ...path) => ({ kind: path.at(-2), id: path.at(-1) }),
+    getDocsFromServer: async () => ({ forEach: () => {} }),
+    getDocFromServer: async () => ({ exists: () => false }),
+    waitForPendingWrites: async () => {},
+    onSnapshot: (reference, callback) => {
+      const docs = reference.kind === "wearableDays"
+        ? [{ data: () => ({ dateISO: "2026-09-23", steps: 8000 }) }]
+        : reference.kind === "wearableSessions"
+          ? [{ data: () => ({ id: "session-1", title: "Trote" }) }]
+          : [];
+      callback({ docs, docChanges: () => [], metadata: {}, exists: () => false });
+      return () => {};
+    },
+    getFirestore: () => ({})
+  };
+  const cloud = createCloudSync({
+    repository,
+    storage: emptyStorage,
+    isConfigured: true,
+    firebaseModules: {
+      firestoreModule,
+      appModule: { getApps: () => [], initializeApp: () => ({}) },
+      authModule: {
+        getAuth: () => ({}), browserLocalPersistence: {}, setPersistence: async () => {},
+        onAuthStateChanged: (_auth, listener) => {
+          authListener = listener;
+          listener({ uid: "test-user" });
+          return () => {};
+        }
+      }
+    },
+    onWearableChanged: data => updates.push(data),
+    onStatus: status => { if (status.state === "synced") synced(); }
+  });
+  await cloud.initialize();
+  await ready;
+  assert.equal(updates.at(-1).days[0].steps, 8000);
+  assert.equal(updates.at(-1).sessions[0].title, "Trote");
+  await authListener(null);
+  assert.deepEqual(updates.at(-1), { days: [], sessions: [] });
+  cloud.destroy();
+});

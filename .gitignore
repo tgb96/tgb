@@ -3,3 +3,11 @@ functions/node_modules/
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+android/tgtrain-sync/.gradle/
+android/tgtrain-sync/.kotlin/
+android/tgtrain-sync/local.properties
+android/tgtrain-sync/app/build/
+android/tgtrain-sync/build/
+android/tgtrain-sync/app/google-services.json
+android/tgtrain-sync/*.jks
+android/tgtrain-sync/.tooling/

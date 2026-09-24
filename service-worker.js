@@ -1,16 +1,16 @@
-const CACHE_NAME = "tgtrain-shell-v63";
+const CACHE_NAME = "tgtrain-shell-v64";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./assets/css/styles.css?v=63",
-  "./assets/js/app.js?v=63",
+  "./assets/css/styles.css?v=64",
+  "./assets/js/app.js?v=64",
   "./assets/js/coach-plan.js?v=63",
   "./assets/js/data.js?v=63",
   "./assets/js/storage.js?v=63",
   "./assets/js/utils.js?v=63",
-  "./assets/js/cloud.js?v=63",
+  "./assets/js/cloud.js?v=64",
   "./assets/js/ai.js?v=63",
   "./assets/js/training-plan.js?v=63",
   "./assets/js/coach-tracking.js?v=63",
@@ -47,6 +47,8 @@ self.addEventListener("fetch", event => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // No guardes el instalador en la caché de la PWA: es grande y debe descargarse actualizado.
+  if (url.pathname.endsWith(".apk")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(
