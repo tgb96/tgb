@@ -1,4 +1,4 @@
-import { guidedElapsedMs, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "./guided-sessions.js?v=67";
+import { guidedElapsedMs, guidedOptions, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "./guided-sessions.js?v=68";
 import { getChileDateISO } from "./utils.js?v=67";
 
 const KEY = "tgtrain-guided-session-v1";
@@ -20,6 +20,7 @@ const button = (text, className, handler) => {
 export function createGuidedUI(repository, { showView, showToast, onSaved } = {}) {
   let state = null;
   let previewKind = "";
+  let previewPlanId = "";
   let editingRecord = null;
   let audioContext = null;
   let notifiedStep = -1;
@@ -28,7 +29,7 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
   function load() {
     try {
       const value = JSON.parse(window.localStorage.getItem(KEY) || "null");
-      const plan = guidedPlan(value?.kind);
+      const plan = guidedPlan(value?.kind, value?.planId);
       if (!plan || !["active", "paused", "review"].includes(value.status)
         || !Number.isInteger(value.index) || value.index < 0
         || (value.status === "review" ? value.index > plan.steps.length : value.index >= plan.steps.length)
@@ -63,14 +64,18 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
     } catch { /* El reloj visual sigue funcionando si el sonido no está disponible. */ }
   }
 
-  function currentPlan() { return guidedPlan(editingRecord?.category || state?.kind || previewKind); }
+  function currentPlan() {
+    if (editingRecord) return guidedPlan(editingRecord.category, editingRecord.guidedSessionId);
+    if (state) return guidedPlan(state.kind, state.planId);
+    return guidedPlan(previewKind, previewPlanId);
+  }
 
   function start() {
     const plan = currentPlan();
     if (!plan) return;
     const now = Date.now();
     const gentle = Boolean(document.getElementById("guidedGentle")?.checked);
-    persist({ kind: plan.category, status: "active", index: 0, results: [], gentle,
+    persist({ kind: plan.category, planId: plan.id, status: "active", index: 0, results: [], gentle,
       startedAt: new Date(now).toISOString(), activeStartedAt: now, stepEndsAt: now + plan.steps[0].seconds * 1000,
       stepRemainingMs: plan.steps[0].seconds * 1000, elapsedMs: 0 });
     notifiedStep = -1;
@@ -95,7 +100,7 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
 
   function advance(skipped = false) {
     if (!state || !["active", "paused"].includes(state.status)) return;
-    const plan = guidedPlan(state.kind);
+    const plan = guidedPlan(state.kind, state.planId);
     const now = Date.now();
     const elapsedMs = guidedElapsedMs(state, now);
     const results = [...state.results.filter(item => item.id !== plan.steps[state.index]?.id)];
@@ -225,6 +230,17 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
     const safety = element("p", "guided-safety", plan.safety); root.append(safety);
     if (editingRecord || state?.status === "review") { root.append(renderReview(plan)); return; }
     if (!state) {
+      const options = element("div", "guided-variant-options");
+      guidedOptions(plan.category).forEach(option => {
+        const choice = button(`${Math.round(guidedTotalSeconds(option) / 60)} min`, option.id === plan.id ? "active" : "", () => {
+          previewPlanId = option.id;
+          render();
+        });
+        choice.setAttribute("aria-pressed", String(option.id === plan.id));
+        choice.setAttribute("aria-label", option.title);
+        options.append(choice);
+      });
+      root.append(options);
       const card = element("section", "guided-preview");
       card.append(element("strong", "", `${plan.steps.length} pasos · aprox. ${Math.round(guidedTotalSeconds(plan) / 60)} min`),
         element("p", "", "Abre esta guía para revisar movimientos. El tiempo solo comienza cuando pulses Iniciar."));
@@ -233,10 +249,6 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
       gentleLabel.append(gentle, element("span", "", "Modo suave: priorizar alternativas sin impacto"));
       card.append(gentleLabel, button("Iniciar sesión guiada", "guided-primary", start));
       root.append(card, renderSteps(plan));
-      const source = element("p", "guided-sources");
-      const itf = element("a", "", "Guía ITF sobre movilidad para tenis"); itf.href = "https://www.itftennis.com/en/news-and-media/articles/tennis-science-flexibility-training/"; itf.target = "_blank"; itf.rel = "noopener noreferrer";
-      const nhs = element("a", "", "Estiramientos suaves del NHS"); nhs.href = "https://www.nhs.uk/live-well/exercise/how-to-stretch-after-exercising/"; nhs.target = "_blank"; nhs.rel = "noopener noreferrer";
-      source.append(plan.category === "warmup" ? itf : nhs); root.append(source);
       return;
     }
     const step = plan.steps[state.index];
@@ -274,11 +286,15 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
       if (state && state.kind !== kind) {
         showToast?.("Tienes otra guía en curso. Retómala o descártala antes de iniciar una nueva.");
         previewKind = state.kind;
-      } else previewKind = kind;
+        previewPlanId = state.planId || guidedPlan(state.kind)?.id || "";
+      } else {
+        previewKind = kind;
+        previewPlanId = guidedPlan(kind)?.id || "";
+      }
       editingRecord = null; render(); showView?.("guided");
     },
-    resumePending() { if (state) { previewKind = state.kind; render(); showView?.("guided"); return true; } return false; },
-    editRecord(record) { editingRecord = record; previewKind = record.category; render(); showView?.("guided"); },
+    resumePending() { if (state) { previewKind = state.kind; previewPlanId = state.planId || guidedPlan(state.kind)?.id || ""; render(); showView?.("guided"); return true; } return false; },
+    editRecord(record) { editingRecord = record; previewKind = record.category; previewPlanId = record.guidedSessionId; render(); showView?.("guided"); },
     render,
     getState() { return state; }
   };

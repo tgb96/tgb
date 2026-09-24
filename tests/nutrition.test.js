@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionPlanForDate, normalizeNutritionEntries } from "../assets/js/nutrition.js";
+import { estimatePreset, foodCatalog, mealPresets, presetsForSlot } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
 
 function memoryStorage() {
@@ -14,7 +15,19 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.ok(tuesday.slots.some(slot => slot.id === "post" && slot.time.includes("22:15")));
   assert.ok(nutritionPlanForDate("2026-09-21").slots.some(slot => slot.id === "pre"));
   assert.equal(nutritionPlanForDate("2026-09-26").name, "Sin partido · trekking o cardio");
-  assert.equal(nutritionPlanForDate("2026-09-26", "late").name, "Partido a las 17:15");
+  assert.equal(nutritionPlanForDate("2026-09-26", "late").name, "Escenario: partido tarde (ej. 17:15)");
+  assert.match(nutritionPlanForDate("2026-09-26", "early").detail, /no un partido programado/);
+  assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
+  assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
+});
+
+test("cada ejemplo concreto tiene porción y nutrientes orientativos", () => {
+  assert.ok(Object.values(foodCatalog).every(food => food.portion && food.kcal > 0 && food.proteinG >= 0 && food.carbsG >= 0 && food.fatG >= 0));
+  assert.deepEqual(estimatePreset(mealPresets.hamCheeseSandwich), { caloriesKcal: 305, proteinG: 21, carbsG: 28, fatG: 12 });
+  for (const slotId of ["breakfast", "morning", "lunch", "pre", "snack", "post", "dinner"]) {
+    assert.ok(presetsForSlot(slotId).length >= 4);
+    assert.ok(presetsForSlot(slotId).every(preset => estimatePreset(preset)?.caloriesKcal > 0));
+  }
 });
 
 test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => {

@@ -276,6 +276,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .guided-heading { min-height: 0; justify-content: space-between; align-items: flex-start; }
 .guided-heading .guided-back { flex: 0 0 auto; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: white; font-size: 11px; font-weight: 850; }
+.guided-variant-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 12px; }
+.guided-variant-options button { min-height: 47px; border: 1px solid var(--line); border-radius: 13px; background: white; color: var(--ink); font-size: 15px; font-weight: 900; }
+.guided-variant-options button.active { border-color: var(--blue); background: var(--blue); color: white; }
 .guided-safety { margin: -5px 0 15px; padding: 12px 14px; border-left: 4px solid var(--coral); border-radius: 10px; background: #fff1ec; color: #563e38; font-size: 12px; line-height: 1.5; }
 .guided-preview, .guided-active, .guided-review { padding: 19px; border-radius: 25px; background: var(--night); color: white; }
 .guided-preview > strong { display: block; font-size: 18px; }
@@ -302,8 +305,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .guided-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 16px; }
 .guided-controls button { min-width: 0; padding: 7px 4px; font-size: 11px; }
 .guided-end-early { margin-top: 13px; padding: 8px 0; border: 0; background: transparent; color: #d9dce6; font-size: 11px; text-decoration: underline; }
-.guided-elapsed, .guided-sources { margin: 12px 2px; color: var(--muted); font-size: 11px; }
-.guided-sources a { color: var(--blue-dark); }
+.guided-elapsed { margin: 12px 2px; color: var(--muted); font-size: 11px; }
 .guided-review h2 { margin: 4px 0 8px; font-size: 25px; }
 .guided-review > p:not(.eyebrow) { color: #d9dce6; font-size: 12px; }
 .guided-review-form { display: grid; gap: 12px; margin-top: 14px; }
@@ -743,6 +745,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-day-card h2 { margin: 5px 0 7px; font-size: 25px; letter-spacing: -.7px; }
 .nutrition-day-card > p:not(.eyebrow) { margin: 0; color: #d2d6df; font-size: 13px; line-height: 1.5; }
 .nutrition-day-card .nutrition-hydration-tip { margin-top: 12px !important; color: #f0f3f8 !important; }
+.nutrition-day-card .nutrition-scenario-note { margin-top: 9px !important; color: #c7d0df !important; font-size: 11px !important; }
 .nutrition-context-card { margin-top: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 22px; background: white; }
 .nutrition-context-card h2 { margin: 4px 0 10px; font-size: 19px; }
 .nutrition-context-card p:not(.eyebrow) { margin: 7px 0; color: #4e5663; font-size: 12px; line-height: 1.45; }
@@ -771,6 +774,21 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-slot > p { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .nutrition-options { display: grid; gap: 7px; }
 .nutrition-options button { min-height: 43px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font-size: 12px; font-weight: 750; line-height: 1.35; text-align: left; }
+.nutrition-preset-options { margin-top: 12px; border-top: 1px solid var(--line); }
+.nutrition-preset-options summary { padding: 12px 0; color: var(--blue-dark); font-size: 12px; font-weight: 850; cursor: pointer; }
+.nutrition-preset-list { display: grid; gap: 7px; padding-bottom: 4px; }
+.nutrition-preset-list button { min-height: 58px; padding: 10px 12px; border: 1px solid #d8e3c8; border-radius: 12px; background: #f1f8e6; color: var(--ink); text-align: left; }
+.nutrition-preset-list strong, .nutrition-preset-list small { display: block; }
+.nutrition-preset-list strong { font-size: 12px; line-height: 1.35; }
+.nutrition-preset-list small { margin-top: 4px; color: #436d29; font-size: 10px; font-weight: 850; }
+.nutrition-food-catalog { margin: 13px 0 17px; padding: 14px; border: 1px solid var(--line); border-radius: 19px; background: white; }
+.nutrition-food-catalog summary { color: var(--blue-dark); font-size: 13px; font-weight: 900; cursor: pointer; }
+.nutrition-food-catalog > p { color: var(--muted); font-size: 11px; line-height: 1.45; }
+#nutritionFoodCatalogList { display: grid; gap: 6px; max-height: 380px; overflow: auto; }
+#nutritionFoodCatalogList button { padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); text-align: left; }
+#nutritionFoodCatalogList strong, #nutritionFoodCatalogList small { display: block; }
+#nutritionFoodCatalogList strong { font-size: 11px; }
+#nutritionFoodCatalogList small { margin-top: 3px; color: var(--muted); font-size: 10px; }
 .nutrition-other-button { margin-top: 9px; padding: 8px 0; border: 0; background: none; color: var(--blue); font-size: 12px; font-weight: 850; }
 .nutrition-entry { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 11px; border-radius: 12px; background: #ebf5d7; }
 .nutrition-entry > div { flex: 1; min-width: 0; }
@@ -786,6 +804,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-entry-dialog label { display: block; margin: 12px 0 6px; font-size: 12px; font-weight: 850; }
 .nutrition-entry-dialog input, .nutrition-entry-dialog textarea { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--ink); }
 .nutrition-entry-dialog textarea { min-height: 96px; resize: vertical; }
+.nutrition-estimate-note { margin: 12px 0 0; padding: 10px; border-radius: 10px; background: #eef4e3; color: #425334; font-size: 11px; line-height: 1.45; }
 .nutrition-macros { margin: 15px 0; }
 .nutrition-macros summary { color: var(--blue); font-size: 12px; font-weight: 850; }
 .nutrition-macro-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

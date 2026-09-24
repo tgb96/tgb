@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=67">
+  <link rel="stylesheet" href="assets/css/styles.css?v=68">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -203,11 +203,12 @@
             <option value="physical">Entrenamiento físico</option>
             <option value="tennis">Tenis grupal</option>
             <option value="recovery">Descanso / recuperación</option>
-            <option value="early">Partido 13:45</option>
-            <option value="late">Partido 17:15</option>
+            <option value="early">Escenario: partido temprano (ej. 13:45)</option>
+            <option value="late">Escenario: partido tarde (ej. 17:15)</option>
             <option value="other">Trekking / cardio sin partido</option>
           </select>
         </label>
+        <p class="nutrition-scenario-note">Los horarios de partido son ejemplos de la planificación, no eventos de tu calendario.</p>
         <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
         <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
       </section>
@@ -224,12 +225,17 @@
           <button type="button" data-water-ml="500">+ 500 ml agua</button>
           <button id="nutritionCustomWater" type="button">Otra cantidad</button>
         </div>
-        <p>Solo se suman los nutrientes que tú ingreses; si faltan datos, el total es parcial. El agua registrada no incluye bebidas de comidas salvo que la añadas.</p>
+        <p>Los ejemplos con porciones rellenan kcal y macros orientativos. Si cambias cantidades, ajusta los valores. Los datos faltantes no se inventan.</p>
       </section>
+      <details class="nutrition-food-catalog">
+        <summary>Ver valores aproximados por alimento</summary>
+        <p>Porciones de referencia, no tus cantidades reales. Envasados, aceite y preparación pueden variar bastante.</p>
+        <div id="nutritionFoodCatalogList"></div>
+      </details>
       <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
       <div id="nutritionSlots" class="nutrition-slots"></div>
       <button id="nutritionExtraMeal" class="nutrition-extra-button" type="button">+ Registrar otra comida o colación</button>
-      <p class="nutrition-disclaimer">Esta planificación fue entregada por tu entrenador. TGTrain no calcula automáticamente calorías o nutrientes ni sustituye una evaluación nutricional individual.</p>
+      <p class="nutrition-disclaimer">La planificación fue entregada por tu entrenador. Las cifras de ejemplos usan porciones genéricas y son solo orientativas; no sustituyen etiquetas ni evaluación nutricional individual.</p>
     </section>
 
     <section id="viewTimer" class="view hidden" hidden aria-labelledby="timerHeading">
@@ -451,7 +457,8 @@
       <input id="nutritionMealTime" type="time" required>
       <label for="nutritionMealText">¿Qué comiste y cuánto? <small>(obligatorio)</small></label>
       <textarea id="nutritionMealText" rows="4" maxlength="1000" placeholder="Ej.: 2 huevos, 2 rebanadas de pan y 1 plátano" required></textarea>
-      <details class="nutrition-macros"><summary>Agregar kcal y macros de etiqueta o medición (opcional)</summary>
+      <p id="nutritionEstimateNote" class="nutrition-estimate-note">Puedes anotar kcal y macros si conoces las cantidades. Si no, déjalos en blanco.</p>
+      <details id="nutritionMacrosDetails" class="nutrition-macros"><summary>Revisar kcal y macros (opcional)</summary>
         <div class="nutrition-macro-grid">
           <label>kcal<input id="nutritionMealCalories" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
           <label>Proteína (g)<input id="nutritionMealProtein" type="number" min="0" max="10000" step="0.1" inputmode="decimal"></label>
@@ -484,6 +491,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=67"></script>
+  <script type="module" src="assets/js/app.js?v=68"></script>
 </body>
 </html>

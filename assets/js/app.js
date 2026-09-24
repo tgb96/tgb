@@ -22,10 +22,10 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=67";
+import { createRepository } from "./storage.js?v=68";
 import { createCloudSync } from "./cloud.js?v=66";
-import { createNutritionUI } from "./nutrition-ui.js?v=67";
-import { createGuidedUI } from "./guided-ui.js?v=67";
+import { createNutritionUI } from "./nutrition-ui.js?v=68";
+import { createGuidedUI } from "./guided-ui.js?v=68";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=67";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=67";
 import { analysisMatchesCurrentPlan, comparableActivity, dayPlanOverview, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=67";

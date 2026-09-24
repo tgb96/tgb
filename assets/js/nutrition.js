@@ -1,9 +1,11 @@
 // Guía entregada por el entrenador de Tomás. Es una plantilla, no una medición.
 const slot = (id, time, title, options, tip = "") => ({ id, time, title, options, tip });
-const breakfast = (options = ["2–3 huevos + pan o arepa + fruta", "Yogurt alto en proteína + granola + fruta"]) =>
-  slot("breakfast", "08:00–08:30", "Desayuno", options);
+const breakfast = (options = ["2–3 huevos + pan o arepa + fruta", "Yogurt alto en proteína + granola + fruta"], time = "08:00–08:30") =>
+  slot("breakfast", time, "Desayuno", [...new Set([...options,
+    "Pan integral con jamón y queso", "Avena + leche + fruta", "Arepa con huevo + fruta", "Protein+ + pan con jamón, queso o huevo"])]);
 const morning = (options = ["Yogurt alto en proteína + fruta", "Protein+ + fruta"]) =>
-  slot("morning", "11:00–12:00", "Colación de mañana", options);
+  slot("morning", "11:00–12:00", "Colación de mañana", [...new Set([...options,
+    "Fruta + 20–30 g de frutos secos", "Pan integral pequeño con jamón y queso", "Fruta + yogurt alto en proteína"])]);
 const lunch = (options = ["Pollo o carne + arroz, papas o fideos + verduras"]) =>
   slot("lunch", "14:00", "Almuerzo", options, "Guía de tu plan: aprox. 150–200 g de proteína cruda, 1 taza de arroz/fideos cocidos o 1–2 papas, más verduras.");
 const dinner = (options = ["Proteína + carbohidrato + verduras"]) =>
@@ -34,17 +36,17 @@ const tennis = {
 
 const saturdayPlans = {
   early: {
-    name: "Partido a las 13:45", detail: "Comer antes del partido y recuperar con una comida completa.", waterMinMl: 2500, waterMaxMl: 3000,
+    name: "Escenario: partido temprano (ej. 13:45)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
     slots: [
-      slot("breakfast", "08:30–09:30", "Desayuno", ["Huevos o yogurt alto en proteína + pan, avena o granola + fruta"]),
+      breakfast(["Huevos + pan + fruta", "Yogurt alto en proteína + granola + fruta"], "08:30–09:30"),
       slot("pre", "11:45–12:30", "Prepartido", ["Plátano", "Pan con miel o mermelada", "Barra simple"]),
       slot("during", "Durante", "En el partido", ["Agua y electrolitos según tu plan", "Si dura más de 75–90 min: plátano o barra simple"]),
       slot("post", "Después", "Comida postpartido", ["Proteína + carbohidrato + verduras"])
     ], hydration: "Tu plan propone aprox. 1 L con electrolitos durante el partido; ajusta según condiciones y tolerancia."
   },
   late: {
-    name: "Partido a las 17:15", detail: "Almorzar bien y hacer una colación antes de jugar.", waterMinMl: 2500, waterMaxMl: 3000,
-    slots: [breakfast(), morning(), lunch(),
+    name: "Escenario: partido tarde (ej. 17:15)", detail: "Es solo un ejemplo del plan del entrenador, no un partido programado. Ajusta los horarios reales si lo eliges.", waterMinMl: 2500, waterMaxMl: 3000,
+    slots: [breakfast(undefined, "08:30"), morning(), lunch(),
       slot("pre", "16:00", "Snack prepartido", ["Plátano", "Barra simple", "Pan con miel o mermelada", "Yogurt"]),
       slot("during", "Durante", "En el partido", ["Agua y electrolitos según tu plan"]),
       dinner(["Proteína + carbohidrato moderado"])

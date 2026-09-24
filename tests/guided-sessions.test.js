@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { guidedElapsedMs, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "../assets/js/guided-sessions.js";
+import { guidedElapsedMs, guidedOptions, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "../assets/js/guided-sessions.js";
 import { createRepository } from "../assets/js/storage.js";
 import { groupRecordsByWeek, recordsToCSV, validateRecord, weeklyReport } from "../assets/js/utils.js";
 import { dayPlanOverview, plannedContextForRecord } from "../assets/js/coach-tracking.js";
@@ -21,6 +21,19 @@ test("las dos guías contienen pasos progresivos y alternativas suaves", () => {
     assert.ok(plan.steps.every(step => step.id && step.title && step.instruction && step.alternative && step.seconds > 0));
     assert.equal(new Set(plan.steps.map(step => step.id)).size, plan.steps.length);
   }
+});
+
+test("calentamiento y estiramientos ofrecen tres duraciones estables", () => {
+  assert.deepEqual(guidedOptions("warmup").map(guidedTotalSeconds), [300, 660, 900]);
+  assert.deepEqual(guidedOptions("stretching").map(guidedTotalSeconds), [400, 900, 1800]);
+  for (const kind of ["warmup", "stretching"]) {
+    for (const plan of guidedOptions(kind)) {
+      assert.equal(guidedPlan(kind, plan.id).id, plan.id);
+      assert.equal(new Set(plan.steps.map(step => step.id)).size, plan.steps.length);
+      assert.ok(plan.steps.every(step => step.alternative));
+    }
+  }
+  assert.equal(guidedPlan("warmup", "tennis-warmup-v1").id, "tennis-warmup-v1");
 });
 
 test("el reloj mantiene tiempo restante y activo tras pausa y reanudación", () => {

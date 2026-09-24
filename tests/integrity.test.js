@@ -188,10 +188,10 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-ui.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(worker, /tgtrain-shell-v67/);
+  assert.match(worker, /tgtrain-shell-v68/);
   assert.match(worker, /coach-tracking\.js\?v=67/);
 });
 

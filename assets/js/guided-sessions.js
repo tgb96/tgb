@@ -39,7 +39,60 @@ export const guidedSessions = {
   }
 };
 
-export const guidedPlan = kind => guidedSessions[kind] || null;
+const warmupBase = guidedSessions.warmup;
+const stretchBase = guidedSessions.stretching;
+const stepWithTime = (step, seconds) => ({ ...step, seconds });
+const warmupExtra = [
+  { id: "diagonal", title: "Pasos diagonales", seconds: 60, instruction: "Avanza y retrocede en diagonal con pasos cortos y controlados, sin giros bruscos.", alternative: "Camina en diagonal y reduce la velocidad." },
+  { id: "reaction", title: "Reacción y frenada suave", seconds: 60, instruction: "Desde una posición cómoda, sal un paso hacia cada lado y frena con control.", alternative: "Haz solo cambios de apoyo sin acelerar si la rodilla está sensible." },
+  { id: "forehand-backhand", title: "Derecha y revés progresivos", seconds: 60, instruction: "Alterna golpes de sombra de derecha y revés, aumentando ligeramente la velocidad.", alternative: "Haz el gesto más corto y sin raqueta." },
+  { id: "serve-build", title: "Servicio progresivo", seconds: 60, instruction: "Ensaya el saque en partes, primero lento y luego cerca del ritmo de juego.", alternative: "Omite la elevación del brazo si el hombro molesta; practica solo pies y lanzamiento suave." }
+];
+const longStretchSteps = [
+  { id: "settle", title: "Respirar y bajar el ritmo", instruction: "Camina despacio y deja que baje el ritmo respiratorio.", alternative: "Quédate de pie con apoyo y respira cómodo." },
+  { id: "feet", title: "Pies y tobillos", instruction: "Moviliza tobillos y dedos de los pies sin forzar.", alternative: "Hazlo sentado." },
+  { id: "calves", title: "Pantorrillas", instruction: "Estira suavemente una pantorrilla y luego la otra, alternando cada 30–40 segundos.", alternative: "Reduce el paso y apóyate en la pared." },
+  { id: "quads", title: "Parte anterior del muslo", instruction: "Con apoyo, acerca el talón al glúteo sin tirar de la rodilla; cambia de lado.", alternative: "Si flexionar la rodilla incomoda, omite el estiramiento y respira." },
+  { id: "hamstrings", title: "Parte posterior del muslo", instruction: "Inclina la cadera suavemente sobre una pierna adelantada; cambia de lado.", alternative: "Siéntate y mantén una flexión cómoda de rodilla." },
+  { id: "glutes", title: "Glúteos", instruction: "Sentado, cruza una pierna y acerca el tronco suavemente; cambia de lado.", alternative: "Mantén ambos pies en el suelo si la rodilla se siente incómoda." },
+  { id: "hip-front", title: "Cadera anterior", instruction: "Da un paso corto atrás y mueve la pelvis suavemente; cambia de lado.", alternative: "Hazlo de pie con apoyo y poca amplitud." },
+  { id: "spine", title: "Columna y espalda", instruction: "Sentado o de pie, alterna una espalda larga con una ligera flexión, sin llegar a dolor.", alternative: "Haz movimientos pequeños mientras respiras." },
+  { id: "rotation", title: "Rotación de tronco", instruction: "Gira despacio el tronco a cada lado sin bloquear la cadera.", alternative: "Reduce la amplitud y acompaña el giro con los pies." },
+  { id: "chest", title: "Pecho", instruction: "Abre el pecho con brazos relajados, sin forzar el hombro; alterna la posición.", alternative: "Mantén las manos bajas si el hombro está sensible." },
+  { id: "shoulder", title: "Hombros", instruction: "Cruza suavemente un brazo delante del pecho y cambia de lado.", alternative: "Haz círculos pequeños de hombros sin estirar el brazo." },
+  { id: "forearms", title: "Antebrazos y muñecas", instruction: "Flexiona y extiende suavemente las muñecas, alternando lados.", alternative: "Solo abre y cierra las manos si el codo o la muñeca molestan." },
+  { id: "neck", title: "Cuello y postura", instruction: "Inclina ligeramente la cabeza a cada lado; mantén la mandíbula relajada.", alternative: "Mantén la cabeza neutra y haz respiraciones lentas." },
+  { id: "body-check", title: "Revisión corporal", instruction: "Nota cómo se sienten piernas, rodilla, hombro y brazo; evita forzar zonas sensibles.", alternative: "Si estás incómodo, descansa sentado." },
+  { id: "finish", title: "Respiración final", instruction: "Respira de forma natural y registra cualquier molestia al terminar.", alternative: "Termina sentado si lo prefieres." }
+];
+
+export const guidedVariants = {
+  warmup: [
+    { ...warmupBase, id: "tennis-warmup-5-v1", title: "Calentamiento rápido · 5 min",
+      subtitle: "Movilidad y golpes progresivos cuando tienes poco tiempo.",
+      steps: [stepWithTime(warmupBase.steps[0], 60), stepWithTime(warmupBase.steps[1], 35), stepWithTime(warmupBase.steps[2], 35),
+        stepWithTime(warmupBase.steps[3], 35), stepWithTime(warmupBase.steps[4], 35), stepWithTime(warmupBase.steps[5], 40),
+        stepWithTime(warmupBase.steps[7], 30), stepWithTime(warmupBase.steps[8], 30)] },
+    { ...warmupBase, title: "Calentamiento completo · 11 min" },
+    { ...warmupBase, id: "tennis-warmup-15-v1", title: "Calentamiento extendido · 15 min",
+      subtitle: "Más tiempo para pies, reacción y golpes antes de jugar.",
+      steps: [...warmupBase.steps.slice(0, -1), ...warmupExtra, warmupBase.steps.at(-1)] }
+  ],
+  stretching: [
+    { ...stretchBase, title: "Estiramientos cortos · 7 min" },
+    { ...stretchBase, id: "post-play-stretch-15-v1", title: "Movilidad y estiramientos · 15 min",
+      subtitle: "Vuelta a la calma más pausada después del entrenamiento.",
+      steps: longStretchSteps.slice(0, 10).map(step => ({ ...step, seconds: 90 })) },
+    { ...stretchBase, id: "post-play-stretch-30-v1", title: "Movilidad tranquila · 30 min",
+      subtitle: "Sesión larga de movilidad suave y respiración, de estilo relajado.",
+      steps: longStretchSteps.map(step => ({ ...step, seconds: 120 })) }
+  ]
+};
+
+export const guidedOptions = kind => guidedVariants[kind] || [];
+export const guidedPlan = (kind, id = "") => id
+  ? guidedOptions(kind).find(plan => plan.id === id) || null
+  : guidedOptions(kind).find(plan => plan.id === guidedSessions[kind]?.id) || null;
 export const guidedTotalSeconds = plan => (plan?.steps || []).reduce((sum, step) => sum + step.seconds, 0);
 
 export function guidedRemainingMs(state, now = Date.now()) {

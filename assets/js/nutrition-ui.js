@@ -1,4 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=66";
+import { nutritionDayTotals, nutritionPlanForDate } from "./nutrition.js?v=68";
+import { estimatePreset, foodCatalog, presetsForSlot } from "./nutrition-presets.js?v=68";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
 const byId = id => document.getElementById(id);
@@ -6,6 +7,7 @@ const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.
 const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
+const estimateLine = value => `≈ ${value.caloriesKcal} kcal · proteína ${value.proteinG} g · carbos ${value.carbsG} g · grasas ${value.fatG} g`;
 
 export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }) } = {}) {
   let selectedDate = getChileDateISO();
@@ -13,7 +15,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
   let selectedSlot = "other";
   const dialog = byId("nutritionEntryDialog");
 
-  function openMeal(slotId = "other", suggestion = "", entry = null) {
+  function openMeal(slotId = "other", suggestion = "", entry = null, estimate = null) {
     selectedSlot = slotId;
     editingId = entry?.id || "";
     byId("nutritionEntryTitle").textContent = entry ? "Editar comida registrada" : "Registrar lo que comiste";
@@ -21,8 +23,12 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     byId("nutritionMealTime").value = entry?.time || localTime();
     byId("nutritionMealText").value = entry?.text || suggestion;
     for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
-      byId(field).value = entry?.[key] ?? "";
+      byId(field).value = entry?.[key] ?? estimate?.[key] ?? "";
     }
+    byId("nutritionMacrosDetails").open = Boolean(estimate || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
+    byId("nutritionEstimateNote").textContent = estimate
+      ? "Valores orientativos para la porción descrita. Si cambias cantidad, marca o preparación, corrige también los números antes de guardar."
+      : "Puedes anotar kcal y macros si conoces las cantidades. Si no, déjalos en blanco.";
     dialog.showModal();
     byId("nutritionMealText").focus();
   }
@@ -85,6 +91,19 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Quitar";
     remove.addEventListener("click", () => deleteEntry(entry)); row.append(remove);
     container.append(row);
+  }
+
+  function renderFoodCatalog() {
+    const list = byId("nutritionFoodCatalogList"); list.replaceChildren();
+    Object.values(foodCatalog).forEach(food => {
+      const button = document.createElement("button"); button.type = "button";
+      const name = document.createElement("strong"); name.textContent = `${food.name} · ${food.portion}`;
+      const estimate = { caloriesKcal: food.kcal, proteinG: food.proteinG, carbsG: food.carbsG, fatG: food.fatG };
+      const metrics = document.createElement("small"); metrics.textContent = estimateLine(estimate);
+      button.append(name, metrics);
+      button.addEventListener("click", () => openMeal("other", `${food.name} · ${food.portion}`, null, estimate));
+      list.append(button);
+    });
   }
 
   function render() {
@@ -181,6 +200,24 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
         button.addEventListener("click", () => openMeal(item.id, option)); options.append(button);
       });
       card.append(options);
+      const presets = presetsForSlot(item.id);
+      if (presets.length) {
+        const examples = document.createElement("details"); examples.className = "nutrition-preset-options";
+        examples.open = ["breakfast", "morning"].includes(item.id);
+        const summary = document.createElement("summary"); summary.textContent = `Ejemplos con porción y nutrientes aproximados (${presets.length})`;
+        examples.append(summary);
+        const list = document.createElement("div"); list.className = "nutrition-preset-list";
+        presets.forEach(preset => {
+          const estimate = estimatePreset(preset);
+          const button = document.createElement("button"); button.type = "button";
+          const title = document.createElement("strong"); title.textContent = preset.title;
+          const metrics = document.createElement("small"); metrics.textContent = estimateLine(estimate);
+          button.append(title, metrics);
+          button.addEventListener("click", () => openMeal(item.id, preset.title, null, estimate));
+          list.append(button);
+        });
+        examples.append(list); card.append(examples);
+      }
       const other = document.createElement("button"); other.type = "button"; other.className = "nutrition-other-button";
       other.textContent = "+ Anotar algo diferente"; other.addEventListener("click", () => openMeal(item.id)); card.append(other);
       entries.filter(entry => entry.kind === "meal" && entry.slotId === item.id).forEach(entry => appendEntry(card, entry));
@@ -201,6 +238,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
   }
 
   function initialize() {
+    renderFoodCatalog();
     byId("nutritionPreviousDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, -1); render(); });
     byId("nutritionNextDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, 1); render(); });
     byId("nutritionDate").addEventListener("change", event => { if (event.target.value) { selectedDate = event.target.value; render(); } });
