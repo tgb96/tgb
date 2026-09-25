@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=81">
+  <link rel="stylesheet" href="assets/css/styles.css?v=86">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -92,16 +92,14 @@
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Preguntas y respuestas recientes"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
         <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar preguntas y respuestas</button>
-        <p class="coach-history-note">Tus preguntas quedan guardadas hasta que las limpies. Si propones cambiar una actividad, la guía relacionará entrenamiento y alimentación, pero te pedirá confirmación antes de tocar el plan.</p>
         <form id="coachQuestionForm">
           <label for="coachQuestionText">Tu pregunta</label>
           <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: probablemente suspendan mi partido de mañana. ¿Lo cambio por un peloteo suave o por otra sesión?"></textarea>
           <div class="coach-ask-actions">
-            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-label="Grabar y transcribir pregunta con el micrófono">🎙️ Grabar</button>
+            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-label="Grabar y transcribir pregunta con el micrófono" title="Grabar pregunta">&#127897;&#65039;</button>
             <button id="coachAskButton" class="coach-ask-button" type="submit">Preguntar a la guía →</button>
           </div>
           <p id="coachQuestionStatus" class="coach-question-status" role="status"></p>
-          <small id="coachVoiceHelp">Graba hasta 30 segundos y revisa la transcripción antes de enviarla. El audio se envía a Firebase AI solo para transcribirlo; TGTrain no lo guarda. La pregunta y los datos relevantes se envían a la guía al pulsar Preguntar.</small>
         </form>
       </section>
 
@@ -232,6 +230,12 @@
           <button id="nutritionCustomWater" type="button">Otra cantidad</button>
         </div>
       </section>
+      <section class="nutrition-coach-card" aria-labelledby="nutritionCoachTitle">
+        <p class="eyebrow dark">Guía nutricional IA</p>
+        <h2 id="nutritionCoachTitle">Comentario del entrenador</h2>
+        <div id="nutritionCoachInsight"></div>
+        <button id="nutritionCoachButton" type="button">Analizar alimentación de este día</button>
+      </section>
       <div class="section-title-row"><div><p class="eyebrow dark">Comidas del día</p><h2>Guía y registro real</h2></div></div>
       <div id="nutritionSlots" class="nutrition-slots"></div>
       <button id="nutritionExtraMeal" class="nutrition-extra-button" type="button">+ Registrar otra comida o colación</button>
@@ -321,6 +325,7 @@
         <div id="trekkingRankings" class="trekking-rankings"></div>
       </section>
 
+      <div id="historyCoachInsights" class="history-coach-insights"></div>
       <div id="historyWeeks" class="history-weeks"></div>
 
       <section class="data-card" aria-labelledby="dataTitle">
@@ -497,6 +502,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=84"></script>
+  <script type="module" src="assets/js/app.js?v=86"></script>
 </body>
 </html>

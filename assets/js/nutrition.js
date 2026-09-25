@@ -153,23 +153,45 @@ export function normalizeNutritionEntries(value) {
     if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) return [];
     const parsedDate = new Date(`${dateISO}T12:00:00Z`);
     if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dateISO) return [];
-    const kind = ["meal", "water", "plan"].includes(item?.kind) ? item.kind : "meal";
+    const kind = ["meal", "water", "plan", "nutrition-analysis", "monthly-summary"].includes(item?.kind) ? item.kind : "meal";
     const planMode = kind === "plan" ? String(item?.planMode || "default") : "";
     if (kind === "plan" && !nutritionModes.includes(planMode)) return [];
     const amountMl = kind === "water" ? Number(item?.amountMl) : 0;
     if (kind === "water" && (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 3000)) return [];
     const text = String(item?.text || "").trim().slice(0, 1000);
     if (kind === "meal" && !text) return [];
+    if (["nutrition-analysis", "monthly-summary"].includes(kind) && !String(item?.summary || "").trim()) return [];
     const parts = Object.fromEntries(Object.entries(item?.parts && typeof item.parts === "object" && !Array.isArray(item.parts) ? item.parts : {})
       .filter(([id, count]) => /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(id) && Number.isInteger(count) && count >= 1 && count <= 99)
       .slice(0, 50));
     const optional = key => item?.[key] === "" || item?.[key] == null ? null : Number(item[key]);
     const metrics = Object.fromEntries(["caloriesKcal", "proteinG", "carbsG", "fatG"].map(key => [key, kind === "meal" ? optional(key) : null]));
     if (Object.values(metrics).some(n => n !== null && (!Number.isFinite(n) || n < 0 || n > 10000))) return [];
+    const sections = ["nutrition-analysis", "monthly-summary"].includes(kind)
+      ? (Array.isArray(item?.sections) ? item.sections : []).slice(0, 6).map(section => ({
+          title: String(section?.title || "").trim().slice(0, 120),
+          items: (Array.isArray(section?.items) ? section.items : []).slice(0, 8)
+            .map(value => String(value || "").trim().slice(0, 500)).filter(Boolean)
+        })).filter(section => section.title && section.items.length)
+      : [];
+    const rawStats = item?.stats && typeof item.stats === "object" && !Array.isArray(item.stats) ? item.stats : {};
+    const stats = Object.fromEntries(Object.entries(rawStats).slice(0, 30).flatMap(([key, value]) => {
+      if (!/^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(key)) return [];
+      if (typeof value === "number" && Number.isFinite(value)) return [[key, value]];
+      if (typeof value === "string") return [[key, value.slice(0, 200)]];
+      return [];
+    }));
     return [[id, { id, dateISO, kind, slotId: kind === "meal" ? String(item?.slotId || "other").slice(0, 40) : "",
       time: String(item?.time || "").slice(0, 5), text, note: kind === "meal" ? String(item?.note || "").trim().slice(0, 1000) : "",
       parts: kind === "meal" ? parts : {}, estimateSource: kind === "meal" && ["label", "generic", "manual"].includes(item?.estimateSource) ? item.estimateSource : "",
       amountMl, planMode, ...metrics,
+      title: ["nutrition-analysis", "monthly-summary"].includes(kind) ? String(item?.title || "Comentario del entrenador").trim().slice(0, 200) : "",
+      summary: ["nutrition-analysis", "monthly-summary"].includes(kind) ? String(item?.summary || "").trim().slice(0, 3000) : "",
+      sections,
+      encouragement: ["nutrition-analysis", "monthly-summary"].includes(kind) ? String(item?.encouragement || "").trim().slice(0, 1000) : "",
+      stats,
+      periodStartISO: String(item?.periodStartISO || "").slice(0, 10), periodEndISO: String(item?.periodEndISO || "").slice(0, 10),
+      sourceUpdatedAt: String(item?.sourceUpdatedAt || ""), generatedAt: String(item?.generatedAt || ""), model: String(item?.model || "").slice(0, 100),
       deleted: Boolean(item?.deleted), createdAt: String(item?.createdAt || ""), updatedAt: String(item?.updatedAt || item?.createdAt || "") }]];
   }));
 }

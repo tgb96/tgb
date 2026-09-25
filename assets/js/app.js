@@ -22,13 +22,13 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=80";
+import { createRepository } from "./storage.js?v=87";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=80";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=80";
+import { createNutritionUI } from "./nutrition-ui.js?v=87";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=81";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=87";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=69";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
@@ -85,7 +85,10 @@ const cloudSync = createCloudSync({
 const nutritionUI = createNutritionUI(repository, {
   showToast: message => showToast(message),
   getWearableData: () => wearableData,
-  getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock())
+  getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock()),
+  getNutritionInsight: dateISO => repository.getNutritionEntry(`nutrition-analysis-${dateISO}`),
+  analyzeNutritionDay: dateISO => requestNutritionAnalysis(dateISO),
+  isNutritionAnalysisLoading: dateISO => nutritionAnalysisInFlight.has(dateISO)
 });
 const guidedUI = createGuidedUI(repository, {
   showView: name => showView(name),
@@ -122,6 +125,9 @@ let plannedRegistrationContext = null;
 let plannedActivityTicker = null;
 let aiPlanCandidate = null;
 const aiAnalysisInFlight = new Set();
+const nutritionAnalysisInFlight = new Set();
+let monthlySummaryInFlight = false;
+let monthlySummaryAttempted = false;
 let coachQuestionInFlight = false;
 let coachHistoryExpanded = false;
 let coachMediaRecorder = null;
@@ -763,6 +769,7 @@ function updateCloudStatus(status) {
   $("cloudSyncButton").classList.toggle("hidden", !hasUser || status.state === "account-mismatch");
   $("cloudSignOutButton").classList.toggle("hidden", !hasUser);
   $("cloudSyncButton").disabled = status.state === "syncing";
+  if (status.state === "synced") queueMicrotask(maybeGenerateMonthlySummary);
 }
 
 function openCloudDialog() {
@@ -945,6 +952,171 @@ function nutritionDayForCoach(dateISO, block = activeTrainingBlock()) {
   };
 }
 
+function newestTimestamp(items = []) {
+  return items.map(item => String(item?.updatedAt || item?.syncedAt || item?.createdAt || ""))
+    .filter(Boolean).sort().at(-1) || "";
+}
+
+function coachInsightPayload(result, base) {
+  const insight = result?.insight || result || {};
+  return {
+    ...base,
+    title: String(insight.title || base.title || "Comentario del entrenador").trim(),
+    summary: String(insight.summary || "").trim(),
+    sections: Array.isArray(insight.sections) ? insight.sections : [],
+    encouragement: String(insight.encouragement || "").trim(),
+    model: String(result?.model || ""),
+    generatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function requestNutritionAnalysis(dateISO) {
+  if (nutritionAnalysisInFlight.has(dateISO)) return;
+  if (!cloudSync.currentUser) {
+    openCloudDialog();
+    showToast("Inicia sesión con Google para recibir el comentario nutricional.");
+    return;
+  }
+  const profile = repository.getCoachProfile();
+  if (!profile?.profileText) {
+    openCoachProfileDialog();
+    showToast("Configura primero el perfil privado de tu entrenador IA.");
+    return;
+  }
+  const allSourceEntries = repository.listNutritionEntries(dateISO)
+    .filter(item => ["meal", "water", "plan"].includes(item.kind));
+  const sourceEntries = allSourceEntries.filter(item => !item.deleted);
+  const activities = repository.list().filter(item => item.dateISO === dateISO);
+  if (!sourceEntries.some(item => item.kind === "meal")) {
+    showToast("Registra al menos una comida antes de pedir el comentario nutricional.");
+    return;
+  }
+  nutritionAnalysisInFlight.add(dateISO);
+  nutritionUI.render();
+  try {
+    const dayData = wearableData.days.find(day => day.dateISO === dateISO);
+    const result = await aiClient.analyzeNutritionDay({
+      dateISO,
+      privateCoachProfile: String(profile.profileText || "").slice(0, 14000),
+      nutrition: nutritionDayForCoach(dateISO),
+      activities: activities.map(record => routineForAi(record)).slice(0, 8),
+      wearable: dayData ? wearableDayForCoach(dayData) : null,
+      previousDays: [2, 1].map(offset => nutritionDayForCoach(addDaysISO(dateISO, -offset)))
+    });
+    const previous = repository.getNutritionEntry(`nutrition-analysis-${dateISO}`);
+    repository.saveNutritionEntry(coachInsightPayload(result, {
+      id: `nutrition-analysis-${dateISO}`,
+      dateISO,
+      kind: "nutrition-analysis",
+      title: "Comentario nutricional del día",
+      sourceUpdatedAt: newestTimestamp([...allSourceEntries, ...activities]),
+      stats: nutritionDayForCoach(dateISO).totals,
+      createdAt: previous?.createdAt || new Date().toISOString()
+    }));
+    renderHistory();
+    showToast("Comentario nutricional guardado en el historial.");
+  } catch (error) {
+    showToast(error.message || "No se pudo generar el comentario nutricional.");
+  } finally {
+    nutritionAnalysisInFlight.delete(dateISO);
+    nutritionUI.render();
+  }
+}
+
+function previousMonthPeriod(todayISO = getChileDateISO()) {
+  const [year, month] = todayISO.split("-").map(Number);
+  const end = new Date(Date.UTC(year, month - 1, 0));
+  const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  return { startISO: start.toISOString().slice(0, 10), endISO: end.toISOString().slice(0, 10), key: start.toISOString().slice(0, 7) };
+}
+
+function monthlyCoachContext(startISO, endISO) {
+  const records = repository.list().filter(item => item.dateISO >= startISO && item.dateISO <= endISO);
+  const main = records.filter(isMainDayRecord);
+  const nutritionEntries = repository.listNutritionEntries().filter(item => !item.deleted && item.dateISO >= startISO && item.dateISO <= endISO);
+  const meals = nutritionEntries.filter(item => item.kind === "meal").map(nutritionEntryWithEstimate);
+  const waters = nutritionEntries.filter(item => item.kind === "water");
+  const nutritionDays = [...new Set(meals.map(item => item.dateISO))];
+  const calorieKnown = meals.filter(item => item.caloriesKcal !== null);
+  const proteinKnown = meals.filter(item => item.proteinG !== null);
+  const wearableDays = wearableData.days.filter(item => item.dateISO >= startISO && item.dateISO <= endISO);
+  const sleepDays = wearableDays.filter(item => Number(item.sleepMinutes) > 0);
+  const stepDays = wearableDays.filter(item => Number.isFinite(Number(item.steps)));
+  const sum = (items, getter) => items.reduce((total, item) => total + (Number(getter(item)) || 0), 0);
+  const stats = {
+    sessions: main.length,
+    activeDays: new Set(main.filter(item => item.category !== "rest").map(item => item.dateISO)).size,
+    minutes: Math.round(sum(main, item => activityTiming(item).durationSeconds) / 60),
+    trainingCaloriesKcal: Math.round(sum(main, item => item.calories)),
+    physicalVolumeKg: Math.round(sum(main, item => item.routineVolumeKg)),
+    tennisSessions: main.filter(item => item.category === "tennis").length,
+    cardioSessions: main.filter(item => item.category === "cardio").length,
+    physicalSessions: main.filter(item => item.category === "physical").length,
+    restDays: main.filter(item => item.category === "rest").length,
+    mealRecords: meals.length,
+    nutritionDays: nutritionDays.length,
+    caloriesKnownMeals: calorieKnown.length,
+    averageCaloriesKcal: nutritionDays.length ? Math.round(sum(calorieKnown, item => item.caloriesKcal) / nutritionDays.length) : 0,
+    proteinKnownMeals: proteinKnown.length,
+    averageProteinG: nutritionDays.length ? Math.round(sum(proteinKnown, item => item.proteinG) / nutritionDays.length) : 0,
+    averageWaterMl: nutritionDays.length ? Math.round(sum(waters, item => item.amountMl) / nutritionDays.length) : 0,
+    averageSleepMinutes: sleepDays.length ? Math.round(sum(sleepDays, item => item.sleepMinutes) / sleepDays.length) : 0,
+    sleepDays: sleepDays.length,
+    averageSteps: stepDays.length ? Math.round(sum(stepDays, item => item.steps) / stepDays.length) : 0,
+    stepDays: stepDays.length
+  };
+  return {
+    periodStartISO: startISO,
+    periodEndISO: endISO,
+    stats,
+    activities: main.slice().reverse().slice(0, 80).map(item => ({
+      dateISO: item.dateISO, title: recordTitle(item), category: item.category,
+      durationMinutes: Math.round(activityTiming(item).durationSeconds / 60), calories: item.calories,
+      volumeKg: item.routineVolumeKg, abdominalCount: item.routineAbsCount,
+      effort: item.routineEffort, pain: item.routinePain, sensations: item.sensations,
+      wearable: item.wearableSnapshot ? wearableSummaryText(item.wearableSnapshot) : ""
+    })),
+    nutritionDays: nutritionDays.map(dateISO => nutritionDayForCoach(dateISO)).slice(0, 31),
+    wearableDays: wearableDays.map(wearableDayForCoach).slice(0, 31)
+  };
+}
+
+async function maybeGenerateMonthlySummary() {
+  const todayISO = getChileDateISO();
+  if (monthlySummaryAttempted || monthlySummaryInFlight || Number(todayISO.slice(8, 10)) > 5) return;
+  if (!cloudSync.currentUser || !repository.getCoachProfile()?.profileText) return;
+  const period = previousMonthPeriod(todayISO);
+  const id = `monthly-summary-${period.key}`;
+  if (repository.getNutritionEntry(id)) return;
+  monthlySummaryAttempted = true;
+  monthlySummaryInFlight = true;
+  try {
+    const context = monthlyCoachContext(period.startISO, period.endISO);
+    const result = await aiClient.analyzeMonthlySummary({
+      ...context,
+      privateCoachProfile: String(repository.getCoachProfile().profileText || "").slice(0, 14000)
+    });
+    repository.saveNutritionEntry(coachInsightPayload(result, {
+      id,
+      dateISO: period.endISO,
+      kind: "monthly-summary",
+      title: `Resumen mensual · ${period.key}`,
+      periodStartISO: period.startISO,
+      periodEndISO: period.endISO,
+      sourceUpdatedAt: newestTimestamp([...repository.list(), ...repository.listNutritionEntries(), ...wearableData.days]),
+      stats: context.stats,
+      createdAt: new Date().toISOString()
+    }));
+    renderHistory();
+    showToast("Tu resumen del mes anterior ya está disponible en Historial.");
+  } catch (error) {
+    showToast(error.message || "No se pudo preparar el resumen mensual.");
+  } finally {
+    monthlySummaryInFlight = false;
+  }
+}
+
 function applyCoachPlanAdjustment(item) {
   const adjustment = item.planAdjustment;
   const block = activeTrainingBlock();
@@ -1121,9 +1293,10 @@ async function toggleCoachVoice() {
     recorder.onstop = async () => {
       const mimeType = (recorder.mimeType || format).split(";")[0];
       releaseCoachMicrophone();
-      button.textContent = "Transcribiendo…";
+      button.textContent = "…";
+      button.setAttribute("aria-label", "Transcribiendo pregunta");
       button.disabled = true;
-      if (failed) { coachVoiceBusy = false; button.textContent = "🎙️ Grabar"; button.disabled = false; return; }
+      if (failed) { coachVoiceBusy = false; button.textContent = "\u{1F399}\uFE0F"; button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono"); button.disabled = false; return; }
       try {
         const audio = new Blob(chunks, { type: mimeType });
         $("coachQuestionStatus").textContent = "Transcribiendo tu pregunta…";
@@ -1136,7 +1309,8 @@ async function toggleCoachVoice() {
         $("coachQuestionStatus").textContent = `${error.message} También puedes usar el micrófono del teclado de Android.`;
       } finally {
         coachVoiceBusy = false;
-        button.textContent = "🎙️ Grabar";
+        button.textContent = "\u{1F399}\uFE0F";
+        button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono");
         button.disabled = false;
       }
     };
@@ -1144,7 +1318,8 @@ async function toggleCoachVoice() {
     coachVoiceActive = true;
     coachVoiceBusy = false;
     button.disabled = false;
-    button.textContent = "■ Detener";
+    button.textContent = "■";
+    button.setAttribute("aria-label", "Detener grabación");
     button.classList.add("listening");
     $("coachQuestionStatus").textContent = "Grabando… Pulsa Detener al terminar (máximo 30 segundos).";
     coachVoiceTimer = setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 30000);
@@ -1152,7 +1327,8 @@ async function toggleCoachVoice() {
     releaseCoachMicrophone();
     coachVoiceBusy = false;
     button.disabled = false;
-    button.textContent = "🎙️ Grabar";
+    button.textContent = "\u{1F399}\uFE0F";
+    button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono");
     $("coachQuestionStatus").textContent = error.name === "NotAllowedError"
       ? "Permite el micrófono para TGTrain en Android o usa el micrófono del teclado."
       : "No se pudo abrir el micrófono. Puedes usar el micrófono del teclado de Android.";
@@ -4477,9 +4653,64 @@ function renderExerciseProgress(records) {
   });
 }
 
+function createCoachInsightDisclosure(insight) {
+  const details = document.createElement("details");
+  details.className = `history-coach-insight ${insight.kind}`;
+  const disclosure = document.createElement("summary");
+  const copy = document.createElement("span");
+  const eyebrow = document.createElement("small");
+  eyebrow.textContent = insight.kind === "monthly-summary" ? "Resumen mensual IA" : `Nutrición · ${formatShortDate(insight.dateISO)}`;
+  const title = document.createElement("strong");
+  title.textContent = insight.title;
+  copy.append(eyebrow, title);
+  const toggle = document.createElement("span"); toggle.setAttribute("aria-hidden", "true");
+  disclosure.append(copy, toggle);
+  const body = document.createElement("div");
+  body.className = "history-coach-insight-body";
+  if (insight.kind === "monthly-summary") {
+    const stats = document.createElement("div"); stats.className = "history-monthly-stats";
+    const values = [
+      ["Sesiones", insight.stats.sessions], ["Días activos", insight.stats.activeDays],
+      ["Minutos", insight.stats.minutes], ["Volumen", `${Number(insight.stats.physicalVolumeKg || 0).toLocaleString("es-CL")} kg`],
+      ["Días con comida", insight.stats.nutritionDays], ["Sueño registrado", `${insight.stats.sleepDays || 0} días`]
+    ];
+    values.forEach(([label, value]) => stats.append(balanceMetric(label, value ?? "—")));
+    body.append(stats);
+  }
+  const summary = document.createElement("p"); summary.textContent = insight.summary; body.append(summary);
+  (insight.sections || []).forEach(section => {
+    const group = document.createElement("section");
+    const heading = document.createElement("strong"); heading.textContent = section.title;
+    const list = document.createElement("ul");
+    section.items.forEach(value => { const item = document.createElement("li"); item.textContent = value; list.append(item); });
+    group.append(heading, list); body.append(group);
+  });
+  if (insight.encouragement) {
+    const encouragement = document.createElement("p"); encouragement.className = "history-coach-encouragement";
+    encouragement.textContent = insight.encouragement; body.append(encouragement);
+  }
+  details.append(disclosure, body);
+  return details;
+}
+
+function renderHistoryCoachInsights() {
+  const container = $("historyCoachInsights");
+  const insights = repository.listNutritionEntries().filter(item => !item.deleted && ["nutrition-analysis", "monthly-summary"].includes(item.kind))
+    .sort((a, b) => String(b.generatedAt || b.updatedAt).localeCompare(String(a.generatedAt || a.updatedAt)));
+  container.replaceChildren();
+  container.classList.toggle("hidden", !insights.length);
+  if (!insights.length) return;
+  const heading = document.createElement("div"); heading.className = "history-insights-heading";
+  const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow dark"; eyebrow.textContent = "Entrenador IA";
+  const title = document.createElement("h2"); title.textContent = "Nutrición y balances mensuales";
+  heading.append(eyebrow, title); container.append(heading);
+  insights.forEach(insight => container.append(createCoachInsightDisclosure(insight)));
+}
+
 function renderHistory() {
   const records = repository.list();
   const groups = groupRecordsByWeek(records);
+  renderHistoryCoachInsights();
   renderExerciseProgress(records);
   renderPhysicalRankings(records);
   renderRunningRankings(records);
@@ -4760,7 +4991,17 @@ function createHistoryEntry(sourceRecord) {
   remove.addEventListener("click", () => deleteRecord(record.id));
   actions.append(edit, remove);
   top.append(copy, actions);
-  entry.append(top, aiCard);
+  entry.append(top);
+  if (record.routineAiAnalysis) {
+    const disclosure = document.createElement("details");
+    disclosure.className = "history-ai-disclosure";
+    const summary = document.createElement("summary");
+    summary.textContent = "Comentario del entrenador IA";
+    disclosure.append(summary, aiCard);
+    entry.append(disclosure);
+  } else {
+    entry.append(aiCard);
+  }
   return entry;
 }
 
@@ -4879,7 +5120,6 @@ function bindEvents() {
   });
   if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
     $("coachVoiceButton").classList.add("hidden");
-    $("coachVoiceHelp").textContent = "En este dispositivo, usa el micrófono del teclado de Android para dictar la pregunta y revisa el texto antes de enviarlo.";
   }
   document.querySelectorAll("[data-view-target]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.viewTarget;

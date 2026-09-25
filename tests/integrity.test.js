@@ -28,6 +28,9 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="viewTimer"/);
   assert.match(html, /id="viewNutrition"/);
   assert.match(html, /id="nutritionEntryForm"/);
+  assert.match(html, /id="nutritionCoachInsight"/);
+  assert.match(html, /id="nutritionCoachButton"/);
+  assert.match(html, /id="historyCoachInsights"/);
   assert.match(html, /id="timerWorkDuration"/);
   assert.match(html, /id="timerStageLabel"/);
   assert.match(html, /id="sensationSuggestions"/);
@@ -41,7 +44,9 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="coachQuestionForm"/);
   assert.match(html, /id="coachVoiceButton"/);
   assert.match(html, /id="coachHistoryToggle"/);
-  assert.match(html, /id="coachVoiceHelp"/);
+  assert.doesNotMatch(html, /Tus preguntas quedan guardadas hasta que las limpies/);
+  assert.doesNotMatch(html, /Graba hasta 30 segundos/);
+  assert.match(html, /id="coachVoiceButton"[^>]+>&#127897;&#65039;<\/button>/);
   assert.match(html, /id="runningRankings"/);
   assert.match(html, /id="physicalRankings"/);
   assert.match(html, /id="openAiPlanButton"/);
@@ -242,6 +247,20 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(bridge, /OxygenSaturationRecord/);
 });
 
+test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
+  const [ai, app] = await Promise.all([
+    readFile(resolve(root, "assets/js/ai.js"), "utf8"),
+    readFile(resolve(root, "assets/js/app.js"), "utf8")
+  ]);
+  assert.match(ai, /async analyzeNutritionDay\(context/);
+  assert.match(ai, /async analyzeMonthlySummary\(context/);
+  assert.match(app, /nutrition-analysis-\$\{dateISO\}/);
+  assert.match(app, /Number\(todayISO\.slice\(8, 10\)\) > 5/);
+  assert.match(app, /monthly-summary-\$\{period\.key\}/);
+  assert.match(app, /history-ai-disclosure/);
+  assert.match(app, /Comentario del entrenador IA/);
+});
+
 test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya vinculadas", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   assert.match(app, /linkedSessionIds\.has\(session\.id\)/);
@@ -332,7 +351,8 @@ test("la guía recibe métricas canónicas y valida ritmos antes de guardar su c
 test("la tarjeta de la guía usa todo el ancho del historial y texto legible", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const css = await readFile(resolve(root, "assets/css/styles.css"), "utf8");
-  assert.match(app, /entry\.append\(top, aiCard\)/);
+  assert.match(app, /disclosure\.append\(summary, aiCard\)/);
+  assert.match(css, /\.history-ai-disclosure > \.routine-ai-card \{ width: 100%/);
   assert.match(css, /\.routine-ai-card \{ width: 100%/);
   assert.match(css, /\.routine-ai-card p \{[^}]*font-size: 14px/);
   assert.match(css, /\.routine-ai-group ul \{[^}]*font-size: 13px/);

@@ -163,6 +163,28 @@ const coachQuestionSchema = {
   required: ["answer", "hasPlanAdjustment"]
 };
 
+const coachInsightSchema = {
+  type: "object",
+  properties: {
+    title: stringSchema,
+    summary: stringSchema,
+    sections: {
+      type: "array",
+      maxItems: 6,
+      items: {
+        type: "object",
+        properties: {
+          title: stringSchema,
+          items: { type: "array", items: stringSchema, maxItems: 8 }
+        },
+        required: ["title", "items"]
+      }
+    },
+    encouragement: stringSchema
+  },
+  required: ["title", "summary", "sections", "encouragement"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -290,6 +312,40 @@ export function createAiClient() {
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
       return { answer, planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null, model: MODEL_NAME };
+    },
+    async analyzeNutritionDay(context = {}) {
+      const instructions = [
+        "Eres la guía nutricional de TGTrain para una persona que entrena con foco en tenis.",
+        "Evalúa exclusivamente el día entregado y relaciona comidas, kcal, proteína, carbohidratos, grasas, agua, entrenamiento, plan, sueño y pulsera cuando existan.",
+        "Distingue datos completos, parciales y ausentes. Las porciones y calorías son estimaciones: no inventes alimentos, cantidades, macros ni gasto energético.",
+        "No restes calorías activas de la pulsera a la ingesta. No diagnostiques ni prescribas una dieta clínica. Si los registros son parciales, comenta solo lo observado.",
+        "Usa 2 o 3 secciones breves: Lo positivo, Ajustes prácticos y Próximo paso. Da sugerencias realistas para energía, recuperación y tenis.",
+        "Termina con una frase positiva sobria, sin exagerar ni culpabilizar. Responde en español claro."
+      ].join("\n");
+      const insight = await generateJson({
+        instructions,
+        input: JSON.stringify(context),
+        schema: coachInsightSchema,
+        maxOutputTokens: 2200
+      });
+      return { insight, model: MODEL_NAME };
+    },
+    async analyzeMonthlySummary(context = {}) {
+      const instructions = [
+        "Eres la guía mensual de TGTrain, enfocada en progreso sostenible para tenis.",
+        "Resume el mes usando únicamente las estadísticas y registros entregados de entrenamiento, nutrición, hidratación, sueño y pulsera.",
+        "No inventes tendencias ni atribuyas causalidad. Indica cuando los datos nutricionales, de sueño o de pulsera sean parciales.",
+        "No sumes calorías de la pulsera con kcal anotadas ni las uses para compensar comidas. Las cifras de alimentación son aproximadas.",
+        "Incluye cuatro secciones breves: Entrenamiento, Nutrición, Recuperación y Para el próximo mes. Destaca constancia, carga tolerable, molestias y relación con el tenis.",
+        "Cierra animando a continuar de forma concreta y sobria, sin promesas ni elogios exagerados. Responde en español claro."
+      ].join("\n");
+      const insight = await generateJson({
+        instructions,
+        input: JSON.stringify(context),
+        schema: coachInsightSchema,
+        maxOutputTokens: 3200
+      });
+      return { insight, model: MODEL_NAME };
     },
     async importTrainingPlan(planText, currentDate = "") {
       const catalog = {

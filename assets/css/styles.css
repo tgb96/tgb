@@ -572,7 +572,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-question-history { display: grid; gap: 12px; margin-bottom: 15px; }
 .coach-history-toggle { width: 100%; min-height: 42px; margin: -2px 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px; background: #f3f5ff; color: var(--blue-dark); font-size: 13px; font-weight: 900; }
 .coach-history-clear { display: block; margin: 0 0 10px auto; padding: 7px 9px; border: 0; background: transparent; color: #a52c2c; font-size: 11px; font-weight: 850; }
-.coach-history-note { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .coach-question-hint { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .coach-exchange { display: grid; gap: 8px; }
 .coach-exchange p { margin: 0; padding: 11px 13px; border-radius: 13px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
@@ -586,14 +585,13 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-ask-card textarea { width: 100%; min-height: 86px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fbfbf9; color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
 .coach-ask-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 .coach-ask-actions button { min-height: 48px; padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 900; }
-.coach-voice-button { border: 1px solid var(--line); background: white; color: var(--ink); }
+.coach-voice-button { width: 48px; padding: 0; border: 1px solid var(--line); background: white; color: var(--ink); font-size: 18px !important; }
 .coach-voice-button.listening { border-color: #a51627; background: #fff0f1; color: #a51627; }
 .coach-voice-button:disabled { opacity: .5; }
 .coach-ask-button { border: 0; background: var(--blue); color: white; }
 .coach-ask-button:disabled { opacity: .6; }
 .coach-question-status { margin: 0; color: var(--blue-dark); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .coach-question-status:empty { display: none; }
-.coach-ask-card form small { color: var(--muted); font-size: 11px; line-height: 1.4; }
 .routine-ai-card > span { display: block; color: var(--blue); font-size: 11px; font-weight: 950; line-height: 1.35; letter-spacing: .6px; text-transform: uppercase; }
 .routine-ai-card > .routine-ai-decision { width: max-content; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--night); color: var(--lime); }
 .routine-ai-card > .routine-ai-decision.reduce, .routine-ai-card > .routine-ai-decision.recover { background: #fff0dd; color: #7a4a10; }
@@ -708,6 +706,9 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .history-entry-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .history-entry-top > div:first-child { min-width: 0; flex: 1; }
 .history-entry > .routine-ai-card { width: 100%; }
+.history-ai-disclosure { width: 100%; margin-top: 10px; border: 1px solid #cdd7ff; border-radius: 14px; background: #f4f7ff; overflow: hidden; }
+.history-ai-disclosure > summary { padding: 12px; color: var(--blue-dark); font-size: 12px; font-weight: 900; cursor: pointer; }
+.history-ai-disclosure > .routine-ai-card { width: 100%; margin: 0; border: 0; border-top: 1px solid #dce3ff; border-radius: 0; }
 .history-entry h3 { margin: 0; font-size: 14px; }
 .history-entry p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .history-routine-balance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
@@ -735,6 +736,28 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .wearable-link-option > div { min-width: 180px; flex: 1; }
 .wearable-link-option strong { display: block; font-size: 12px; }
 .wearable-link-option button { margin-top: 0; }
+.history-coach-insights { display: grid; gap: 9px; margin-bottom: 16px; }
+.history-insights-heading { margin: 5px 3px 2px; }
+.history-insights-heading h2 { margin: 4px 0 0; font-size: 21px; }
+.history-coach-insight { border: 1px solid var(--line); border-radius: 18px; background: white; overflow: hidden; }
+.history-coach-insight > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; cursor: pointer; list-style: none; }
+.history-coach-insight > summary::-webkit-details-marker { display: none; }
+.history-coach-insight > summary small, .history-coach-insight > summary strong { display: block; }
+.history-coach-insight > summary small { color: var(--blue); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .7px; }
+.history-coach-insight > summary strong { margin-top: 4px; font-size: 14px; }
+.history-coach-insight > summary > span:last-child::after { content: "+"; font-size: 21px; }
+.history-coach-insight[open] > summary > span:last-child::after { content: "−"; }
+.history-coach-insight-body { padding: 14px; border-top: 1px solid var(--line); color: var(--ink); }
+.history-coach-insight-body > p { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.history-coach-insight-body section + section { margin-top: 12px; }
+.history-coach-insight-body section > strong { font-size: 12px; }
+.history-coach-insight-body ul { margin: 6px 0 0; padding-left: 19px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.history-coach-insight-body .history-coach-encouragement { margin: 14px 0 0; padding: 11px; border-radius: 12px; background: #eff8d4; color: #3f5e00; font-weight: 750; }
+.history-monthly-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 13px; }
+.history-monthly-stats > div { padding: 9px; border-radius: 11px; background: var(--paper); }
+.history-monthly-stats strong, .history-monthly-stats span { display: block; }
+.history-monthly-stats strong { font-size: 13px; }
+.history-monthly-stats span { margin-top: 3px; color: var(--muted); font-size: 7px; font-weight: 850; text-transform: uppercase; }
 .entry-actions { display: flex; gap: 5px; }
 .entry-actions button { min-width: 40px; min-height: 40px; border: 0; border-radius: 12px; background: white; color: var(--muted); font-size: 11px; font-weight: 850; }
 .entry-actions .delete { color: var(--danger); }
@@ -797,6 +820,15 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .nutrition-water-actions button { min-height: 45px; padding: 6px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
 .nutrition-summary-card > p, .nutrition-disclaimer { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .nutrition-summary-card > p { margin: 12px 0 0; }
+.nutrition-coach-card { margin: 13px 0 18px; padding: 17px; border: 1px solid #cdd7ff; border-radius: 23px; background: #f4f7ff; }
+.nutrition-coach-card h2 { margin: 4px 0 11px; font-size: 20px; }
+.nutrition-coach-card > button { width: 100%; min-height: 47px; margin-top: 12px; border: 0; border-radius: 13px; background: var(--blue); color: white; font-size: 12px; font-weight: 900; }
+.nutrition-coach-card > button:disabled { opacity: .6; }
+.nutrition-coach-empty, .nutrition-coach-summary { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+#nutritionCoachInsight > div { margin-top: 11px; padding: 11px; border-radius: 12px; background: white; }
+#nutritionCoachInsight > div strong { display: block; font-size: 12px; }
+#nutritionCoachInsight ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.nutrition-coach-encouragement { margin: 11px 0 0; padding: 10px; border-radius: 12px; background: #e6f6bd; color: #3f5e00; font-size: 12px; font-weight: 750; line-height: 1.45; }
 .nutrition-slots { display: grid; gap: 11px; }
 .nutrition-slot { padding: 16px; border: 1px solid var(--line); border-radius: 21px; background: white; }
 .nutrition-slot-heading span { color: var(--blue); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; }

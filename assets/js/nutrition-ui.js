@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=80";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=78";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
@@ -9,7 +9,14 @@ const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Sa
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
 
-export function createNutritionUI(repository, { showToast = () => {}, getWearableData = () => ({ days: [], sessions: [] }), getTrainingSession = () => null } = {}) {
+export function createNutritionUI(repository, {
+  showToast = () => {},
+  getWearableData = () => ({ days: [], sessions: [] }),
+  getTrainingSession = () => null,
+  getNutritionInsight = () => null,
+  analyzeNutritionDay = () => {},
+  isNutritionAnalysisLoading = () => false
+} = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
   let selectedSlot = "other";
@@ -177,6 +184,43 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     container.append(row);
   }
 
+  function renderCoachInsight(sourceEntries) {
+    const container = byId("nutritionCoachInsight");
+    const button = byId("nutritionCoachButton");
+    const insight = getNutritionInsight(selectedDate);
+    const loading = isNutritionAnalysisLoading(selectedDate);
+    container.replaceChildren();
+    if (insight && !insight.deleted) {
+      const summary = document.createElement("p");
+      summary.className = "nutrition-coach-summary";
+      summary.textContent = insight.summary;
+      container.append(summary);
+      (insight.sections || []).forEach(section => {
+        const block = document.createElement("div");
+        const title = document.createElement("strong"); title.textContent = section.title;
+        const list = document.createElement("ul");
+        section.items.forEach(value => { const item = document.createElement("li"); item.textContent = value; list.append(item); });
+        block.append(title, list); container.append(block);
+      });
+      if (insight.encouragement) {
+        const encouragement = document.createElement("p");
+        encouragement.className = "nutrition-coach-encouragement";
+        encouragement.textContent = insight.encouragement;
+        container.append(encouragement);
+      }
+      const latestSource = sourceEntries.map(item => String(item.updatedAt || item.createdAt || "")).filter(Boolean).sort().at(-1) || "";
+      button.textContent = latestSource > String(insight.sourceUpdatedAt || "") ? "Actualizar con los nuevos registros" : "Actualizar comentario nutricional";
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "nutrition-coach-empty";
+      empty.textContent = "Cuando hayas registrado una comida, la guía puede revisar este día junto con tu entrenamiento y recuperación.";
+      container.append(empty);
+      button.textContent = "Analizar alimentación de este día";
+    }
+    button.disabled = loading;
+    if (loading) button.textContent = "Analizando alimentación…";
+  }
+
   function render() {
     byId("nutritionDate").value = selectedDate;
     const strip = byId("nutritionWeekStrip"); strip.replaceChildren();
@@ -316,6 +360,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       ? `Falta estimar la proteína de ${totals.meals - totals.proteinKnownMeals} comida${totals.meals - totals.proteinKnownMeals === 1 ? "" : "s"}; el total es parcial.`
       : "Proteína aproximada según los ingredientes y porciones registrados.";
     proteinProgress.append(proteinNote);
+    renderCoachInsight(repository.listNutritionEntries(selectedDate).filter(entry => ["meal", "water", "plan"].includes(entry.kind)));
     const slots = byId("nutritionSlots"); slots.replaceChildren();
     plan.slots.forEach(item => {
       const card = document.createElement("article"); card.className = "nutrition-slot";
@@ -368,6 +413,7 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
       const value = window.prompt("¿Cuántos ml de agua bebiste?", "300"); if (value !== null) addWater(value);
     });
     byId("nutritionExtraMeal").addEventListener("click", () => openMeal());
+    byId("nutritionCoachButton").addEventListener("click", () => analyzeNutritionDay(selectedDate));
     byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
     for (const id of ["nutritionMealCalories", "nutritionMealProtein", "nutritionMealCarbs", "nutritionMealFat"])
       byId(id).addEventListener("input", () => { estimateSource = "manual"; });

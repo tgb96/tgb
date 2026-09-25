@@ -121,6 +121,26 @@ test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => 
   assert.equal(entries.find(item => item.id === "b").proteinG, null);
 });
 
+test("conserva comentarios nutricionales y resúmenes mensuales sin sumarlos como comidas", () => {
+  const entries = Object.values(normalizeNutritionEntries([
+    {
+      id: "nutrition-analysis-2026-09-25", dateISO: "2026-09-25", kind: "nutrition-analysis",
+      title: "Comentario nutricional", summary: "Registro parcial pero bien encaminado.",
+      sections: [{ title: "Lo positivo", items: ["Incluiste proteína."] }], encouragement: "Sigue registrando.",
+      stats: { meals: 3, proteinG: 90 }, generatedAt: "2026-09-25T20:00:00.000Z"
+    },
+    {
+      id: "monthly-summary-2026-08", dateISO: "2026-08-31", kind: "monthly-summary",
+      title: "Resumen de agosto", summary: "Mes constante.", periodStartISO: "2026-08-01", periodEndISO: "2026-08-31",
+      sections: [{ title: "Entrenamiento", items: ["Hubo 12 sesiones."] }], stats: { sessions: 12 }
+    }
+  ]));
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].sections[0].items[0], "Incluiste proteína.");
+  assert.equal(entries[1].stats.sessions, 12);
+  assert.equal(nutritionDayTotals(entries).meals, 0);
+});
+
 test("comidas, agua, cambio de plan y eliminaciones viajan en respaldo", () => {
   const repository = createRepository(memoryStorage());
   const dateISO = "2026-09-23";
