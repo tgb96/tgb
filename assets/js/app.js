@@ -28,7 +28,7 @@ import { createNutritionUI } from "./nutrition-ui.js?v=87";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=87";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=89";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=69";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
@@ -130,12 +130,6 @@ let monthlySummaryInFlight = false;
 let monthlySummaryAttempted = false;
 let coachQuestionInFlight = false;
 let coachHistoryExpanded = false;
-let coachMediaRecorder = null;
-let coachMediaStream = null;
-let coachVoiceTimer = null;
-let coachVoiceActive = false;
-let coachVoiceBusy = false;
-let coachQuestionSource = "text";
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -1223,13 +1217,13 @@ async function submitCoachQuestion(existing = null) {
   try {
     const context = coachQuestionContext();
     if (!saved) saved = repository.saveCoachQuestion({
-      id: crypto.randomUUID(), question, answer: "", source: coachQuestionSource,
+      id: crypto.randomUUID(), question, answer: "", source: "text",
       createdAt: timestamp, updatedAt: timestamp
     });
     renderCoachQuestions();
     const result = await aiClient.askCoach(question, context);
     repository.saveCoachQuestion({ ...saved, answer: result.answer, planAdjustment: result.planAdjustment, adjustmentStatus: result.planAdjustment ? "pending" : "", updatedAt: new Date().toISOString() });
-    if (!existing) { input.value = ""; coachQuestionSource = "text"; }
+    if (!existing) input.value = "";
     $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
   } catch (error) {
     $("coachQuestionStatus").textContent = error.message || "No se pudo obtener respuesta. Puedes reintentarlo.";
@@ -1238,100 +1232,6 @@ async function submitCoachQuestion(existing = null) {
     $("coachAskButton").disabled = false;
     $("coachAskButton").textContent = "Preguntar a la guía →";
     renderCoachQuestions();
-  }
-}
-
-function coachAudioMimeType() {
-  if (!window.MediaRecorder?.isTypeSupported) return "";
-  return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(type => MediaRecorder.isTypeSupported(type)) || "";
-}
-
-function releaseCoachMicrophone() {
-  if (coachVoiceTimer) clearTimeout(coachVoiceTimer);
-  coachVoiceTimer = null;
-  coachMediaStream?.getTracks().forEach(track => track.stop());
-  coachMediaStream = null;
-  coachMediaRecorder = null;
-  coachVoiceActive = false;
-  $("coachVoiceButton").classList.remove("listening");
-}
-
-async function toggleCoachVoice() {
-  if (coachVoiceActive) {
-    if (coachMediaRecorder?.state === "recording") {
-      coachVoiceActive = false;
-      coachVoiceBusy = true;
-      $("coachVoiceButton").disabled = true;
-      coachMediaRecorder.stop();
-    }
-    return;
-  }
-  if (coachVoiceBusy) return;
-  if (!cloudSync.currentUser) {
-    $("coachQuestionStatus").textContent = "Inicia sesión con Google para transcribir tu pregunta.";
-    openCloudDialog();
-    return;
-  }
-  if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
-    $("coachQuestionStatus").textContent = "Esta PWA no puede grabar audio aquí. Usa el micrófono del teclado de Android para dictar.";
-    return;
-  }
-  const button = $("coachVoiceButton");
-  coachVoiceBusy = true;
-  button.disabled = true;
-  $("coachQuestionStatus").textContent = "Solicitando permiso para usar el micrófono…";
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    coachMediaStream = stream;
-    const format = coachAudioMimeType();
-    const recorder = new MediaRecorder(stream, { mimeType: format });
-    coachMediaRecorder = recorder;
-    const chunks = [];
-    let failed = false;
-    recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
-    recorder.onerror = () => { failed = true; $("coachQuestionStatus").textContent = "La grabación falló. Puedes usar el micrófono del teclado de Android."; };
-    recorder.onstop = async () => {
-      const mimeType = (recorder.mimeType || format).split(";")[0];
-      releaseCoachMicrophone();
-      button.textContent = "…";
-      button.setAttribute("aria-label", "Transcribiendo pregunta");
-      button.disabled = true;
-      if (failed) { coachVoiceBusy = false; button.textContent = "\u{1F399}\uFE0F"; button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono"); button.disabled = false; return; }
-      try {
-        const audio = new Blob(chunks, { type: mimeType });
-        $("coachQuestionStatus").textContent = "Transcribiendo tu pregunta…";
-        const transcript = await aiClient.transcribeAudio(audio);
-        const input = $("coachQuestionText");
-        input.value = [input.value.trim(), transcript].filter(Boolean).join(" ").slice(0, 1000);
-        coachQuestionSource = "voice";
-        $("coachQuestionStatus").textContent = "Transcripción lista. Revísala y pulsa Preguntar a la guía.";
-      } catch (error) {
-        $("coachQuestionStatus").textContent = `${error.message} También puedes usar el micrófono del teclado de Android.`;
-      } finally {
-        coachVoiceBusy = false;
-        button.textContent = "\u{1F399}\uFE0F";
-        button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono");
-        button.disabled = false;
-      }
-    };
-    recorder.start();
-    coachVoiceActive = true;
-    coachVoiceBusy = false;
-    button.disabled = false;
-    button.textContent = "■";
-    button.setAttribute("aria-label", "Detener grabación");
-    button.classList.add("listening");
-    $("coachQuestionStatus").textContent = "Grabando… Pulsa Detener al terminar (máximo 30 segundos).";
-    coachVoiceTimer = setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 30000);
-  } catch (error) {
-    releaseCoachMicrophone();
-    coachVoiceBusy = false;
-    button.disabled = false;
-    button.textContent = "\u{1F399}\uFE0F";
-    button.setAttribute("aria-label", "Grabar y transcribir pregunta con el micrófono");
-    $("coachQuestionStatus").textContent = error.name === "NotAllowedError"
-      ? "Permite el micrófono para TGTrain en Android o usa el micrófono del teclado."
-      : "No se pudo abrir el micrófono. Puedes usar el micrófono del teclado de Android.";
   }
 }
 
@@ -5105,7 +5005,6 @@ function bindEvents() {
     event.preventDefault();
     submitCoachQuestion();
   });
-  $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
   $("coachHistoryToggle").addEventListener("click", () => {
     coachHistoryExpanded = !coachHistoryExpanded;
     renderCoachQuestions();
@@ -5118,9 +5017,6 @@ function bindEvents() {
     renderCoachQuestions();
     $("coachQuestionStatus").textContent = "Preguntas y respuestas limpiadas. El cambio se sincronizará con tu cuenta.";
   });
-  if (!navigator.mediaDevices?.getUserMedia || !coachAudioMimeType()) {
-    $("coachVoiceButton").classList.add("hidden");
-  }
   document.querySelectorAll("[data-view-target]").forEach(button => button.addEventListener("click", () => {
     const target = button.dataset.viewTarget;
     if (target === "register") openRegistrationOrActiveRoutine();

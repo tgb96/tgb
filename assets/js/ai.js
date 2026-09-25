@@ -250,42 +250,6 @@ export function createAiClient() {
   }
 
   return {
-    async transcribeAudio(audioBlob) {
-      try {
-        if (!audioBlob || audioBlob.size < 100 || audioBlob.size > 4 * 1024 * 1024) {
-          throw new Error("La grabación está vacía o es demasiado larga. Intenta una pregunta breve.");
-        }
-        const mimeType = String(audioBlob.type || "").split(";")[0];
-        if (!["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"].includes(mimeType)) {
-          throw new Error("El formato de audio de este navegador no es compatible. Usa el micrófono del teclado para dictar.");
-        }
-        await initialize();
-        const user = modules.authModule.getAuth().currentUser;
-        if (!user) throw Object.assign(new Error("Inicia sesión con Google para transcribir la pregunta."), { code: "unauthenticated" });
-        if (user.uid !== ALLOWED_UID) throw Object.assign(new Error("Esta función está disponible únicamente para el propietario de TGTrain."), { code: "permission-denied" });
-        const data = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
-          reader.onerror = () => reject(new Error("No se pudo leer la grabación."));
-          reader.readAsDataURL(audioBlob);
-        });
-        if (!data) throw new Error("No se pudo preparar la grabación.");
-        const model = modules.aiModule.getGenerativeModel(ai, {
-          model: MODEL_NAME,
-          systemInstruction: "Transcribe fielmente el habla en español. Devuelve solo las palabras pronunciadas, sin explicaciones ni responder la pregunta.",
-          generationConfig: { maxOutputTokens: 500, temperature: 0 }
-        });
-        const result = await model.generateContent([
-          "Transcribe esta pregunta en español chileno. Devuelve únicamente la transcripción literal.",
-          { inlineData: { data, mimeType } }
-        ]);
-        const transcript = String(result.response.text() || "").trim().replace(/^['\"“”]+|['\"“”]+$/g, "").slice(0, 1000);
-        if (!transcript) throw new Error("No se reconoció ninguna frase. Intenta hablar un poco más cerca del micrófono.");
-        return transcript;
-      } catch (error) {
-        throw new Error(friendlyError(error));
-      }
-    },
     async askCoach(question, context = {}) {
       const catalog = {
         routines: physicalRoutines.map(item => ({ id: item.id, name: item.name })),

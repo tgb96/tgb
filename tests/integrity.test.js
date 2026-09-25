@@ -42,11 +42,10 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
   assert.match(html, /id="coachQuestionForm"/);
-  assert.match(html, /id="coachVoiceButton"/);
+  assert.doesNotMatch(html, /id="coachVoiceButton"|coach-voice-button/);
   assert.match(html, /id="coachHistoryToggle"/);
   assert.doesNotMatch(html, /Tus preguntas quedan guardadas hasta que las limpies/);
   assert.doesNotMatch(html, /Graba hasta 30 segundos/);
-  assert.match(html, /id="coachVoiceButton"[^>]+>&#127897;&#65039;<\/button>/);
   assert.match(html, /id="runningRankings"/);
   assert.match(html, /id="physicalRankings"/);
   assert.match(html, /id="openAiPlanButton"/);
@@ -275,17 +274,11 @@ test("la guía no repite que su comentario ya está guardado", async () => {
   assert.doesNotMatch(app, /Comentario guardado en tu historial/);
 });
 
-test("la voz usa grabación y transcripción con revisión, no Web Speech en la PWA", async () => {
+test("la app deja el dictado al teclado y no muestra controles propios de micrófono", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
-  assert.match(app, /navigator\.mediaDevices\.getUserMedia\(\{ audio: true \}\)/);
-  assert.match(app, /new MediaRecorder\(stream/);
-  assert.match(app, /aiClient\.transcribeAudio\(audio\)/);
-  assert.match(app, /input\.value = \[input\.value\.trim\(\), transcript\]/);
-  assert.match(app, /setTimeout\(\(\) => \{ if \(recorder\.state === "recording"\) recorder\.stop\(\); \}, 30000\)/);
-  assert.doesNotMatch(app, /webkitSpeechRecognition|SpeechRecognition/);
-  assert.match(ai, /inlineData: \{ data, mimeType \}/);
-  assert.match(ai, /async transcribeAudio\(audioBlob\)/);
+  assert.doesNotMatch(app, /MediaRecorder|coachVoiceButton|toggleCoachVoice|getUserMedia\(\{ audio: true \}\)/);
+  assert.doesNotMatch(ai, /inlineData: \{ data, mimeType \}|async transcribeAudio\(audioBlob\)/);
 });
 
 test("el importador compacta planes largos y reintenta respuestas JSON truncadas", async () => {
