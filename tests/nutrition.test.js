@@ -59,6 +59,8 @@ test("los rangos de kcal del entrenador dependen del día y del escenario real",
 
 test("los ingredientes se suman por unidad con etiqueta o porciones promedio", () => {
   assert.equal(foodCatalog.integralBread.kcal, 73);
+  assert.deepEqual(estimateParts({ semiIntegralArtisanBread: 2 }), { caloriesKcal: 224, proteinG: 8, carbsG: 42, fatG: 3 });
+  assert.equal(foodCatalog.semiIntegralArtisanBread.portion, "1 rebanada · aprox. 45 g");
   assert.ok(Object.values(foodCatalog).every(food => food.portion));
   assert.ok(Object.values(foodCatalog).every(food => Number.isFinite(food.kcal)));
   assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 1);
@@ -74,6 +76,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(summarizeParts({ integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1 }),
     "3 rebanadas de pan integral con palta, queso, jamón y mantequilla · ½ manzana");
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
+  assert.ok(foodsForSlot("breakfast").some(food => food.id === "semiIntegralArtisanBread"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
   assert.ok(!foodsForSlot("lunch").some(food => food.name.includes("Atún")));

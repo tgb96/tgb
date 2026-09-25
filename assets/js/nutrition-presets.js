@@ -11,6 +11,7 @@ export const isSelectableFood = id => Boolean(foodCatalog[id]) && !retiredFoodId
 
 export const foodCatalog = {
   integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
+  semiIntegralArtisanBread: food("Pan semi integral artesanal", "1 rebanada · aprox. 45 g", 112, 4, 21, 1.5),
   whiteBread: food("Pan de molde normal", "1 rebanada · aprox. 30 g", 80, 2.5, 15, 1),
   egg: food("Huevo", "1 unidad · aprox. 50 g", 72, 6.3, 0.4, 4.8),
   avocado: food("Palta", "1 porción normal · aprox. 50 g", 80, 1, 4.3, 7.3),
@@ -43,9 +44,9 @@ export const foodCatalog = {
   cerealBar: food("Barra de cereal", "1 unidad · aprox. 35 g", 140, 2, 25, 4)
 };
 
-const breakfast = ["integralBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
-const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
-const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread"];
+const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
+const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
+const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {
   const preferred = slotId === "breakfast" ? breakfast : ["morning", "pre", "snack", "during"].includes(slotId) ? snack : main;
@@ -61,7 +62,7 @@ export function describeParts(parts) {
 }
 
 const compactFoodNames = {
-  integralBread: "rebanada de pan integral", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta",
+  integralBread: "rebanada de pan integral", semiIntegralArtisanBread: "rebanada de pan semi integral artesanal", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta",
   cheeseSlice: "lámina de queso", hamSlice: "lámina de jamón", butter: "mantequilla", applePortion: "½ manzana",
   bananaPortion: "½ plátano"
 };
@@ -71,7 +72,7 @@ const pluralize = (text, count) => count === 1 ? text : text
 
 export function summarizeParts(parts) {
   const counts = Object.fromEntries(Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && Number.isInteger(count) && count > 0));
-  const breadId = counts.integralBread ? "integralBread" : counts.whiteBread ? "whiteBread" : "";
+  const breadId = counts.integralBread ? "integralBread" : counts.semiIntegralArtisanBread ? "semiIntegralArtisanBread" : counts.whiteBread ? "whiteBread" : "";
   const pieces = [];
   if (breadId) {
     const breadCount = counts[breadId];
