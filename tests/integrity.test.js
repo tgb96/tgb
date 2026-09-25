@@ -225,6 +225,22 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.equal(firebase.functions, undefined);
 });
 
+test("la guía integra sueño y nutrición y exige confirmar los cambios del plan", async () => {
+  const [ai, app, html, bridge] = await Promise.all([
+    readFile(resolve(root, "assets/js/ai.js"), "utf8"),
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "index.html"), "utf8"),
+    readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/HealthSyncService.kt"), "utf8")
+  ]);
+  assert.match(ai, /hasPlanAdjustment/);
+  assert.match(ai, /nutritionContext/);
+  assert.match(app, /Aplicar al plan y nutrición/);
+  assert.match(app, /sleepStagesMinutes/);
+  assert.match(html, /wearableSleepDetails/);
+  assert.match(bridge, /STAGE_TYPE_DEEP/);
+  assert.match(bridge, /OxygenSaturationRecord/);
+});
+
 test("la voz usa grabación y transcripción con revisión, no Web Speech en la PWA", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");

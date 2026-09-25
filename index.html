@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=74">
+  <link rel="stylesheet" href="assets/css/styles.css?v=80">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -66,6 +66,7 @@
           <div><strong id="wearableSteps">—</strong><span>Pasos de hoy</span></div>
           <div><strong id="wearableSleep">—</strong><span>Última noche</span><small id="wearableSleepDate"></small></div>
         </div>
+        <div id="wearableSleepDetails" class="wearable-sleep-details hidden"></div>
         <p id="wearableHelp" class="wearable-help">Instala TGTrain Sync para traer los datos de Mi Fitness.</p>
         <div id="wearableSessions" class="wearable-sessions"></div>
       </section>
@@ -92,10 +93,10 @@
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Preguntas y respuestas recientes"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
         <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar preguntas y respuestas</button>
-        <p class="coach-history-note">Tus preguntas quedan guardadas hasta que las limpies. El cambio se sincroniza con tu cuenta.</p>
+        <p class="coach-history-note">Tus preguntas quedan guardadas hasta que las limpies. Si propones cambiar una actividad, la guía relacionará entrenamiento y alimentación, pero te pedirá confirmación antes de tocar el plan.</p>
         <form id="coachQuestionForm">
           <label for="coachQuestionText">Tu pregunta</label>
-          <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: ¿cómo adapto la próxima sesión si la rodilla sigue molesta?"></textarea>
+          <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: probablemente suspendan mi partido de mañana. ¿Lo cambio por un peloteo suave o por otra sesión?"></textarea>
           <div class="coach-ask-actions">
             <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-label="Grabar y transcribir pregunta con el micrófono">🎙️ Grabar</button>
             <button id="coachAskButton" class="coach-ask-button" type="submit">Preguntar a la guía →</button>
@@ -358,7 +359,7 @@
       <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
-      <a class="wearable-download" href="downloads/tgtrain-sync-0.4.0.apk" download>Descargar TGTrain Sync para Android</a>
+      <a class="wearable-download" href="downloads/tgtrain-sync-0.5.0.apk" download>Descargar TGTrain Sync para Android</a>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
@@ -497,6 +498,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=79"></script>
+  <script type="module" src="assets/js/app.js?v=80"></script>
 </body>
 </html>

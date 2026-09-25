@@ -8,6 +8,7 @@ import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
@@ -51,7 +52,8 @@ class HealthSyncService(private val context: Context) {
         val optionalPermissions = setOf(
             androidx.health.connect.client.permission.HealthPermission.getReadPermission(DistanceRecord::class),
             androidx.health.connect.client.permission.HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-            androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class)
+            androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class),
+            androidx.health.connect.client.permission.HealthPermission.getReadPermission(OxygenSaturationRecord::class)
         )
         val allPermissions = essentialPermissions + optionalPermissions
     }
@@ -108,6 +110,7 @@ class HealthSyncService(private val context: Context) {
         val heartRateGranted = granted.contains(androidx.health.connect.client.permission.HealthPermission.getReadPermission(HeartRateRecord::class))
         var sessionsWithHeartRate = 0
         var heartRateSamples = 0
+        var sleepSessionsWithStages = 0
 
         for (offset in 0 until days) {
             val day = firstDay.plusDays(offset.toLong())
@@ -121,14 +124,34 @@ class HealthSyncService(private val context: Context) {
                 )
             )[StepsRecord.COUNT_TOTAL] ?: 0L
             val night = sleepByDay[day].orEmpty()
-            val dayData = hashMapOf<String, Any>(
+            val dayData = hashMapOf<String, Any?>(
                 "dateISO" to day.toString(),
                 "steps" to steps,
+                "sleepMinutes" to null,
+                "sleepStart" to null,
+                "sleepEnd" to null,
+                "sleepSessions" to 0,
+                "sleepOriginPackage" to null,
+                "sleepStageCount" to 0,
+                "sleepStagesAvailable" to false,
+                "sleepStagesMinutes" to null,
+                "sleepHeartRateSampleCount" to 0,
+                "sleepHeartRateAvgBpm" to null,
+                "sleepHeartRateMinBpm" to null,
+                "sleepHeartRateMaxBpm" to null,
+                "sleepOxygenSampleCount" to 0,
+                "sleepOxygenAvgPercent" to null,
+                "sleepOxygenMinPercent" to null,
+                "sleepOxygenMaxPercent" to null,
                 "source" to "health_connect",
                 "originPackage" to sourcePackage,
                 "syncedAt" to syncedAt
             )
             if (night.isNotEmpty()) {
+                val stages = night.flatMap { it.stages }
+                val stageMinutes = stages.groupingBy { sleepStageKey(it.stage) }.fold(0L) { total, stage ->
+                    total + Duration.between(stage.startTime, stage.endTime).toMinutes().coerceAtLeast(0)
+                }
                 dayData["sleepMinutes"] = night.sumOf {
                     Duration.between(it.startTime, it.endTime).toMinutes().coerceAtLeast(0)
                 }
@@ -136,6 +159,37 @@ class HealthSyncService(private val context: Context) {
                 dayData["sleepEnd"] = night.maxOf { it.endTime }.toString()
                 dayData["sleepSessions"] = night.size
                 dayData["sleepOriginPackage"] = night.first().metadata.dataOrigin.packageName
+                dayData["sleepStageCount"] = stages.size
+                dayData["sleepStagesAvailable"] = stages.isNotEmpty()
+                if (stages.isNotEmpty()) {
+                    sleepSessionsWithStages += night.count { it.stages.isNotEmpty() }
+                    dayData["sleepStagesMinutes"] = stageMinutes
+                }
+                val sleepStart = night.minOf { it.startTime }
+                val sleepEnd = night.maxOf { it.endTime }
+                val sleepOrigins = night.map { DataOrigin(it.metadata.dataOrigin.packageName) }.toSet()
+                if (heartRateGranted) {
+                    val samples = readAll(HeartRateRecord::class, sleepStart, sleepEnd, sleepOrigins)
+                        .flatMap { it.samples }
+                        .filter { !it.time.isBefore(sleepStart) && it.time.isBefore(sleepEnd) }
+                    dayData["sleepHeartRateSampleCount"] = samples.size
+                    if (samples.isNotEmpty()) {
+                        dayData["sleepHeartRateAvgBpm"] = samples.map { it.beatsPerMinute }.average()
+                        dayData["sleepHeartRateMinBpm"] = samples.minOf { it.beatsPerMinute }
+                        dayData["sleepHeartRateMaxBpm"] = samples.maxOf { it.beatsPerMinute }
+                    }
+                }
+                if (granted.contains(HealthPermission.getReadPermission(OxygenSaturationRecord::class))) {
+                    val oxygen = readAll(OxygenSaturationRecord::class, sleepStart, sleepEnd, sleepOrigins)
+                        .filter { !it.time.isBefore(sleepStart) && it.time.isBefore(sleepEnd) }
+                        .map { it.percentage.value }
+                    dayData["sleepOxygenSampleCount"] = oxygen.size
+                    if (oxygen.isNotEmpty()) {
+                        dayData["sleepOxygenAvgPercent"] = oxygen.average()
+                        dayData["sleepOxygenMinPercent"] = oxygen.min()
+                        dayData["sleepOxygenMaxPercent"] = oxygen.max()
+                    }
+                }
             }
             batch.set(
                 firestore.collection("users").document(uid).collection("wearableDays")
@@ -207,7 +261,7 @@ class HealthSyncService(private val context: Context) {
             )
         }
         batch.commit().await()
-        return SyncReport(days, sleep.size, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
+        return SyncReport(days, sleep.size, sleepSessionsWithStages, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
     }
 
     private suspend fun <T : Record> readAll(
@@ -246,6 +300,17 @@ class HealthSyncService(private val context: Context) {
     private fun isMiFitnessSource(packageName: String) =
         packageName.contains("xiaomi", ignoreCase = true) || packageName.contains("mifitness", ignoreCase = true)
 
+    private fun sleepStageKey(stage: Int) = when (stage) {
+        SleepSessionRecord.STAGE_TYPE_AWAKE -> "awake"
+        SleepSessionRecord.STAGE_TYPE_SLEEPING -> "sleeping"
+        SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> "outOfBed"
+        SleepSessionRecord.STAGE_TYPE_LIGHT -> "light"
+        SleepSessionRecord.STAGE_TYPE_DEEP -> "deep"
+        SleepSessionRecord.STAGE_TYPE_REM -> "rem"
+        SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED -> "awakeInBed"
+        else -> "unknown"
+    }
+
     private fun exerciseTitle(type: Int) = when (type) {
         ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "Trote"
         ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> "Caminata"
@@ -262,6 +327,7 @@ class HealthSyncService(private val context: Context) {
 data class SyncReport(
     val days: Int,
     val sleepSessions: Int,
+    val sleepSessionsWithStages: Int,
     val workouts: Int,
     val sessionsWithHeartRate: Int,
     val heartRateSamples: Int,

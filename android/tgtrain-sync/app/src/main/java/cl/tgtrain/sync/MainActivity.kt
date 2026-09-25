@@ -15,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -112,7 +113,7 @@ class MainActivity : ComponentActivity() {
         card.addView(signInButton)
 
         card.addView(text("2 · Permiso de salud", 17f, ink, true).apply { setPadding(0, dp(20), 0, 0) })
-        card.addView(text("Solo leerá pasos, sueño y sesiones. LPM, distancia y calorías son opcionales. El acceso en segundo plano permite actualizar sin abrir esta app.", 13f, Color.DKGRAY))
+        card.addView(text("Solo leerá pasos, sueño y sesiones. Fases de sueño, LPM, oxígeno, distancia y calorías dependen de lo que Mi Fitness comparta. El acceso en segundo plano permite actualizar sin abrir esta app.", 13f, Color.DKGRAY))
         permissionButton = action("Permitir acceso a Health Connect") {
             permissionLauncher.launch(service.requestedPermissions)
         }
@@ -203,6 +204,7 @@ class MainActivity : ComponentActivity() {
                     "No encontré registros recientes. Abre Mi Fitness, sincroniza la pulsera y vuelve a buscar."
                 else "${sources.size} fuente(s) encontrada(s). Elige Mi Fitness y sincroniza." +
                     (if (granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) " LPM habilitadas." else " Para incluir LPM, pulsa Permitir acceso otra vez.") +
+                    (if (granted.contains(HealthPermission.getReadPermission(OxygenSaturationRecord::class))) " Oxígeno habilitado." else " Para incluir oxígeno nocturno, pulsa Permitir acceso otra vez.") +
                     (if (service.backgroundReadAvailable && !granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND))
                         " Para sincronizar con la app cerrada, pulsa Permitir acceso y habilita el segundo plano." else "")
                 refreshAccount()
@@ -226,9 +228,14 @@ class MainActivity : ComponentActivity() {
                     report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
                     else -> "${report.sessionsWithHeartRate} entrenamientos con LPM (${report.heartRateSamples} mediciones)."
                 }
+                val sleepDetailStatus = when {
+                    report.sleepSessions == 0 -> ""
+                    report.sleepSessionsWithStages == 0 -> " Mi Fitness entregó duración, pero no fases de sueño."
+                    else -> " ${report.sleepSessionsWithStages} sesiones incluyen fases de sueño."
+                }
                 status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. " +
                     (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
-                    "$heartRateStatus Abre TGTrain para verlos."
+                    "$sleepDetailStatus $heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo sincronizar: ${error.localizedMessage}"
             } finally { setBusy(false) }

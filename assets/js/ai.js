@@ -136,6 +136,33 @@ const analysisSchema = {
   required: ["decision", "headline", "summary", "highlights", "progress", "nextSession", "cautions", "changes", "goal", "planComparison", "encouragement"]
 };
 
+const coachQuestionSchema = {
+  type: "object",
+  properties: {
+    answer: stringSchema,
+    hasPlanAdjustment: { type: "boolean" },
+    planAdjustment: {
+      type: "object",
+      properties: {
+        targetDateISO: stringSchema,
+        title: stringSchema,
+        reason: stringSchema,
+        category: { type: "string", enum: ["physical", "cardio", "tennis", "rest"] },
+        summary: stringSchema,
+        details: { type: "array", items: stringSchema, maxItems: 12 },
+        routineId: stringSchema,
+        cardioTypeId: stringSchema,
+        tennisTypeId: stringSchema,
+        restTypeId: stringSchema,
+        nutritionMode: { type: "string", enum: ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+        nutritionReason: stringSchema
+      },
+      required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "nutritionMode", "nutritionReason"]
+    }
+  },
+  required: ["answer", "hasPlanAdjustment"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -238,23 +265,31 @@ export function createAiClient() {
       }
     },
     async askCoach(question, context = {}) {
+      const catalog = {
+        routines: physicalRoutines.map(item => ({ id: item.id, name: item.name })),
+        cardio: cardioTypes.map(item => ({ id: item.id, name: item.name })),
+        tennis: tennisTypes.map(item => ({ id: item.id, name: item.name })),
+        rest: restTypes.map(item => ({ id: item.id, name: item.name }))
+      };
       const instructions = [
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
-        "Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. El sueño y los pasos son contexto, no causas demostradas.",
-        "No modifiques registros, rutinas ni planificación. La respuesta es una orientación, no una orden médica. Si el usuario pide cambiar el plan, explica la propuesta y que debe confirmarla por separado.",
+        "Integra entrenamiento, comidas registradas, hidratación, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
+        "No inventes una calidad de sueño ni un diagnóstico nutricional. Indica cuando las comidas o los macros estén incompletos y usa los rangos del plan como orientación, no como prescripción clínica.",
+        "No modifiques registros ni planificación por tu cuenta. Si el usuario comunica una novedad que requiere cambiar una fecha concreta (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), responde y además devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. La aplicación pedirá confirmación antes de aplicarla. Si solo pregunta o comenta sin pedir/implicar adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
+        "Para un ajuste usa exclusivamente los identificadores del CATÁLOGO. Un peloteo amistoso es tennisTypeId friendly-hitting; un descanso normal es restTypeId planned. Conserva el objetivo semanal, considera lo ya realizado y evita compensar con exceso de carga. No propongas dos actividades principales para el mismo día.",
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
       ].join("\n");
       const response = await generateJson({
         instructions,
-        input: JSON.stringify({ question: String(question || "").trim().slice(0, 1000), context }),
-        schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
-        maxOutputTokens: 900
+        input: JSON.stringify({ question: String(question || "").trim().slice(0, 1000), catalog, context }),
+        schema: coachQuestionSchema,
+        maxOutputTokens: 1800
       });
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
-      return { answer, model: MODEL_NAME };
+      return { answer, planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null, model: MODEL_NAME };
     },
     async importTrainingPlan(planText, currentDate = "") {
       const catalog = {
@@ -312,7 +347,8 @@ export function createAiClient() {
         "Comenta cualquier actividad recibida: entrenamiento físico, cardio, trote, trekking, pádel, tenis o descanso. La ruta de registro no cambia el análisis.",
         "Lee todas las sensaciones y comentarios del registro actual. Explica qué implican para el avance, la recuperación y la siguiente sesión. Si falta RPE, dolor, técnica o energía, no los inventes ni asumas que están bien.",
         "Si hay wearable vinculado, integra solo sus LPM y kcal activas disponibles con el volumen, series, duración y sensaciones del registro manual. Cita la fuente y distingue kcal activas estimadas de kcal anotadas; jamás las sumes. Si faltan muestras de LPM, dilo sin inventar media ni máxima. No inventes zonas cardíacas ni FC máxima personal.",
-        "Compara tendencias de LPM solo entre actividades realmente comparables y con datos suficientes; la FC en fuerza depende también de descansos y condiciones del día. Usa sueño y pasos como contexto de recuperación, no como prueba causal ni diagnóstico. El dolor y las molestias reportadas prevalecen sobre una métrica favorable de la pulsera.",
+        "Compara tendencias de LPM solo entre actividades realmente comparables y con datos suficientes; la FC en fuerza depende también de descansos y condiciones del día. Usa sueño, sus fases, oxígeno y pasos como contexto de recuperación, no como prueba causal ni diagnóstico. Las fases y el oxígeno de la pulsera son estimaciones y pueden faltar aunque exista duración. El dolor y las molestias reportadas prevalecen sobre una métrica favorable de la pulsera.",
+        "Integra nutritionContext cuando exista: comidas, kcal y macros registrados, hidratación y rangos del plan. No inventes alimentos ni completes totales faltantes; no restes kcal de la pulsera a la ingesta. Solo comenta la relación práctica con energía y recuperación, sin diagnóstico ni prescripción clínica.",
         "Compara el resultado real con currentPlan cuando exista, incluso si se registró desde Registrar. Distingue entre objetivo planificado y actividad realizada; no afirmes cumplimiento total solo porque coincida el tipo de actividad.",
         "Devuelve planComparison: completed solo si la actividad actual cubre el objetivo previsto con evidencia suficiente; partial si falta parte; adapted si se cambió la rutina, distancia, intensidad o carga y se explica su relación con el objetivo; recovery para descanso sustitutivo; different si no cubre el objetivo; unknown si no hay plan o faltan datos. No confundir descansar con incumplir: puede ser una adaptación responsable, sin afirmar que era el descanso planificado.",
         "En planComparison.reason compara explícitamente plan y realidad: lo que sí se cubrió, qué cambió y qué queda pendiente o no se puede determinar. Considera alternativas y sameDayActivities, sin atribuir sus resultados a la actividad actual ni duplicarlos. Para otra rutina evalúa grupos musculares, habilidades de tenis y recuperación; explica si cubre el objetivo de otra forma, parcialmente o no. Más completa, más carga o más kilómetros no significa automáticamente mejor ni autorizado por el plan.",
@@ -348,6 +384,7 @@ export function createAiClient() {
           currentPlan: context.currentPlan ? { ...context.currentPlan, sameDayActivities } : null,
           recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
           wearableContext: context.wearableContext || null,
+          nutritionContext: context.nutritionContext || null,
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
           planDetails: planDetails.slice(0, 20)
         })

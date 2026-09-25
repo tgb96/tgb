@@ -5,12 +5,12 @@ Aplicación puente personal para traer los datos que Mi Fitness ya escribió en 
 ## Qué sincroniza
 
 - Pasos diarios de la fuente elegida durante los últimos 14 días.
-- Sesiones de sueño, atribuidas al día en que terminan.
+- Sesiones de sueño, atribuidas al día en que terminan, con fases, frecuencia cardíaca y oxígeno nocturno cuando Mi Fitness los publica en Health Connect.
 - Sesiones de ejercicio, con duración y tipo; distancia, calorías activas y frecuencia cardíaca media, máxima y mínima si Health Connect concede esos permisos y Mi Fitness comparte las mediciones. No se suben muestras crudas de LPM.
 
 La app solo **lee** Health Connect. Escribe documentos separados en `users/{uid}/wearableDays/{dateISO}` y `users/{uid}/wearableSessions/{id}`. No modifica la colección `records`, por lo que nunca duplica ni reemplaza los entrenamientos anotados en TGTrain. El mismo ID de Health Connect produce el mismo ID de Firestore al repetir la sincronización.
 
-La versión 0.4.0 sincroniza automáticamente los últimos dos días al abrir TGTrain Sync si han pasado al menos 15 minutos desde la última actualización. Con el permiso adicional de lectura en segundo plano, intenta repetirla cada 30 minutos cuando haya internet; Android puede retrasar los trabajos periódicos para ahorrar batería. **Sincronizar ahora** sigue recuperando 14 días. El inicio de sesión con Google queda persistido por Firebase en el teléfono. Se debe elegir la fuente de Mi Fitness para no mezclar pasos del móvil. El sueño se busca también en otras fuentes de Mi Fitness, porque puede tener un origen diferente al de los pasos. Si ninguna fuente comparte sueño, la app lo indicará sin inventar una duración. La app puente no puede iniciar la transferencia de la pulsera a Mi Fitness: si Mi Fitness no publica datos nuevos en Health Connect, no aparecerán en TGTrain.
+La versión 0.5.0 sincroniza automáticamente los últimos dos días al abrir TGTrain Sync si han pasado al menos 15 minutos desde la última actualización. Con el permiso adicional de lectura en segundo plano, intenta repetirla cada 30 minutos cuando haya internet; Android puede retrasar los trabajos periódicos para ahorrar batería. **Sincronizar ahora** sigue recuperando 14 días. El inicio de sesión con Google queda persistido por Firebase en el teléfono. Se debe elegir la fuente de Mi Fitness para no mezclar pasos del móvil. El sueño se busca también en otras fuentes de Mi Fitness, porque puede tener un origen diferente al de los pasos. Si Mi Fitness solo comparte la duración y no las fases, TGTrain lo dirá claramente. La app puente no puede iniciar la transferencia de la pulsera a Mi Fitness: si Mi Fitness no publica datos nuevos en Health Connect, no aparecerán en TGTrain.
 
 ## Vinculación con un entrenamiento de TGTrain
 
@@ -31,6 +31,6 @@ Si existe un perfil de entrenador IA configurado, al vincular se genera de nuevo
 ## Límites de esta versión
 
 - Health Connect normalmente permite leer datos de otras apps hasta 30 días hacia atrás desde el primer permiso; por ello se importan los últimos 14 días, sin solicitar acceso histórico adicional.
-- El valor de sueño representa la duración de las sesiones compartidas por Mi Fitness; no es un diagnóstico ni una puntuación clínica.
+- La duración, las fases, las LPM y el oxígeno nocturno son las estimaciones que Mi Fitness comparte; TGTrain no reproduce la puntuación propietaria de calidad de sueño ni las convierte en diagnóstico.
 - La distancia, las calorías activas y las LPM pueden faltar en algunas sesiones o versiones de Mi Fitness. La media de LPM es la media de las muestras compartidas, no una media temporal continua.
 - La periodicidad de 30 minutos no es una garantía de ejecución exacta: Android decide cuándo correr las tareas en segundo plano. La disponibilidad depende de la versión de Health Connect, sus permisos y las restricciones de batería del teléfono.

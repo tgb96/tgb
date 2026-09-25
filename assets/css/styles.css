@@ -104,6 +104,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .wearable-metrics strong { font-size: clamp(19px, 5vw, 25px); letter-spacing: -.7px; }
 .wearable-metrics span { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 750; }
 .wearable-metrics small { margin-top: 3px; color: var(--blue); font-size: 10px; }
+.wearable-sleep-details { margin-top: 10px; padding: 12px; border-radius: 16px; background: #f3f5ff; }
+.wearable-sleep-details > strong { display: block; margin-bottom: 8px; font-size: 11px; }
+.wearable-sleep-details > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.wearable-sleep-details span { min-width: 0; padding: 8px; border-radius: 10px; background: white; }
+.wearable-sleep-details b, .wearable-sleep-details small { display: block; font-size: 9px; }
+.wearable-sleep-details small { margin-top: 3px; color: var(--muted); }
+.wearable-sleep-details p { margin: 9px 0 0; color: var(--muted); font-size: 10px; }
 .wearable-help { margin: 13px 1px 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .wearable-sessions { display: grid; gap: 7px; margin-top: 14px; }
 .wearable-sessions:empty { display: none; }
@@ -174,6 +181,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .coach-plan-actions { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 12px; padding-top: 10px; }
 .coach-plan-actions .coach-plan-open { margin: 0; padding: 10px 2px; border: 0; }
 .coach-ai-open { min-height: 40px; padding: 0 12px; border: 1px solid rgba(200,255,77,0.34); border-radius: 12px; background: rgba(200,255,77,0.1); color: var(--lime); font-size: 10px; font-weight: 900; white-space: nowrap; }
+.coach-plan-proposal { margin-top: 10px; padding: 12px; border: 1px solid #c8ff4d; border-radius: 14px; background: #f5ffe0; color: var(--ink); }
+.coach-plan-proposal > strong, .coach-plan-proposal > span, .coach-plan-proposal > small { display: block; }
+.coach-plan-proposal > strong { color: #3157ff; font-size: 9px; text-transform: uppercase; letter-spacing: .8px; }
+.coach-plan-proposal > span { margin-top: 4px; font-weight: 900; }
+.coach-plan-proposal > small { margin-top: 5px; line-height: 1.45; }
+.coach-plan-proposal > div { display: flex; gap: 8px; margin-top: 10px; }
+.coach-plan-proposal button { flex: 1; min-height: 40px; border: 0; border-radius: 11px; background: var(--night); color: white; font-weight: 900; }
+.coach-plan-proposal button.secondary { border: 1px solid #d6d8d2; background: white; color: var(--ink); }
+.coach-plan-proposal.applied { border-color: #dce8bd; background: #f3f6ea; }
+.coach-plan-proposal.dismissed { border-color: #dededb; background: #f5f5f3; opacity: .78; }
 .coach-option-button { width: 100%; min-height: 43px; padding: 9px 12px; border: 0; border-radius: 12px; background: var(--blue); color: white; font-size: 10px; font-weight: 900; }
 .coach-option-button.compact { width: auto; min-width: 105px; flex: 0 0 auto; background: var(--lime); color: var(--night); }
 .coach-option-button:disabled { cursor: default; background: #e6e7e3; color: #8a8f99; }
@@ -562,6 +579,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-exchange-question { justify-self: end; max-width: 93%; background: var(--night); color: white; font-weight: 700; }
 .coach-exchange-answer { background: #f3f5ff; color: var(--ink); }
 .coach-exchange button { justify-self: start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; font-weight: 800; }
+.coach-exchange .coach-plan-proposal button { justify-self: stretch; border: 0; background: var(--night); color: white; }
+.coach-exchange .coach-plan-proposal button.secondary { border: 1px solid var(--line); background: white; color: var(--ink); }
 .coach-ask-card form { display: grid; gap: 8px; }
 .coach-ask-card label { font-size: 13px; font-weight: 850; }
 .coach-ask-card textarea { width: 100%; min-height: 86px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fbfbf9; color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }

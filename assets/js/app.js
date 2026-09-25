@@ -22,11 +22,13 @@ import {
   coachTrainingBlock,
   coachWeekForDate
 } from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=77";
+import { createRepository } from "./storage.js?v=80";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=79";
+import { createNutritionUI } from "./nutrition-ui.js?v=80";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=80";
+import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=68";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=80";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=68";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
@@ -875,6 +877,31 @@ function renderCoachQuestions() {
     answer.className = "coach-exchange-answer";
     answer.textContent = item.answer || "Sin respuesta todavía. Pulsa Reintentar cuando tengas conexión.";
     exchange.append(question, answer);
+    if (item.planAdjustment) {
+      const proposal = document.createElement("div");
+      proposal.className = `coach-plan-proposal ${item.adjustmentStatus || "pending"}`;
+      const heading = document.createElement("strong");
+      heading.textContent = item.adjustmentStatus === "applied" ? "Ajuste aplicado" : item.adjustmentStatus === "dismissed" ? "Propuesta descartada" : "Propuesta para confirmar";
+      const title = document.createElement("span");
+      title.textContent = `${formatShortDate(item.planAdjustment.targetDateISO)} · ${item.planAdjustment.title}`;
+      const reason = document.createElement("small");
+      reason.textContent = [item.planAdjustment.reason, item.planAdjustment.nutritionReason].filter(Boolean).join(" Alimentación: ");
+      proposal.append(heading, title, reason);
+      if ((item.adjustmentStatus || "pending") === "pending") {
+        const actions = document.createElement("div");
+        const apply = document.createElement("button");
+        apply.type = "button"; apply.textContent = "Aplicar al plan y nutrición";
+        apply.addEventListener("click", () => applyCoachPlanAdjustment(item));
+        const dismiss = document.createElement("button");
+        dismiss.type = "button"; dismiss.className = "secondary"; dismiss.textContent = "Descartar";
+        dismiss.addEventListener("click", () => {
+          repository.saveCoachQuestion({ ...item, adjustmentStatus: "dismissed", updatedAt: new Date().toISOString() });
+          renderCoachQuestions();
+        });
+        actions.append(apply, dismiss); proposal.append(actions);
+      }
+      exchange.append(proposal);
+    }
     if (!item.answer) {
       const retry = document.createElement("button");
       retry.type = "button";
@@ -887,11 +914,84 @@ function renderCoachQuestions() {
   });
 }
 
+function wearableDayForCoach(day) {
+  if (!day) return null;
+  return {
+    dateISO: day.dateISO,
+    steps: Number(day.steps) || 0,
+    sleepMinutes: Number(day.sleepMinutes) || null,
+    sleepStagesMinutes: day.sleepStagesMinutes || null,
+    sleepHeartRateAvgBpm: Number(day.sleepHeartRateAvgBpm) || null,
+    sleepHeartRateMinBpm: Number(day.sleepHeartRateMinBpm) || null,
+    sleepOxygenAvgPercent: Number(day.sleepOxygenAvgPercent) || null,
+    sleepOxygenMinPercent: Number(day.sleepOxygenMinPercent) || null,
+    sleepOriginPackage: day.sleepOriginPackage || ""
+  };
+}
+
+function nutritionDayForCoach(dateISO, block = activeTrainingBlock()) {
+  const entries = repository.listNutritionEntries(dateISO).filter(item => !item.deleted);
+  const meals = entries.filter(item => item.kind === "meal").map(nutritionEntryWithEstimate);
+  const totals = nutritionDayTotals(entries.filter(item => item.kind !== "plan").map(nutritionEntryWithEstimate));
+  const override = entries.find(item => item.kind === "plan")?.planMode || "default";
+  const planned = plannedNutritionContext(coachSessionForDate(dateISO, block));
+  const mode = override === "default" && planned?.mode ? planned.mode : override;
+  const target = nutritionPlanForDate(dateISO, mode);
+  return {
+    dateISO, mode, plannedActivity: planned,
+    totals,
+    target: target ? { caloriesMinKcal: target.caloriesMinKcal, caloriesMaxKcal: target.caloriesMaxKcal, proteinMinG: 110, proteinMaxG: 125, waterMinMl: target.waterMinMl, waterMaxMl: target.waterMaxMl } : null,
+    meals: meals.map(item => ({ time: item.time, slotId: item.slotId, summary: item.text, caloriesKcal: item.caloriesKcal, proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG })).slice(0, 12)
+  };
+}
+
+function applyCoachPlanAdjustment(item) {
+  const adjustment = item.planAdjustment;
+  const block = activeTrainingBlock();
+  const copy = JSON.parse(JSON.stringify(block));
+  const session = copy.weeks.flatMap(week => week.sessions || []).find(candidate => candidate.dateISO === adjustment.targetDateISO);
+  if (!session) { showToast("Esa fecha ya no está en el plan activo. Pídele una nueva propuesta a la guía."); return; }
+  const category = adjustment.category;
+  const valid = category === "physical" ? physicalRoutineById(adjustment.routineId)
+    : category === "cardio" ? cardioTypeById(adjustment.cardioTypeId)
+      : category === "tennis" ? tennisTypeById(adjustment.tennisTypeId)
+        : restTypes.some(type => type.id === adjustment.restTypeId);
+  if (!valid) { showToast("La propuesta usa una actividad que TGTrain no reconoce. Vuelve a preguntarle a la guía."); return; }
+  const optionId = `coach-${adjustment.targetDateISO}-${item.id.slice(0, 12)}`;
+  const option = {
+    id: optionId, title: adjustment.title, category, summary: adjustment.summary,
+    details: adjustment.details,
+    routineId: category === "physical" ? adjustment.routineId : "",
+    cardioTypeId: category === "cardio" ? adjustment.cardioTypeId : "",
+    tennisTypeId: category === "tennis" ? adjustment.tennisTypeId : "",
+    restTypeId: category === "rest" ? adjustment.restTypeId : ""
+  };
+  session.options = [...session.options.filter(candidate => candidate.id !== optionId), option];
+  const originalOptionId = session.primaryOptionId;
+  session.primaryOptionId = optionId;
+  try {
+    repository.saveTrainingBlock({ ...copy, updatedAt: new Date().toISOString() });
+    const planId = `nutrition-plan-${adjustment.targetDateISO}`;
+    const previous = repository.getNutritionEntry(planId);
+    repository.saveNutritionEntry({
+      id: planId, dateISO: adjustment.targetDateISO, kind: "plan", planMode: adjustment.nutritionMode || "default",
+      createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()
+    });
+    repository.saveCoachQuestion({ ...item, adjustmentStatus: "applied", appliedOptionId: optionId, originalOptionId, appliedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    renderHome(); renderCoachPlanDialog(); nutritionUI.render();
+    showToast("Ajuste aplicado al entrenamiento y a la guía de alimentación.");
+  } catch (error) {
+    showToast(error.message || "No se pudo aplicar la propuesta.");
+  }
+}
+
 function coachQuestionContext() {
   const records = repository.list();
   const block = activeTrainingBlock();
   const todayISO = getChileDateISO();
   const todaySession = coachSessionForDate(todayISO, block);
+  const upcomingSessions = (block.weeks || []).flatMap(week => week.sessions || [])
+    .filter(session => session.dateISO >= todayISO && session.dateISO <= addDaysISO(todayISO, 7));
   const latest = records.filter(record => record.routineAiAnalysis)
     .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
       .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
@@ -904,7 +1004,12 @@ function coachQuestionContext() {
     complementaryActivities: records.filter(isComplementaryActivity).slice(0, 6)
       .map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
     wearableRecovery: wearableData.days.filter(day => day.dateISO >= addDaysISO(todayISO, -6))
-      .map(day => ({ dateISO: day.dateISO, steps: day.steps, sleepMinutes: day.sleepMinutes })),
+      .map(wearableDayForCoach),
+    nutrition: {
+      recentDays: Array.from({ length: 7 }, (_, index) => nutritionDayForCoach(addDaysISO(todayISO, index - 6), block)),
+      today: nutritionDayForCoach(todayISO, block),
+      tomorrow: nutritionDayForCoach(addDaysISO(todayISO, 1), block)
+    },
     latestAnalysis: latest ? {
       activity: recordTitle(latest),
       dateISO: latest.dateISO,
@@ -914,6 +1019,7 @@ function coachQuestionContext() {
       title: block.title,
       week: coachWeekForDate(todayISO, block),
       today: todaySession,
+      upcomingSessions,
       rules: (block.rules || []).slice(0, 12)
     },
     previousQuestions: repository.listCoachQuestions().filter(item => item.answer).slice(0, 4).reverse()
@@ -950,7 +1056,7 @@ async function submitCoachQuestion(existing = null) {
     });
     renderCoachQuestions();
     const result = await aiClient.askCoach(question, context);
-    repository.saveCoachQuestion({ ...saved, answer: result.answer, updatedAt: new Date().toISOString() });
+    repository.saveCoachQuestion({ ...saved, answer: result.answer, planAdjustment: result.planAdjustment, adjustmentStatus: result.planAdjustment ? "pending" : "", updatedAt: new Date().toISOString() });
     if (!existing) { input.value = ""; coachQuestionSource = "text"; }
     $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
   } catch (error) {
@@ -2505,6 +2611,33 @@ function renderWearable() {
     $("wearableSleep").textContent = "—";
     $("wearableSleepDate").textContent = days.length ? "Sin sueño reciente compartido por Mi Fitness" : "";
   }
+  const sleepDetails = $("wearableSleepDetails");
+  sleepDetails.replaceChildren();
+  const stageLabels = { light: "Ligero", deep: "Profundo", rem: "REM", awake: "Despierto", awakeInBed: "Despierto en cama", outOfBed: "Fuera de cama", sleeping: "Sueño sin fase" };
+  const stages = lastSleep?.sleepStagesMinutes && typeof lastSleep.sleepStagesMinutes === "object" ? lastSleep.sleepStagesMinutes : null;
+  const stageEntries = stages ? Object.entries(stageLabels).map(([key, label]) => [label, Number(stages[key]) || 0]).filter(([, minutes]) => minutes > 0) : [];
+  if (stageEntries.length) {
+    const title = document.createElement("strong"); title.textContent = "Distribución estimada por Mi Fitness";
+    const grid = document.createElement("div");
+    stageEntries.forEach(([label, minutes]) => {
+      const item = document.createElement("span");
+      item.innerHTML = `<b>${label}</b><small>${Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)} h ` : ""}${String(minutes % 60).padStart(2, "0")} min</small>`;
+      grid.append(item);
+    });
+    sleepDetails.append(title, grid);
+  }
+  const signals = [];
+  if (Number(lastSleep?.sleepHeartRateAvgBpm) > 0) signals.push(`${Math.round(lastSleep.sleepHeartRateAvgBpm)} lpm promedio durmiendo`);
+  if (Number(lastSleep?.sleepOxygenAvgPercent) > 0) signals.push(`${Number(lastSleep.sleepOxygenAvgPercent).toLocaleString("es-CL", { maximumFractionDigits: 1 })}% SpO₂ promedio`);
+  if (signals.length) {
+    const line = document.createElement("p"); line.textContent = signals.join(" · "); sleepDetails.append(line);
+  }
+  if (lastSleep && !stageEntries.length) {
+    const unavailable = document.createElement("small");
+    unavailable.textContent = "Mi Fitness compartió la duración, pero no las fases de sueño en Health Connect.";
+    sleepDetails.append(unavailable);
+  }
+  sleepDetails.classList.toggle("hidden", !lastSleep);
   const newestSync = days.map(day => day.syncedAt).filter(Boolean).sort().at(-1);
   $("wearableSyncTime").textContent = newestSync
     ? `Actualizado ${new Date(newestSync).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}`
@@ -2880,9 +3013,13 @@ function routineAiContext(record) {
   const lastNight = wearableData.days.find(day => day.dateISO === record.dateISO && Number(day.sleepMinutes) > 0);
   return {
     coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan,
+    nutritionContext: {
+      activityDay: nutritionDayForCoach(record.dateISO, block),
+      previousDay: nutritionDayForCoach(addDaysISO(record.dateISO, -1), block)
+    },
     wearableContext: {
       linkedSession: record.wearableSnapshot,
-      precedingSleepMinutes: lastNight ? Number(lastNight.sleepMinutes) : null,
+      precedingSleep: wearableDayForCoach(lastNight),
       dailySteps: wearableData.days.find(day => day.dateISO === record.dateISO)?.steps ?? null
     }
   };

@@ -177,14 +177,17 @@ test("guarda preguntas de la guía, permite reintentar y las incluye en el respa
   const createdAt = "2026-09-23T12:00:00.000Z";
   repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", createdAt, updatedAt: createdAt });
   assert.equal(repository.listCoachQuestions()[0].answer, "");
-  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Descansa si persiste el dolor.", createdAt, updatedAt: "2026-09-23T12:01:00.000Z" });
+  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Cambia el partido por un peloteo suave.",
+    planAdjustment: { targetDateISO: "2026-09-26", title: "Peloteo amistoso suave", reason: "Cancha de partido no disponible", category: "tennis",
+      summary: "Mantener contacto con la pelota sin carga de partido", details: ["Intensidad suave"], tennisTypeId: "friendly-hitting", nutritionMode: "tennisLight", nutritionReason: "Menor exigencia que un partido" },
+    adjustmentStatus: "pending", createdAt, updatedAt: "2026-09-23T12:01:00.000Z" });
   assert.equal(repository.listCoachQuestions().length, 1);
-  assert.match(repository.backup(), /Descansa si persiste el dolor/);
-  assert.equal(createRepository(storage).listCoachQuestions()[0].answer, "Descansa si persiste el dolor.");
+  assert.match(repository.backup(), /Peloteo amistoso suave/);
+  assert.equal(createRepository(storage).listCoachQuestions()[0].planAdjustment.tennisTypeId, "friendly-hitting");
   assert.equal(repository.applyCloudCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Respuesta anterior", createdAt, updatedAt: createdAt }), false);
   const restored = createRepository(new FakeStorage());
   restored.importMerge(repository.backup());
-  assert.equal(restored.listCoachQuestions()[0].answer, "Descansa si persiste el dolor.");
+  assert.equal(restored.listCoachQuestions()[0].planAdjustment.nutritionMode, "tennisLight");
 });
 
 test("limpiar preguntas deja marcas de borrado para que no reaparezcan desde la nube", () => {

@@ -1,6 +1,6 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=67";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=68";
-import { normalizeNutritionEntries } from "./nutrition.js?v=77";
+import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=80";
 import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 
 export const DATA_KEY = "tgb-data-v3";
@@ -68,12 +68,36 @@ export function normalizeCoachQuestions(value) {
     const id = String(item?.id || "").slice(0, 120);
     const question = String(item?.question || "").trim().slice(0, 1000);
     if (!id || !question) return [];
+    const rawAdjustment = item?.planAdjustment;
+    const targetDateISO = String(rawAdjustment?.targetDateISO || "");
+    const category = ["physical", "cardio", "tennis", "rest"].includes(rawAdjustment?.category) ? rawAdjustment.category : "";
+    const planAdjustment = isValidISODate(targetDateISO) && category ? {
+      targetDateISO,
+      title: String(rawAdjustment?.title || "Ajuste propuesto").trim().slice(0, 200),
+      reason: String(rawAdjustment?.reason || "").trim().slice(0, 1000),
+      category,
+      summary: String(rawAdjustment?.summary || rawAdjustment?.title || "").trim().slice(0, 300),
+      details: (Array.isArray(rawAdjustment?.details) ? rawAdjustment.details : []).slice(0, 12)
+        .map(value => String(value || "").trim().slice(0, 500)).filter(Boolean),
+      routineId: String(rawAdjustment?.routineId || "").slice(0, 100),
+      cardioTypeId: String(rawAdjustment?.cardioTypeId || "").slice(0, 100),
+      tennisTypeId: String(rawAdjustment?.tennisTypeId || "").slice(0, 100),
+      restTypeId: String(rawAdjustment?.restTypeId || "").slice(0, 100),
+      nutritionMode: nutritionModes.includes(rawAdjustment?.nutritionMode) ? rawAdjustment.nutritionMode : "default",
+      nutritionReason: String(rawAdjustment?.nutritionReason || "").trim().slice(0, 1000)
+    } : null;
     return [[id, {
       id,
       question,
       answer: String(item?.answer || "").trim().slice(0, 6000),
       deleted: Boolean(item?.deleted),
       source: item?.source === "voice" ? "voice" : "text",
+      planAdjustment,
+      adjustmentStatus: ["pending", "applied", "dismissed"].includes(item?.adjustmentStatus)
+        ? item.adjustmentStatus : planAdjustment ? "pending" : "",
+      appliedOptionId: String(item?.appliedOptionId || "").slice(0, 120),
+      originalOptionId: String(item?.originalOptionId || "").slice(0, 120),
+      appliedAt: String(item?.appliedAt || ""),
       createdAt: String(item?.createdAt || ""),
       updatedAt: String(item?.updatedAt || item?.createdAt || "")
     }]];

@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=77";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=80";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=78";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
@@ -227,7 +227,13 @@ export function createNutritionUI(repository, { showToast = () => {}, getWearabl
     const bandLine = document.createElement("p");
     const bandParts = [];
     if (dayData && Number.isFinite(Number(dayData.steps))) bandParts.push(`${Number(dayData.steps).toLocaleString("es-CL")} pasos`);
-    if (dayData && Number(dayData.sleepMinutes) > 0) bandParts.push(`${Math.floor(dayData.sleepMinutes / 60)} h ${String(dayData.sleepMinutes % 60).padStart(2, "0")} min de sueño`);
+    if (dayData && Number(dayData.sleepMinutes) > 0) {
+      bandParts.push(`${Math.floor(dayData.sleepMinutes / 60)} h ${String(dayData.sleepMinutes % 60).padStart(2, "0")} min de sueño`);
+      const phases = dayData.sleepStagesMinutes || {};
+      const phaseText = [["profundo", phases.deep], ["REM", phases.rem], ["ligero", phases.light]]
+        .filter(([, value]) => Number(value) > 0).map(([label, value]) => `${Math.round(value)} min ${label}`);
+      if (phaseText.length) bandParts.push(phaseText.join(", "));
+    }
     bandLine.textContent = bandParts.length ? `Pulsera: ${bandParts.join(" · ")}.` : "Pulsera: sin pasos o sueño compartidos para este día.";
     context.append(bandLine);
     const linked = activities.filter(item => item.wearableSnapshot);
