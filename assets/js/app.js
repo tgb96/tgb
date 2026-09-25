@@ -3542,13 +3542,16 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       actions.append(apply, modify, discard);
       card.append(actions);
     } else if (analysis.status) {
-      const status = document.createElement("p");
-      status.className = `routine-ai-status ${analysis.status}`;
-      status.textContent = analysis.status === "pending" && !proposedChanges.length ? "No hay cambios concretos de peso, series o repeticiones para guardar. Mantén la configuración actual y usa las recomendaciones como guía."
+      const statusText = analysis.status === "pending" && !proposedChanges.length ? "No hay cambios concretos de peso, series o repeticiones para guardar. Mantén la configuración actual y usa las recomendaciones como guía."
         : analysis.status === "reviewed" && record.category === "physical" && !proposedChanges.length ? "No hay cambios concretos para aplicar en la próxima rutina."
-          : analysis.status === "reviewed" ? "Comentario guardado en tu historial."
+          : analysis.status === "reviewed" ? ""
         : analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
-      card.append(status);
+      if (statusText) {
+        const status = document.createElement("p");
+        status.className = `routine-ai-status ${analysis.status}`;
+        status.textContent = statusText;
+        card.append(status);
+      }
     }
     const refresh = document.createElement("button");
     refresh.type = "button";

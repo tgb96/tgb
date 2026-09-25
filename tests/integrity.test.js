@@ -251,6 +251,11 @@ test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya v
   assert.doesNotMatch(app, /Revisar vínculo/);
 });
 
+test("la guía no repite que su comentario ya está guardado", async () => {
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.doesNotMatch(app, /Comentario guardado en tu historial/);
+});
+
 test("la voz usa grabación y transcripción con revisión, no Web Speech en la PWA", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
