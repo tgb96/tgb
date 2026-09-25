@@ -29,7 +29,7 @@ import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } fro
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 import { createGuidedUI } from "./guided-ui.js?v=72";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=81";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=68";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=69";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
@@ -1173,11 +1173,14 @@ function renderHome() {
   const activePlanned = plannedActivityContext(plannedState);
   const todayPlan = activePlanned?.session || coachSessionForDate(todayISO, block);
 
-  $("currentWeekBadge").textContent = `Semana ${week.weekNumber} · ${week.weekYear}`;
+  $("currentWeekBadge").textContent = plannedWeek
+    ? weekDisplayTitle(plannedWeek)
+    : `Semana ${week.weekNumber} · ${week.weekYear}`;
   $("todayStatus").textContent = dayActivitySummary(todayRecords).label;
   $("homeTitle").textContent = formatLongDate(todayISO);
-  $("weekRange").textContent = `${formatShortDate(week.startISO)} — ${formatShortDate(week.endISO)}`;
-  $("heroWeekTheme").textContent = plannedWeek ? weekDisplayTitle(plannedWeek) : "";
+  $("heroWeekTheme").textContent = plannedWeek
+    ? `Semana ${plannedWeek.number} · ${formatShortDate(plannedWeek.startISO)} al ${formatShortDate(plannedWeek.endISO)}`
+    : "";
   renderHeroEvolution(allRecords);
   const plannedPanel = $("heroPlannedActivity");
   plannedPanel.classList.toggle("hidden", !todayPlan);

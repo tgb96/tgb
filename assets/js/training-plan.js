@@ -176,7 +176,12 @@ export function newestTrainingBlock(blocks) {
 
 export function weekDisplayTitle(week) {
   const label = text(week?.label, 100);
-  if (label && !/^semana(?:\s+(?:n[°º.]?\s*)?\d+)?(?:\s*[-–:]\s*\d+)?$/i.test(label)) return label;
+  const withoutNumber = label.replace(/^(?:semana\s+(?:n[°º.]?\s*)?\d+\s*(?:[·•–—:\-]\s*)?)+/i, "").trim();
+  const genericDateLabel = !withoutNumber
+    || /^\d{4}$/.test(withoutNumber)
+    || /^\d{1,2}(?:\s+de)?\s+[a-záéíóú.]+\s*(?:[-–—]|\bal\b)\s*\d{1,2}/i.test(withoutNumber)
+    || /^\d{1,2}\s*(?:[-–—]|\bal\b)\s*\d{1,2}(?:\s+de)?\s+[a-záéíóú.]+$/i.test(withoutNumber);
+  if (label && !genericDateLabel) return withoutNumber || label;
   const options = (week?.sessions || []).flatMap(session => session.options || []);
   const description = [week?.context, week?.objective, ...options.flatMap(option => [option.title, option.summary])].join(" ").toLocaleLowerCase("es");
   if (options.some(option => option.prefill?.tennisTypeId === "match") || /\bpartidos?\b/.test(description)) return "Semana de partido";

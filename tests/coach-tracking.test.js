@@ -123,6 +123,14 @@ test("relaciona una sesión física propia del plan sin confundirla con una ruti
   assert.equal(option.prefill.routineId, "");
   assert.deepEqual(option.details, ["Dos series de desplazamientos laterales"]);
   assert.equal(weekDisplayTitle(block.weeks[0]), "Semana de partido");
+  assert.equal(weekDisplayTitle({
+    ...block.weeks[0],
+    label: "Semana 39 · 21 al 27 sept"
+  }), "Semana de partido");
+  assert.equal(weekDisplayTitle({
+    ...block.weeks[0],
+    label: "Semana 39 · Semana de competencia"
+  }), "Semana de competencia");
   const actual = { category: "physical", routineId: "", routineName: "Activación de cancha", dateISO: "2026-09-22" };
   assert.equal(plannedMatchForRecord(actual, block)?.option.id, option.id);
   assert.equal(planAssessment(actual, plannedContextForRecord(actual, block)).status, "unknown");
