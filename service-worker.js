@@ -1,11 +1,11 @@
-const CACHE_NAME = "tgtrain-shell-v90";
+const CACHE_NAME = "tgtrain-shell-v91";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
   "./assets/css/styles.css?v=89",
-  "./assets/js/app.js?v=90",
+  "./assets/js/app.js?v=91",
   "./assets/js/coach-plan.js?v=63",
   "./assets/js/data.js?v=67",
   "./assets/js/storage.js?v=87",
@@ -15,8 +15,8 @@ const APP_SHELL = [
   "./assets/js/training-plan.js?v=69",
   "./assets/js/wearable-link.js?v=67",
   "./assets/js/nutrition.js?v=87",
-  "./assets/js/nutrition-presets.js?v=90",
-  "./assets/js/nutrition-ui.js?v=90",
+  "./assets/js/nutrition-presets.js?v=91",
+  "./assets/js/nutrition-ui.js?v=91",
   "./assets/js/guided-sessions.js?v=68",
   "./assets/js/guided-ui.js?v=72",
   "./assets/js/coach-tracking.js?v=72",

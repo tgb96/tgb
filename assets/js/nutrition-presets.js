@@ -1,6 +1,6 @@
 // Porciones repetibles y valores orientativos redondeados. El pan Ideal usa su etiqueta
 // (2 rebanadas de 63 g = 146,16 kcal). La porción de arroz blanco fue pesada cocida por
-// el usuario (157 g, plato pequeño de 23 cm); sus nutrientes usan la referencia USDA.
+// el usuario (151 g); sus nutrientes usan la referencia USDA.
 // El resto son referencias genéricas y pueden variar por marca, variedad y preparación.
 // Etiqueta: https://www.jumbo.cl/pan-molde-100-int-2087389/p
 // Referencia general para alimentos sin marca: https://fdc.nal.usda.gov/
@@ -29,7 +29,7 @@ export const foodCatalog = {
   granola: food("Granola", "1 cucharada · aprox. 10 g", 45, 1, 6.5, 1.8),
   oats: food("Avena", "1 cucharada · aprox. 10 g", 39, 1.7, 6.6, 0.7),
   nuts: food("Frutos secos", "1 puñado pequeño · aprox. 25 g", 150, 5, 5, 13),
-  rice: food("Arroz blanco cocido", "1 porción habitual · 157 g (plato pequeño de 23 cm)", 204, 4.2, 44.2, 0.4, "measured"),
+  rice: food("Arroz blanco", "1 porción habitual · 151 g", 196, 4.1, 42.5, 0.4, "measured"),
   pasta: food("Fideos cocidos", "1 porción · aprox. ½ taza (100 g)", 158, 5.8, 30.9, 0.9),
   potato: food("Papa", "1 unidad mediana · aprox. 150 g", 130, 3, 30, 0.2),
   chicken: food("Pollo", "1 porción · aprox. 100 g cocidos", 165, 31, 0, 3.6),
