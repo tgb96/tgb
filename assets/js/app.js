@@ -28,7 +28,7 @@ import { createNutritionUI } from "./nutrition-ui.js?v=80";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=80";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=80";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=81";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=68";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
@@ -3052,14 +3052,15 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
       .map(routineForAi);
     const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails, context);
     const analysis = result?.analysis || result;
+    const concreteChanges = record.category === "physical" ? actionableRoutineAiChanges(analysis) : [];
     const latest = repository.get(record.id);
     if (!latest || latest.updatedAt !== record.updatedAt) throw new Error("El registro cambió durante el análisis. Vuelve a analizarlo para incluir sus últimos comentarios.");
     repository.upsert({
       ...attachMatchingPlan(latest),
       routineAiAnalysis: {
         ...analysis,
-        changes: record.category === "physical" ? analysis.changes : [],
-        status: record.category === "physical" ? "pending" : "reviewed",
+        changes: concreteChanges,
+        status: concreteChanges.length ? "pending" : "reviewed",
         planContext: context.currentPlan ? {
           blockId: context.currentPlan.blockId,
           blockUpdatedAt: context.currentPlan.blockUpdatedAt,
@@ -3288,7 +3289,29 @@ function saveRoutineAiStatus(record, status, appliedChanges = []) {
   });
 }
 
-function applyRoutineAiChanges(record, selectedChanges = record.routineAiAnalysis?.changes || []) {
+function actionableRoutineAiChanges(analysis) {
+  return (analysis?.changes || []).filter(change => {
+    if (!["increase", "reduce"].includes(change.action)) return false;
+    const currentWeight = change.currentWeightKg === "" || change.currentWeightKg == null ? "" : Number(change.currentWeightKg);
+    const proposedWeight = change.proposedWeightKg === "" || change.proposedWeightKg == null ? "" : Number(change.proposedWeightKg);
+    return Number(change.currentSets) !== Number(change.proposedSets)
+      || String(change.currentTarget || "").trim() !== String(change.proposedTarget || "").trim()
+      || currentWeight !== proposedWeight;
+  });
+}
+
+function routineAiChangeSummary(change) {
+  const parts = [];
+  if (Number(change.currentSets) !== Number(change.proposedSets)) parts.push(`Series: ${change.currentSets} → ${change.proposedSets}`);
+  if (String(change.currentTarget || "").trim() !== String(change.proposedTarget || "").trim())
+    parts.push(`Repeticiones/tiempo: ${change.currentTarget || "—"} → ${change.proposedTarget || "—"}`);
+  const currentWeight = change.currentWeightKg === "" || change.currentWeightKg == null ? "sin carga" : `${change.currentWeightKg} kg`;
+  const proposedWeight = change.proposedWeightKg === "" || change.proposedWeightKg == null ? "sin carga" : `${change.proposedWeightKg} kg`;
+  if (currentWeight !== proposedWeight) parts.push(`Carga: ${currentWeight} → ${proposedWeight}`);
+  return parts;
+}
+
+function applyRoutineAiChanges(record, selectedChanges = actionableRoutineAiChanges(record.routineAiAnalysis)) {
   const routine = physicalRoutineById(record.routineId);
   if (!routine) return showToast("No se encontró la rutina vinculada a esta propuesta.");
   const settings = loadRoutineSettings();
@@ -3312,7 +3335,7 @@ function applyRoutineAiChanges(record, selectedChanges = record.routineAiAnalysi
   saveRoutineAiStatus(record, "applied", applied);
   renderRoutines();
   renderHistory();
-  showToast(applied.length ? "Propuesta aplicada como base de la próxima rutina." : "Recomendación aceptada sin cambios de carga.");
+  showToast(applied.length ? "Cambios guardados como base de la próxima rutina." : "No había cambios concretos para guardar.");
   renderHome();
 }
 
@@ -3322,7 +3345,8 @@ function createRoutineAiEditor(record) {
   const intro = document.createElement("p");
   intro.textContent = "Elige qué ajustes conservar y edita sus valores antes de aplicarlos.";
   editor.append(intro);
-  (record.routineAiAnalysis?.changes || []).forEach((change, index) => {
+  const proposedChanges = actionableRoutineAiChanges(record.routineAiAnalysis);
+  proposedChanges.forEach((change, index) => {
     const row = document.createElement("div");
     row.className = "routine-ai-edit-row";
     const enabled = document.createElement("input");
@@ -3361,12 +3385,12 @@ function createRoutineAiEditor(record) {
   const apply = document.createElement("button");
   apply.type = "button";
   apply.className = "routine-ai-apply";
-  apply.textContent = "Aplicar ajustes editados";
+  apply.textContent = "Guardar ajustes editados para la próxima rutina";
   apply.addEventListener("click", () => {
     const selected = [...editor.querySelectorAll(".routine-ai-edit-row")].flatMap(row => {
       const [enabled, , sets, target, weight] = row.children;
       if (!enabled.checked) return [];
-      const original = record.routineAiAnalysis.changes[Number(row.dataset.index)];
+      const original = proposedChanges[Number(row.dataset.index)];
       return [{
         ...original,
         proposedSets: Number(sets.value),
@@ -3389,6 +3413,7 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const loading = aiAnalysisInFlight.has(record?.id);
   const analysis = record?.routineAiAnalysis;
   if (analysis) {
+    const proposedChanges = actionableRoutineAiChanges(analysis);
     const decisionLabels = {
       progress: "Progresar",
       maintain: "Mantener",
@@ -3442,17 +3467,22 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       groups.append(group);
     });
     if (groups.childElementCount) card.append(groups);
-    if (analysis.changes?.length) {
+    if (proposedChanges.length) {
       const changes = document.createElement("div");
       changes.className = "routine-ai-changes";
-      analysis.changes.forEach(change => {
+      const changesHeading = document.createElement("strong");
+      changesHeading.className = "routine-ai-changes-heading";
+      changesHeading.textContent = `${proposedChanges.length} cambio${proposedChanges.length === 1 ? " concreto propuesto" : "s concretos propuestos"}`;
+      changes.append(changesHeading);
+      proposedChanges.forEach(change => {
         const row = document.createElement("article");
         const title = document.createElement("strong");
         title.textContent = change.exerciseName;
-        const values = document.createElement("p");
-        const currentWeight = change.currentWeightKg === "" ? "sin carga" : `${change.currentWeightKg} kg`;
-        const proposedWeight = change.proposedWeightKg === "" ? "sin carga" : `${change.proposedWeightKg} kg`;
-        values.textContent = `${change.currentSets} × ${change.currentTarget || "—"} · ${currentWeight} → ${change.proposedSets} × ${change.proposedTarget || "—"} · ${proposedWeight}`;
+        const values = document.createElement("ul");
+        values.className = "routine-ai-change-values";
+        routineAiChangeSummary(change).forEach(value => {
+          const item = document.createElement("li"); item.textContent = value; values.append(item);
+        });
         const reason = document.createElement("small");
         reason.textContent = change.reason;
         row.append(title, values, reason);
@@ -3472,13 +3502,13 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       closing.textContent = analysis.encouragement;
       card.append(closing);
     }
-    if (analysis.status === "pending" && record.category === "physical") {
+    if (analysis.status === "pending" && record.category === "physical" && proposedChanges.length) {
       const actions = document.createElement("div");
       actions.className = "routine-ai-actions";
       const apply = document.createElement("button");
       apply.type = "button";
       apply.className = "routine-ai-apply";
-      apply.textContent = "Aplicar propuesta";
+      apply.textContent = `Guardar ${proposedChanges.length === 1 ? "este cambio" : "estos cambios"} para la próxima rutina`;
       apply.addEventListener("click", () => applyRoutineAiChanges(record));
       const modify = document.createElement("button");
       modify.type = "button";
@@ -3503,7 +3533,9 @@ function createRoutineAiCard(record, { compact = false } = {}) {
     } else if (analysis.status) {
       const status = document.createElement("p");
       status.className = `routine-ai-status ${analysis.status}`;
-      status.textContent = analysis.status === "reviewed" ? "Comentario guardado en tu historial."
+      status.textContent = analysis.status === "pending" && !proposedChanges.length ? "No hay cambios concretos de peso, series o repeticiones para guardar. Mantén la configuración actual y usa las recomendaciones como guía."
+        : analysis.status === "reviewed" && record.category === "physical" && !proposedChanges.length ? "No hay cambios concretos para aplicar en la próxima rutina."
+          : analysis.status === "reviewed" ? "Comentario guardado en tu historial."
         : analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
       card.append(status);
     }

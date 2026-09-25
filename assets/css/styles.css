@@ -607,9 +607,12 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-ai-button { width: 100%; min-height: 49px; margin-top: 12px; border: 0; border-radius: 13px; background: var(--blue); color: white; font-size: 13px; font-weight: 900; }
 .routine-ai-button:disabled { opacity: .58; cursor: wait; }
 .routine-ai-changes { display: grid; gap: 7px; margin-top: 10px; }
+.routine-ai-changes > .routine-ai-changes-heading { color: var(--blue); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; }
 .routine-ai-changes article { padding: 10px; border-radius: 12px; background: white; }
 .routine-ai-changes strong, .routine-ai-changes small { display: block; }
 .routine-ai-changes small { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.routine-ai-change-values { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.routine-ai-change-values li { padding: 7px 9px; border-radius: 9px; background: #f3f5ff; color: var(--ink); font-size: 12px; font-weight: 800; }
 .routine-ai-goal { padding: 9px 10px; border-left: 4px solid var(--lime); border-radius: 10px; background: white; color: var(--ink) !important; font-weight: 800; }
 .routine-ai-actions { margin-top: 11px; display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 6px; }
 .routine-ai-actions button, .routine-ai-editor > button { min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--ink); font-size: 11px; font-weight: 900; }

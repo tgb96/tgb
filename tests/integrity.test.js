@@ -140,8 +140,9 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineAiAnalysis/);
   assert.match(app, /routineEffort-/);
   assert.match(app, /routinePain-/);
-  assert.match(app, /Aplicar propuesta/);
-  assert.match(app, /Aplicar ajustes editados/);
+  assert.match(app, /actionableRoutineAiChanges/);
+  assert.match(app, /Guardar ajustes editados para la próxima rutina/);
+  assert.match(app, /No hay cambios concretos para aplicar/);
   assert.match(app, /Descartar/);
   assert.match(app, /next48Hours/);
   assert.match(app, /repository\.getCoachProfile/);
@@ -289,7 +290,7 @@ test("la guía también analiza registros manuales y el plan reconoce actividade
   assert.match(app, /requestRoutineAiAnalysis\(candidate\.id/);
   assert.match(app, /comparableActivity\(record, item\)/);
   assert.match(app, /currentPlan/);
-  assert.match(app, /status: record\.category === "physical" \? "pending" : "reviewed"/);
+  assert.match(app, /status: concreteChanges\.length \? "pending" : "reviewed"/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
