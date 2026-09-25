@@ -242,6 +242,15 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(bridge, /OxygenSaturationRecord/);
 });
 
+test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya vinculadas", async () => {
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.match(app, /linkedSessionIds\.has\(session\.id\)/);
+  assert.match(app, /Vincular con \$\{recordTitle\(candidates\[0\]\.record\)\}/);
+  assert.match(app, /linkWearableSession\(candidates\[0\]\.record\.id, session\.id\)/);
+  assert.doesNotMatch(app, /Vinculada: \$\{recordTitle\(linkedRecord\)\}/);
+  assert.doesNotMatch(app, /Revisar vínculo/);
+});
+
 test("la voz usa grabación y transcripción con revisión, no Web Speech en la PWA", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");

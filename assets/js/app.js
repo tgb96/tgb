@@ -2650,11 +2650,13 @@ function renderWearable() {
     : "Instala TGTrain Sync, elige Mi Fitness y sincroniza una vez; después se actualizará automáticamente si concedes el permiso de segundo plano.";
   const list = $("wearableSessions");
   list.replaceChildren();
-  const recent = sessions.filter(session => session.startTime && session.endTime)
+  const records = repository.list();
+  const linkedSessionIds = new Set(records.map(record => record.wearableSessionId).filter(Boolean));
+  const recent = sessions.filter(session => session.startTime && session.endTime && !linkedSessionIds.has(session.id))
     .sort((a, b) => String(b.startTime).localeCompare(String(a.startTime))).slice(0, 3);
   if (!recent.length) return;
   const heading = document.createElement("strong");
-  heading.textContent = "Entrenamientos detectados";
+  heading.textContent = "Entrenamientos por vincular";
   list.append(heading);
   for (const session of recent) {
     const row = document.createElement("div");
@@ -2668,27 +2670,33 @@ function renderWearable() {
     const bpm = Number(session.heartRateAvgBpm) > 0 ? ` · ${Math.round(Number(session.heartRateAvgBpm))} lpm media` : "";
     details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}${bpm}`;
     row.append(title, details);
-    const linkedRecord = repository.list().find(record => record.wearableSessionId === session.id);
-    if (linkedRecord) {
-      const status = document.createElement("small");
-      status.textContent = `Vinculada: ${recordTitle(linkedRecord)}`;
-      row.append(status);
+    const candidates = records.filter(record => !record.wearableSessionId && record.category !== "rest")
+      .map(record => ({ record, match: wearableMatch(record, session) })).filter(item => item.match)
+      .sort((a, b) => b.match.score - a.match.score);
+    if (candidates.length === 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `Vincular con ${recordTitle(candidates[0].record)}`;
+      button.addEventListener("click", () => linkWearableSession(candidates[0].record.id, session.id));
+      row.append(button);
+    } else if (candidates.length > 1) {
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", `Elegir registro para ${session.title || "entrenamiento detectado"}`);
+      candidates.slice(0, 8).forEach(({ record }) => {
+        const option = document.createElement("option");
+        option.value = record.id;
+        option.textContent = `${formatShortDate(record.dateISO)} · ${recordTitle(record)}`;
+        select.append(option);
+      });
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Vincular";
+      button.addEventListener("click", () => linkWearableSession(select.value, session.id));
+      row.append(select, button);
     } else {
-      const candidates = repository.list().filter(record => !record.wearableSessionId && record.category !== "rest")
-        .map(record => ({ record, match: wearableMatch(record, session) })).filter(item => item.match)
-        .sort((a, b) => b.match.score - a.match.score);
-      const best = candidates[0];
-      const unique = best && (best.match.score >= 90 || (best.match.score >= 30 && !candidates[1]));
       const status = document.createElement("small");
-      status.textContent = unique ? `Posible registro: ${recordTitle(best.record)}. Confirma antes de vincular.`
-        : "Sin vínculo confirmado con un registro de TGTrain.";
+      status.textContent = "Sin un registro compatible para vincular.";
       row.append(status);
-      if (unique) {
-        const review = document.createElement("button");
-        review.type = "button"; review.textContent = "Revisar vínculo";
-        review.addEventListener("click", () => openHistoryRecord(best.record.id));
-        row.append(review);
-      }
     }
     list.append(row);
   }

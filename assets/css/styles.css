@@ -117,6 +117,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .wearable-session { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; }
 .wearable-session strong { min-width: 0; font-size: 12px; }
 .wearable-session span, .wearable-session small { color: var(--muted); font-size: 10px; text-align: left; }
+.wearable-session select { width: 100%; min-height: 38px; margin-top: 3px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font: inherit; font-size: 11px; font-weight: 750; }
 .wearable-session button { width: fit-content; min-height: 32px; margin-top: 3px; padding: 6px 9px; border: 0; border-radius: 9px; background: var(--night); color: var(--lime); font-size: 10px; font-weight: 850; }
 
 .section-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 28px 2px 13px; }
