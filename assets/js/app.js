@@ -24,9 +24,9 @@ import {
 } from "./coach-plan.js?v=63";
 import { createRepository } from "./storage.js?v=87";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=87";
+import { createNutritionUI } from "./nutrition-ui.js?v=90";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
-import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
+import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=90";
 import { createGuidedUI } from "./guided-ui.js?v=72";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=89";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=69";

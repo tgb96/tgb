@@ -65,6 +65,10 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(Object.values(foodCatalog).every(food => Number.isFinite(food.kcal)));
   assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 1);
   assert.equal(foodCatalog.avocado.portion, "1 porción normal · aprox. 50 g");
+  assert.deepEqual(
+    { name: foodCatalog.rice.name, portion: foodCatalog.rice.portion, kcal: foodCatalog.rice.kcal, proteinG: foodCatalog.rice.proteinG, carbsG: foodCatalog.rice.carbsG, fatG: foodCatalog.rice.fatG, source: foodCatalog.rice.source },
+    { name: "Arroz blanco cocido", portion: "1 porción habitual · 157 g (plato pequeño de 23 cm)", kcal: 204, proteinG: 4.2, carbsG: 44.2, fatG: 0.4, source: "measured" }
+  );
   assert.equal(foodCatalog.arepa, undefined);
   assert.equal(foodCatalog.tuna, undefined);
   assert.deepEqual(estimateParts({ integralBread: 3 }), { caloriesKcal: 219, proteinG: 11.3, carbsG: 36.9, fatG: 2.9 });
