@@ -162,18 +162,33 @@ test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", a
   assert.match(cloud, /Importar planificación con IA/);
 });
 
-test("integra el bloque de cuatro semanas del entrenador con sesiones y alternativas", async () => {
-  const { coachTrainingBlock, coachSessionForDate } = await import("../assets/js/coach-plan.js");
+test("integra el plan y el calendario competitivo con sesiones y alternativas", async () => {
+  const { coachTrainingBlock, coachSessionForDate, matchCalendar, withMatchCalendar } = await import("../assets/js/coach-plan.js");
   const { physicalRoutines, trainingCategories } = await import("../assets/js/data.js");
   const sessions = coachTrainingBlock.weeks.flatMap(week => week.sessions);
-  assert.equal(coachTrainingBlock.weeks.length, 4);
-  assert.equal(sessions.length, 28);
-  assert.equal(new Set(sessions.map(session => session.dateISO)).size, 28);
+  assert.equal(coachTrainingBlock.weeks.length, 9);
+  assert.equal(sessions.length, 43);
+  assert.equal(new Set(sessions.map(session => session.dateISO)).size, 43);
   assert.equal(coachTrainingBlock.startISO, "2026-09-14");
-  assert.equal(coachTrainingBlock.endISO, "2026-10-11");
+  assert.equal(coachTrainingBlock.endISO, "2026-11-22");
   assert.ok(sessions.some(session => session.options.length > 1));
   assert.equal(coachSessionForDate("2026-09-14").options[0].prefill.routineId, "legs");
   assert.equal(coachSessionForDate("2026-09-26").options[0].prefill.tennisTypeId, "match");
+  assert.equal(matchCalendar.length, 6);
+  assert.equal(coachSessionForDate("2026-10-03").calendarStatus, "likely-suspended");
+  assert.equal(coachSessionForDate("2026-10-03").options[0].category, "rest");
+  assert.equal(coachSessionForDate("2026-10-03").options[1].prefill.tennisTypeId, "match");
+  for (const event of matchCalendar.filter(item => item.status === "scheduled")) {
+    const session = coachSessionForDate(event.dateISO);
+    assert.equal(session.opponent, event.opponent);
+    assert.equal(session.startTime, event.startTime);
+    assert.equal(session.options[0].prefill.tennisTypeId, "match");
+  }
+  const imported = withMatchCalendar({ id: "imported", startISO: "2026-10-12", endISO: "2026-10-18", rules: [], weeks: [{ weekKey: "2026-W42", startISO: "2026-10-12", endISO: "2026-10-18", sessions: [{ id: "custom", dateISO: "2026-10-17", primaryOptionId: "generic", options: [{ id: "generic", title: "Tenis", category: "tennis", prefill: { tennisTypeId: "match" } }] }] }] });
+  const importedAgain = withMatchCalendar(imported);
+  const importedMatch = importedAgain.weeks.find(item => item.weekKey === "2026-W42").sessions.find(item => item.dateISO === "2026-10-17");
+  assert.equal(importedMatch.options.filter(item => item.id === "calendar-match-2026-10-17").length, 1);
+  assert.equal(importedMatch.opponent, "Jose Astete");
   const categoryIds = new Set(trainingCategories.map(category => category.id));
   const routines = new Map(physicalRoutines.map(routine => [routine.id, routine]));
   sessions.flatMap(session => session.options).forEach(option => {
@@ -188,16 +203,18 @@ test("integra el bloque de cuatro semanas del entrenador con sesiones y alternat
 
 test("normaliza una respuesta compacta sin campos vacíos", async () => {
   const { normalizeTrainingBlock } = await import("../assets/js/training-plan.js");
-  const block = normalizeTrainingBlock({ title: "Plan compacto", weeks: [{ weekKey: "2026-W39", sessions: [{ dateISO: "2026-09-22", startTime: "20:30", options: [{ title: "Trote 5K", category: "cardio", cardioTypeId: "running", distanceKm: 5 }] }] }] });
+  const block = normalizeTrainingBlock({ title: "Plan compacto", matchCalendarSyncedAt: "2026-09-28T13:00:00.000Z", matchCalendarSource: "https://opentennis.cl/partidos.html", matchCalendar: [{ dateISO: "2026-10-17", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Jose Astete", status: "scheduled" }], weeks: [{ weekKey: "2026-W39", sessions: [{ dateISO: "2026-09-22", startTime: "20:30", options: [{ title: "Trote 5K", category: "cardio", cardioTypeId: "running", distanceKm: 5 }] }] }] });
   assert.equal(block.title, "Plan compacto");
   assert.equal(block.weeks[0].sessions[0].startTime, "20:30");
   assert.equal(block.weeks[0].sessions[0].options[0].prefill.cardioTypeId, "running");
   assert.equal(block.weeks[0].sessions[0].options[0].prefill.distanceKm, 5);
+  assert.equal(block.matchCalendar[0].opponent, "Jose Astete");
+  assert.equal(block.matchCalendarSource, "https://opentennis.cl/partidos.html");
 });
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);

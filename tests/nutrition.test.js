@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionModeForPlannedSession, nutritionPlanForDate, normalizeNutritionEntries, plannedActivityTime, plannedNutritionContext } from "../assets/js/nutrition.js";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
+import { coachSessionForDate } from "../assets/js/coach-plan.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -33,6 +34,8 @@ test("la nutrición sigue la actividad y la hora de la planificación deportiva"
   assert.deepEqual(plannedNutritionContext(match("13:45")), { mode: "early", title: "Partido de escalerilla", summary: undefined, time: "13:45", category: "tennis", isMatch: true });
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "rest", options: [{ id: "rest", category: "rest" }] }), "recovery");
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "trek", options: [{ id: "trek", category: "cardio", prefill: { cardioTypeId: "trekking" } }] }), "trekking");
+  assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-17")), { mode: "early", title: "Partido vs. Jose Astete", summary: "13:45–15:15 · cancha 1 · categoría A", time: "13:45", category: "tennis", isMatch: true });
+  assert.equal(plannedNutritionContext(coachSessionForDate("2026-10-03")).mode, "recovery");
 });
 
 test("los rangos de kcal del entrenador dependen del día y del escenario real", () => {

@@ -20,7 +20,7 @@ const rest = (id, title, summary, details = []) => option(id, title, "rest", sum
 const tennis = (id, title, summary, details, tennisTypeId = "group-training") => option(id, title, "tennis", summary, details, { tennisTypeId });
 const cardio = (id, title, summary, details, cardioTypeId, extra = {}) => option(id, title, "cardio", summary, details, { cardioTypeId, ...extra });
 
-export const coachTrainingBlock = {
+const baseCoachTrainingBlock = {
   id: "rendimiento-tenis-2026-09",
   title: "Rendimiento tenis",
   subtitle: "Fuerza + tenis + recuperación",
@@ -213,6 +213,134 @@ export const coachTrainingBlock = {
     }
   ]
 };
+
+export const matchCalendar = Object.freeze([
+  {
+    dateISO: "2026-10-03", weekKey: "2026-W40", weekNumber: 40, weekStartISO: "2026-09-28", weekEndISO: "2026-10-04",
+    startTime: "15:30", endTime: "17:00", court: 1, category: "A", opponent: "Felipe Reyes", homeSide: false,
+    status: "likely-suspended", note: "Probable suspensión por viaje a la playa. No contar como carga competitiva hasta confirmarlo."
+  },
+  { dateISO: "2026-10-17", weekKey: "2026-W42", weekNumber: 42, weekStartISO: "2026-10-12", weekEndISO: "2026-10-18", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Jose Astete", homeSide: true, status: "scheduled" },
+  { dateISO: "2026-10-24", weekKey: "2026-W43", weekNumber: 43, weekStartISO: "2026-10-19", weekEndISO: "2026-10-25", startTime: "13:45", endTime: "15:15", court: 2, category: "A", opponent: "Nicolás Collao", homeSide: false, status: "scheduled" },
+  { dateISO: "2026-11-07", weekKey: "2026-W45", weekNumber: 45, weekStartISO: "2026-11-02", weekEndISO: "2026-11-08", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Angelo Basualto", homeSide: false, status: "scheduled" },
+  { dateISO: "2026-11-14", weekKey: "2026-W46", weekNumber: 46, weekStartISO: "2026-11-09", weekEndISO: "2026-11-15", startTime: "13:45", endTime: "15:15", court: 2, category: "A", opponent: "Luis Flores", homeSide: false, status: "scheduled" },
+  { dateISO: "2026-11-21", weekKey: "2026-W47", weekNumber: 47, weekStartISO: "2026-11-16", weekEndISO: "2026-11-22", startTime: "15:30", endTime: "17:00", court: 1, category: "A", opponent: "Marcelo López", homeSide: false, status: "scheduled" }
+]);
+
+function dateOffset(dateISO, days) {
+  const date = new Date(`${dateISO}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function calendarMatchOption(event) {
+  const conditional = event.status === "likely-suspended" ? " (si finalmente se juega)" : "";
+  return {
+    id: `calendar-match-${event.dateISO}`,
+    title: `Partido vs. ${event.opponent}${conditional}`,
+    category: "tennis",
+    summary: `${event.startTime}–${event.endTime} · cancha ${event.court} · categoría ${event.category}`,
+    startTime: event.startTime,
+    endTime: event.endTime,
+    details: [`Rival: ${event.opponent}`, "Llegar con tiempo para movilidad y calentamiento progresivo", "No sumar otra sesión física exigente este día", "Después: vuelta a la calma, hidratación y comida de recuperación"],
+    prefill: { tennisTypeId: "match" },
+    calendarStatus: event.status,
+    opponent: event.opponent
+  };
+}
+
+function inactiveMatchOption(event) {
+  const title = event.status === "likely-suspended"
+    ? "Viaje a la playa · partido por confirmar"
+    : event.status === "suspended" ? "Partido suspendido · día flexible" : "Partido por coordinar · carga pendiente";
+  return {
+    id: `calendar-travel-${event.dateISO}`,
+    title,
+    category: "rest",
+    summary: "No contar el partido como carga hasta que Open Tennis confirme fecha y estado",
+    details: [event.note || "Revisar el estado antes de reorganizar la semana", "Una caminata suave y movilidad pueden ser suficientes", "No compensar el partido con una sesión intensa"],
+    prefill: { restTypeId: "planned" },
+    calendarStatus: event.status
+  };
+}
+
+function supportingSession(event, offset) {
+  const before = offset < 0;
+  const dateISO = dateOffset(event.dateISO, offset);
+  return {
+    id: `calendar-${before ? "pre" : "post"}-${event.dateISO}`,
+    dateISO,
+    objective: before ? "Llegar fresco y móvil al partido." : "Recuperar y observar la respuesta corporal.",
+    primaryOptionId: `calendar-${before ? "activation" : "recovery"}-${event.dateISO}`,
+    options: [{
+      id: `calendar-${before ? "activation" : "recovery"}-${event.dateISO}`,
+      title: before ? "Activación prepartido" : "Recuperación postpartido",
+      category: "rest",
+      summary: before ? "Movilidad 10–15 min · sin fuerza pesada" : "Descanso, caminata suave y movilidad opcional",
+      details: before ? ["Movilidad de cadera, tobillo, hombro y muñeca", "Nada de piernas pesadas, trote fuerte ni saltos"] : ["Priorizar sueño, hidratación y comida de recuperación", "Registrar molestias o fatiga antes de volver a cargar"],
+      prefill: { restTypeId: "planned" },
+      calendarStatus: event.status
+    }]
+  };
+}
+
+function calendarWeek(event) {
+  return { weekKey: event.weekKey, number: event.weekNumber, startISO: event.weekStartISO, endISO: event.weekEndISO,
+    label: `Semana de partido · ${event.opponent}`,
+    context: `Partido programado contra ${event.opponent} el sábado ${event.dateISO}, de ${event.startTime} a ${event.endTime}, en cancha ${event.court}.`,
+    objective: "Llegar con energía al partido y recuperar sin acumular fatiga innecesaria.", sessions: [] };
+}
+
+export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalendar?.length ? sourceBlock.matchCalendar : matchCalendar) {
+  if (!sourceBlock?.weeks) return sourceBlock;
+  const block = structuredClone(sourceBlock);
+  block.weeks = Array.isArray(block.weeks) ? block.weeks : [];
+  const calendar = Array.isArray(events) && events.length ? events : matchCalendar;
+  block.matchCalendar = structuredClone(calendar);
+  for (const event of calendar) {
+    const isConfirmed = event.status === "scheduled";
+    let week = block.weeks.find(item => item.weekKey === event.weekKey || (event.dateISO >= item.startISO && event.dateISO <= item.endISO));
+    if (!week) { week = calendarWeek(event); block.weeks.push(week); }
+    week.sessions = Array.isArray(week.sessions) ? week.sessions : [];
+    week.label = isConfirmed ? `Semana de partido · ${event.opponent}` : event.status === "likely-suspended" ? "Semana de viaje y partido por confirmar" : "Semana de partido por confirmar";
+    week.context = !isConfirmed
+      ? `${event.note || `El partido contra ${event.opponent} no está confirmado.`} No se cuenta como carga hasta confirmarlo.`
+      : `Partido programado contra ${event.opponent} el sábado ${event.dateISO}, de ${event.startTime} a ${event.endTime}, en cancha ${event.court}.`;
+    week.objective = !isConfirmed ? "Mantener la semana flexible y evitar compensar con carga innecesaria." : "Llegar con energía al partido y recuperar sin acumular fatiga innecesaria.";
+    let session = week.sessions.find(item => item.dateISO === event.dateISO);
+    if (!session) { session = { id: `calendar-session-${event.dateISO}`, dateISO: event.dateISO, options: [] }; week.sessions.push(session); }
+    const existingAlternatives = (session.options || []).filter(item => !String(item.id || "").startsWith("calendar-") && !(item.category === "tennis" && item.prefill?.tennisTypeId === "match"));
+    const matchOption = calendarMatchOption(event);
+    session.objective = !isConfirmed ? "Confirmar fecha y estado del partido y adaptar el día sin compensar." : `Competir contra ${event.opponent} con calentamiento y recuperación adecuados.`;
+    Object.assign(session, { startTime: event.startTime, endTime: event.endTime, calendarStatus: event.status, opponent: event.opponent, court: event.court, matchCategory: event.category });
+    if (!isConfirmed) {
+      const travel = inactiveMatchOption(event);
+      session.primaryOptionId = travel.id;
+      session.options = [travel, matchOption, ...existingAlternatives];
+    } else {
+      session.primaryOptionId = matchOption.id;
+      session.options = [matchOption, ...existingAlternatives];
+      for (const offset of [-1, 1]) {
+        const dateISO = dateOffset(event.dateISO, offset);
+        if (!week.sessions.some(item => item.dateISO === dateISO)) week.sessions.push(supportingSession(event, offset));
+      }
+    }
+    week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  }
+  block.weeks.sort((a, b) => a.startISO.localeCompare(b.startISO));
+  block.startISO = [block.startISO, ...block.weeks.map(week => week.startISO)].filter(Boolean).sort()[0];
+  block.endISO = [block.endISO, ...block.weeks.map(week => week.endISO)].filter(Boolean).sort().at(-1);
+  const calendarRules = [
+    "El calendario de partidos de escalerilla prevalece al adaptar carga, recuperación y nutrición de cada semana.",
+    "En las 48 horas previas a un partido confirmado evita piernas pesadas, pliometría intensa y cardio exigente.",
+    "El partido del 3 de octubre contra Felipe Reyes está probablemente suspendido por viaje a la playa: no se cuenta como carga hasta confirmarlo."
+  ];
+  block.rules = [...new Set([...(block.rules || []), ...calendarRules])];
+  return block;
+}
+
+export const coachTrainingBlock = withMatchCalendar(baseCoachTrainingBlock);
+export const coachBaseTrainingBlock = baseCoachTrainingBlock;
 
 export function coachSessionForDate(dateISO, block = coachTrainingBlock) {
   for (const week of block.weeks) {

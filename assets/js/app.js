@@ -18,18 +18,21 @@ import {
 } from "./data.js?v=67";
 import {
   coachOption,
+  coachBaseTrainingBlock,
   coachSessionForDate,
   coachTrainingBlock,
-  coachWeekForDate
-} from "./coach-plan.js?v=63";
-import { createRepository } from "./storage.js?v=87";
+  coachWeekForDate,
+  withMatchCalendar
+} from "./coach-plan.js?v=93";
+import { createRepository } from "./storage.js?v=93";
 import { createCloudSync } from "./cloud.js?v=74";
 import { createNutritionUI } from "./nutrition-ui.js?v=91";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=91";
 import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=89";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=69";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=92";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=93";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=93";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
@@ -178,7 +181,8 @@ function openRegistration() {
 }
 
 function activeTrainingBlock() {
-  return newestTrainingBlock(repository.listTrainingBlocks()) || coachTrainingBlock;
+  const saved = newestTrainingBlock(repository.listTrainingBlocks());
+  return saved ? withMatchCalendar(saved) : coachTrainingBlock;
 }
 
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
@@ -749,6 +753,11 @@ function updateCloudStatus(status) {
   $("cloudPlanStatus").textContent = importedPlan
     ? `Plan activo en este dispositivo: ${activePlan.title}${Number.isFinite(updatedAt) ? ` · actualizado ${new Date(updatedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}` : ""}.`
     : "Plan activo: el plan incluido en TGTrain. Aún no hay una planificación importada en este dispositivo.";
+  const matchCount = activePlan.matchCalendar?.length || 0;
+  const matchSyncedAt = Date.parse(activePlan.matchCalendarSyncedAt || "");
+  $("matchSyncStatus").textContent = Number.isFinite(matchSyncedAt)
+    ? `${matchCount} partidos futuros desde Open Tennis · actualizado ${new Date(matchSyncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}.`
+    : "Usando las fechas incluidas en TGTrain. Puedes consultar ahora la programación pública de Tomás Gómez.";
 
   const identity = $("cloudIdentity");
   const hasUser = Boolean(status.user);
@@ -913,6 +922,34 @@ function renderCoachQuestions() {
     }
     history.append(exchange);
   });
+}
+
+async function syncMatchCalendar() {
+  const button = $("syncMatchesButton");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Consultando Open Tennis…";
+  try {
+    const result = await syncOpenTennisMatches({ playerName: "Tomás Gómez", todayISO: getChileDateISO() });
+    const sourceBlock = newestTrainingBlock(repository.listTrainingBlocks()) || coachBaseTrainingBlock;
+    repository.saveTrainingBlock({
+      ...sourceBlock,
+      matchCalendar: result.matches,
+      matchCalendarSource: result.source,
+      matchCalendarSyncedAt: result.syncedAt,
+      updatedAt: result.syncedAt
+    });
+    renderHome();
+    renderCoachPlanDialog();
+    updateCloudStatus(currentCloudStatus);
+    const pending = result.matches.filter(item => item.status !== "scheduled").length;
+    showToast(`${result.matches.length} partidos actualizados${pending ? `; ${pending} todavía no confirmado${pending === 1 ? "" : "s"}` : ""}.`);
+  } catch (error) {
+    showToast(error?.message || "No fue posible actualizar los partidos.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 }
 
 function wearableDayForCoach(day) {
@@ -3075,6 +3112,10 @@ function routineAiContext(record) {
         plannedTitle: option?.title || "",
         category: option?.category || "",
         summary: option?.summary || "",
+        startTime: session.startTime || option?.startTime || "",
+        endTime: session.endTime || option?.endTime || "",
+        calendarStatus: session.calendarStatus || option?.calendarStatus || "",
+        opponent: session.opponent || option?.opponent || "",
         alternatives: (session.options || []).map(item => item.title)
       };
     });
@@ -3088,6 +3129,10 @@ function routineAiContext(record) {
     title: match.option.title,
     summary: match.option.summary,
     objective: match.session.objective,
+    startTime: match.session.startTime || match.option.startTime || "",
+    endTime: match.session.endTime || match.option.endTime || "",
+    calendarStatus: match.session.calendarStatus || match.option.calendarStatus || "",
+    opponent: match.session.opponent || match.option.opponent || "",
     details: match.option.details || [],
     target: match.option.prefill || {},
     referenceRoutine: match.option.category === "physical" ? physicalRoutineById(match.option.prefill?.routineId) : null,
@@ -5065,6 +5110,7 @@ function bindEvents() {
   $("coachProfileForm").addEventListener("submit", saveCoachProfile);
   $("cloudSignInButton").addEventListener("click", signInToCloud);
   $("cloudSyncButton").addEventListener("click", syncCloudNow);
+  $("syncMatchesButton").addEventListener("click", syncMatchCalendar);
   $("cloudSignOutButton").addEventListener("click", async () => {
     try { await cloudSync.signOut(); } catch { showToast("No fue posible cerrar la sesión."); }
   });

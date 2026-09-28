@@ -11,6 +11,36 @@ const list = (value, maxItems = 20, maxLength = 500) => Array.isArray(value)
   ? value.slice(0, maxItems).map(item => text(item, maxLength)).filter(Boolean)
   : [];
 
+function normalizeMatchCalendar(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 50).flatMap(item => {
+    const dateISO = text(item?.dateISO, 10);
+    const startTime = text(item?.startTime, 5);
+    const endTime = text(item?.endTime, 5);
+    const opponent = text(item?.opponent, 200);
+    if (!isValidISODate(dateISO) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || !opponent) return [];
+    const info = isoWeekInfo(dateISO);
+    const status = ["scheduled", "likely-suspended", "suspended", "pending"].includes(item?.status) ? item.status : "scheduled";
+    const courtValue = Number(item?.court);
+    return [{
+      dateISO,
+      weekKey: info.weekKey,
+      weekNumber: info.weekNumber,
+      weekStartISO: info.startISO,
+      weekEndISO: info.endISO,
+      startTime,
+      endTime,
+      court: Number.isFinite(courtValue) && courtValue > 0 ? courtValue : text(item?.court, 40),
+      category: text(item?.category, 40),
+      opponent,
+      homeSide: Boolean(item?.homeSide),
+      status,
+      matchId: text(item?.matchId, 160),
+      note: text(item?.note, 500),
+      source: text(item?.source, 300)
+    }];
+  }).sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.startTime.localeCompare(b.startTime));
+}
+
 function slug(value, fallback = "plan") {
   const normalized = text(value, 200)
     .normalize("NFD")
@@ -153,6 +183,9 @@ export function normalizeTrainingBlock(raw) {
     source: text(raw.source, 200) || "Importado con IA",
     rules: list(raw.rules, 30, 1000),
     priority: list(raw.priority, 10, 200),
+    matchCalendar: normalizeMatchCalendar(raw.matchCalendar),
+    matchCalendarSource: text(raw.matchCalendarSource, 300),
+    matchCalendarSyncedAt: text(raw.matchCalendarSyncedAt, 40),
     weeks,
     createdAt: text(raw.createdAt, 40) || new Date().toISOString(),
     updatedAt: text(raw.updatedAt, 40) || new Date().toISOString()
