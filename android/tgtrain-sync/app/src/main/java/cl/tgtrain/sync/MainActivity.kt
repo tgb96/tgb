@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         root.addView(signOutButton)
-        root.addView(text("Con el permiso en segundo plano, se intentará actualizar automáticamente cada 30 minutos con internet; Android puede retrasarlo para ahorrar batería. Al abrir la app también se actualizarán los datos recientes. El botón manual recupera los últimos 14 días. Primero sincroniza la pulsera con Mi Fitness; TGTrain Sync no puede forzar esa transferencia.", 12f, Color.LTGRAY).apply {
+        root.addView(text("Con el permiso en segundo plano, se intentará actualizar automáticamente cada 15 minutos con internet; Android puede retrasarlo para ahorrar batería. Al abrir la app también se actualizarán los datos recientes. El botón manual recupera los últimos 14 días. Primero sincroniza la pulsera con Mi Fitness; TGTrain Sync no puede forzar esa transferencia.", 12f, Color.LTGRAY).apply {
             setPadding(0, dp(12), 0, 0)
         })
     }

@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 
 object AutomaticSync {
     private const val JOB_NAME = "tgtrain_health_connect_sync"
-    const val INTERVAL_MINUTES = 30L
+    const val INTERVAL_MINUTES = 15L
 
     suspend fun refresh(context: Context) {
         val service = HealthSyncService(context)
@@ -34,7 +34,7 @@ object AutomaticSync {
         val request = PeriodicWorkRequestBuilder<HealthSyncWorker>(INTERVAL_MINUTES, TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        manager.enqueueUniquePeriodicWork(JOB_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        manager.enqueueUniquePeriodicWork(JOB_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 }
 

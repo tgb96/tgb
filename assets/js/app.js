@@ -24,15 +24,16 @@ import {
   coachWeekForDate,
   withMatchCalendar
 } from "./coach-plan.js?v=93";
-import { createRepository } from "./storage.js?v=93";
+import { createRepository } from "./storage.js?v=94";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=91";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
-import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=91";
-import { createGuidedUI } from "./guided-ui.js?v=72";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=92";
+import { createNutritionUI } from "./nutrition-ui.js?v=94";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
+import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
+import { createGuidedUI } from "./guided-ui.js?v=94";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=94";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=93";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=93";
+import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
@@ -91,11 +92,13 @@ const nutritionUI = createNutritionUI(repository, {
   getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock()),
   getNutritionInsight: dateISO => repository.getNutritionEntry(`nutrition-analysis-${dateISO}`),
   analyzeNutritionDay: dateISO => requestNutritionAnalysis(dateISO),
-  isNutritionAnalysisLoading: dateISO => nutritionAnalysisInFlight.has(dateISO)
+  isNutritionAnalysisLoading: dateISO => nutritionAnalysisInFlight.has(dateISO),
+  analyzeMealPhoto: (file, context) => aiClient.analyzeMealPhoto(file, context)
 });
 const guidedUI = createGuidedUI(repository, {
   showView: name => showView(name),
   showToast: message => showToast(message),
+  onStateChanged: () => renderActiveSessionDock(),
   onSaved: record => {
     openHistoryRecord(record.id);
     const hasMainActivity = repository.list().some(item => item.dateISO === record.dateISO && isMainDayRecord(item));
@@ -139,6 +142,7 @@ const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const PLANNED_ROUTINE_CONTEXT_KEY = "tgb-planned-routine-v1";
 const PLANNED_ACTIVITY_KEY = "tgb-planned-activity-v1";
+const MATCH_SYNC_CHECK_KEY = "tgb-open-tennis-auto-check-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
 const TIMER_REST_OPTIONS = [20, 30, 40, 50];
@@ -171,7 +175,85 @@ function showView(name) {
   if (name === "guided") guidedUI.render();
   if (name === "history") renderHistory();
   if (name === "nutrition") nutritionUI.render();
+  renderActiveSessionDock();
   window.scrollTo({ top: 0, behavior: name === "routines" ? "auto" : "smooth" });
+}
+
+function routineExerciseStates(session = loadRoutineSession()) {
+  const routine = session ? physicalRoutineById(session.routineId) : null;
+  if (!routine || session.status !== "active") return [];
+  const progress = loadRoutineProgress();
+  const settings = loadRoutineSettings();
+  return routineExercisesForDate(routine, session.dateISO).map(exercise => {
+    const sets = currentExerciseSettings(routine, exercise, settings).sets;
+    const completed = Array.from({ length: sets }, (_, index) => index)
+      .filter(index => progress[routineProgressKey(session.dateISO, routine.id, exercise.id, index)]).length;
+    return { exercise, sets, completed };
+  });
+}
+
+function activeRoutineStep(session = loadRoutineSession()) {
+  const states = routineExerciseStates(session);
+  if (!states.length) return null;
+  const preferred = states.find(state => state.exercise.id === session.activeExerciseId && state.completed < state.sets);
+  const partial = states.find(state => state.completed > 0 && state.completed < state.sets);
+  const pending = states.find(state => state.completed < state.sets);
+  const state = preferred || partial || pending;
+  const completedSets = states.reduce((total, item) => total + item.completed, 0);
+  const totalSets = states.reduce((total, item) => total + item.sets, 0);
+  return { state, states, completedSets, totalSets, allExercisesComplete: !state };
+}
+
+function openActiveSession() {
+  const session = loadRoutineSession();
+  if (session?.status === "active") {
+    openRoutineId = session.routineId;
+    showView("routines");
+    scrollToRoutineProgress(session.routineId);
+    return;
+  }
+  if (guidedUI.getState()) {
+    guidedUI.resumePending();
+    return;
+  }
+  const planned = loadPlannedActivity();
+  if (plannedActivityContext(planned)) openTodayPlannedActivity();
+}
+
+function renderActiveSessionDock() {
+  const dock = $("activeSessionDock");
+  if (!dock) return;
+  const session = loadRoutineSession();
+  const routine = session ? physicalRoutineById(session.routineId) : null;
+  const routineActive = session?.status === "active" && routine;
+  const guided = guidedUI.getState();
+  const plannedState = loadPlannedActivity();
+  const planned = plannedActivityContext(plannedState);
+  const active = routineActive || guided || planned;
+  dock.classList.toggle("hidden", !active);
+  document.body.classList.toggle("has-active-session", Boolean(active));
+  if (!active) return;
+  if (routineActive) {
+    const step = activeRoutineStep(session);
+    $("activeSessionDockLabel").textContent = "Sesión activa";
+    $("activeSessionDockTitle").textContent = step?.state?.exercise?.name || "Cierre y abdominales";
+    $("activeSessionDockMeta").textContent = `${routine.name} · ${step?.completedSets || 0}/${step?.totalSets || 0} series · ${formatClock(routineSessionElapsedSeconds(session))}`;
+    $("activeSessionDockButton").textContent = "Volver al ejercicio";
+    return;
+  }
+  if (guided) {
+    const guidedName = guided.kind === "warmup" ? "Calentamiento guiado" : "Estiramientos guiados";
+    $("activeSessionDockLabel").textContent = guided.status === "review" ? "Sesión por guardar" : "Sesión guiada";
+    $("activeSessionDockTitle").textContent = guidedName;
+    $("activeSessionDockMeta").textContent = guided.status === "review" ? "Revisa y guarda el resultado" : `Paso ${Number(guided.index || 0) + 1}`;
+    $("activeSessionDockButton").textContent = "Continuar";
+    return;
+  }
+  const step = activeRoutineStep(session);
+  $("activeSessionDockLabel").textContent = plannedState.status === "finished" ? "Actividad por guardar" : "Actividad programada";
+  $("activeSessionDockTitle").textContent = planned.option.title;
+  $("activeSessionDockMeta").textContent = plannedState.status === "finished" ? "Completa el registro" : "Cronómetro en curso";
+  $("activeSessionDockButton").textContent = "Continuar";
 }
 
 function openRegistration() {
@@ -410,6 +492,7 @@ function startGenericPlannedActivity(session, option, block) {
   } catch { return showToast("No se pudo conservar el temporizador de esta actividad."); }
   renderPlannedActivityDialog(session, block);
   if (!$("plannedActivityDialog").open) $("plannedActivityDialog").showModal();
+  renderActiveSessionDock();
   renderHome();
 }
 
@@ -422,6 +505,7 @@ function finishGenericPlannedActivity() {
   const finished = { ...state, status: "finished", endedAt, durationSeconds };
   try { savePlannedActivity(finished); }
   catch { return showToast("No se pudo conservar la duración. Inténtalo otra vez."); }
+  renderActiveSessionDock();
   $("plannedActivityDialog").close();
   openPlannedRegistration(context.session, context.option, context.block, finished);
   showToast("Tiempo guardado. Completa las calorías y sensaciones para registrar la actividad.");
@@ -924,11 +1008,12 @@ function renderCoachQuestions() {
   });
 }
 
-async function syncMatchCalendar() {
+async function syncMatchCalendar(options = {}) {
+  const silent = options?.silent === true;
   const button = $("syncMatchesButton");
   const originalText = button.textContent;
   button.disabled = true;
-  button.textContent = "Consultando Open Tennis…";
+  if (!silent) button.textContent = "Consultando Open Tennis…";
   try {
     const result = await syncOpenTennisMatches({ playerName: "Tomás Gómez", todayISO: getChileDateISO() });
     const sourceBlock = newestTrainingBlock(repository.listTrainingBlocks()) || coachBaseTrainingBlock;
@@ -942,14 +1027,22 @@ async function syncMatchCalendar() {
     renderHome();
     renderCoachPlanDialog();
     updateCloudStatus(currentCloudStatus);
+    window.localStorage.setItem(MATCH_SYNC_CHECK_KEY, result.syncedAt);
     const pending = result.matches.filter(item => item.status !== "scheduled").length;
-    showToast(`${result.matches.length} partidos actualizados${pending ? `; ${pending} todavía no confirmado${pending === 1 ? "" : "s"}` : ""}.`);
+    if (!silent) showToast(`${result.matches.length} partidos actualizados${pending ? `; ${pending} todavía no confirmado${pending === 1 ? "" : "s"}` : ""}.`);
   } catch (error) {
-    showToast(error?.message || "No fue posible actualizar los partidos.");
+    if (!silent) showToast(error?.message || "No fue posible actualizar los partidos.");
   } finally {
     button.disabled = false;
     button.textContent = originalText;
   }
+}
+
+function maybeSyncMatchCalendar() {
+  const lastCheck = Date.parse(window.localStorage.getItem(MATCH_SYNC_CHECK_KEY) || "");
+  if (Number.isFinite(lastCheck) && Date.now() - lastCheck < 24 * 60 * 60 * 1000) return;
+  window.localStorage.setItem(MATCH_SYNC_CHECK_KEY, new Date().toISOString());
+  syncMatchCalendar({ silent: true });
 }
 
 function wearableDayForCoach(day) {
@@ -1272,6 +1365,35 @@ async function submitCoachQuestion(existing = null) {
   }
 }
 
+function renderDailyBriefing(todayISO, todayPlan, records) {
+  const option = todayPlan ? coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0] : null;
+  const brief = dailyBrief({
+    dateISO: todayISO,
+    planTitle: option?.title || "",
+    records,
+    wearableDays: wearableData.days,
+    nutritionEntries: repository.listNutritionEntries()
+  });
+  $("dailyBriefTitle").textContent = brief.title;
+  $("dailyBriefSummary").textContent = brief.summary;
+  const status = $("dailyBriefStatus");
+  status.textContent = brief.label;
+  status.className = `daily-brief-status ${brief.tone}`;
+  const signals = $("dailyBriefSignals");
+  signals.replaceChildren();
+  brief.signals.forEach(value => {
+    const item = document.createElement("li");
+    item.textContent = value;
+    signals.append(item);
+  });
+  const active = loadRoutineSession()?.status === "active" || guidedUI.hasPending() || Boolean(plannedActivityContext(loadPlannedActivity()));
+  const button = $("dailyBriefAction");
+  button.dataset.action = active ? "active-session" : !brief.hasTodayActivity && todayPlan ? "planned" : brief.meals ? "nutrition" : "register";
+  button.textContent = active ? "Volver a mi sesión"
+    : !brief.hasTodayActivity && todayPlan ? "Iniciar actividad de hoy"
+      : brief.meals ? "Revisar nutrición de hoy" : "Registrar lo que hice";
+}
+
 function renderHome() {
   const todayISO = getChileDateISO();
   const block = activeTrainingBlock();
@@ -1311,6 +1433,7 @@ function renderHome() {
       : todayMainRecords.length ? "Ver registro en historial"
         : "Iniciar actividad programada";
   }
+  renderDailyBriefing(todayISO, todayPlan, allRecords);
   $("weekProgress").textContent = `${activeDays}/7 días`;
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
@@ -2570,6 +2693,7 @@ function saveRoutineSession(session) {
   try {
     if (session) window.localStorage.setItem(ROUTINE_SESSION_KEY, JSON.stringify(session));
     else window.localStorage.removeItem(ROUTINE_SESSION_KEY);
+    renderActiveSessionDock();
   } catch {
     showToast("No se pudo guardar el estado de la sesión.");
   }
@@ -2687,6 +2811,12 @@ function updateRoutineSessionClock() {
   if (display) display.textContent = elapsed;
   const preview = $("routinePreview-time")?.querySelector("strong");
   if (preview) preview.textContent = elapsed;
+  const dockMeta = $("activeSessionDockMeta");
+  if (dockMeta && !$("activeSessionDock")?.classList.contains("hidden")) {
+    const routine = physicalRoutineById(session.routineId);
+    const step = activeRoutineStep(session);
+    dockMeta.textContent = `${routine?.name || "Rutina"} · ${step?.completedSets || 0}/${step?.totalSets || 0} series · ${elapsed}`;
+  }
 }
 
 function ensureRoutineSessionTicker() {
@@ -2945,6 +3075,8 @@ function startRoutineSession(routine) {
     effort: "",
     pain: 0,
     painDetail: "",
+    focusMode: true,
+    activeExerciseId: routineExercisesForDate(routine, dateISO)[0]?.id || "",
     settingsAtStart,
     planBlockId: plannedForRoutine?.blockId || "",
     planWeekKey: plannedForRoutine?.weekKey || "",
@@ -2988,7 +3120,9 @@ function scrollToRoutineProgress(routineId) {
   const nextAfterCompleted = lastCompletedIndex >= 0
     ? exerciseStates.slice(lastCompletedIndex + 1).find(state => state.completedSets < state.setCount)
     : null;
-  const targetState = partialState
+  const selectedState = exerciseStates.find(state => state.exercise.id === session.activeExerciseId);
+  const targetState = selectedState
+    || partialState
     || nextAfterCompleted
     || exerciseStates.find(state => state.completedSets < state.setCount);
 
@@ -2996,7 +3130,9 @@ function scrollToRoutineProgress(routineId) {
     requestAnimationFrame(() => {
       const routineCard = [...document.querySelectorAll("[data-routine-id]")]
         .find(card => card.dataset.routineId === routineId);
-      const target = targetState
+      const target = session.activeExerciseId === "abdominals-finisher"
+        ? routineCard?.querySelector(".abdominal-finisher")
+        : targetState
         ? [...(routineCard?.querySelectorAll("[data-exercise-id]") || [])]
           .find(card => card.dataset.exerciseId === targetState.exercise.id)
         : routineCard?.querySelector(".abdominal-finisher") || routineCard?.querySelector(".routine-finish-card");
@@ -4125,6 +4261,48 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   return panel;
 }
 
+function createRoutineFocusControls(routine, session, displayedExercises, focusId) {
+  const controls = document.createElement("nav");
+  controls.className = "routine-focus-controls";
+  controls.setAttribute("aria-label", "Navegar por la rutina activa");
+  const ids = [...displayedExercises.map(exercise => exercise.id), "abdominals-finisher"];
+  const currentIndex = Math.max(0, ids.indexOf(focusId));
+  const move = nextIndex => {
+    const current = loadRoutineSession();
+    if (current?.status !== "active" || current.routineId !== routine.id) return;
+    saveRoutineSession({ ...current, activeExerciseId: ids[Math.max(0, Math.min(ids.length - 1, nextIndex))] });
+    renderRoutines();
+    scrollToRoutineProgress(routine.id);
+  };
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.textContent = "← Anterior";
+  previous.disabled = currentIndex === 0;
+  previous.addEventListener("click", () => move(currentIndex - 1));
+  const position = document.createElement("span");
+  position.textContent = currentIndex === displayedExercises.length
+    ? "Cierre de la rutina"
+    : `Ejercicio ${currentIndex + 1} de ${displayedExercises.length}`;
+  const next = document.createElement("button");
+  next.type = "button";
+  next.textContent = currentIndex === ids.length - 1 ? "Ir al cierre ↓" : "Siguiente →";
+  next.disabled = currentIndex === ids.length - 1;
+  next.addEventListener("click", () => move(currentIndex + 1));
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "routine-focus-toggle";
+  toggle.textContent = session.focusMode === false ? "Usar modo enfocado" : "Ver rutina completa";
+  toggle.addEventListener("click", () => {
+    const current = loadRoutineSession();
+    if (current?.status !== "active" || current.routineId !== routine.id) return;
+    saveRoutineSession({ ...current, focusMode: current.focusMode === false });
+    renderRoutines();
+    scrollToRoutineProgress(routine.id);
+  });
+  controls.append(previous, position, next, toggle);
+  return controls;
+}
+
 function renderRoutines() {
   const container = $("routineLibrary");
   let session = loadRoutineSession();
@@ -4188,10 +4366,19 @@ function renderRoutines() {
     const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
     const displayedExercises = routineExercisesForDate(routine, dateISO);
+    const focusStep = isRoutineActive ? activeRoutineStep(session) : null;
+    const savedFocusIsValid = displayedExercises.some(exercise => exercise.id === session?.activeExerciseId)
+      || session?.activeExerciseId === "abdominals-finisher";
+    const focusId = savedFocusIsValid
+      ? session.activeExerciseId
+      : focusStep?.state?.exercise?.id || "abdominals-finisher";
+    body.classList.toggle("routine-focus-mode", isRoutineActive && session.focusMode !== false);
+    if (isRoutineActive) body.append(createRoutineFocusControls(routine, session, displayedExercises, focusId));
     displayedExercises.forEach((exercise, exerciseIndex) => {
       const exerciseCard = document.createElement("article");
       exerciseCard.className = "exercise-card";
       exerciseCard.dataset.exerciseId = exercise.id;
+      exerciseCard.classList.toggle("focus-current", focusId === exercise.id);
       const exerciseSettings = currentExerciseSettings(routine, exercise, settings);
       const exerciseTop = document.createElement("div");
       exerciseTop.className = "exercise-top";
@@ -4260,9 +4447,10 @@ function renderRoutines() {
       weightInput.setAttribute("aria-label", `Peso en kilos de ${exercise.name}`);
       controls.append(
         createControl({ labelText: "Series", input: setsInput }),
-        createControl({ labelText: exerciseTargetMeta(exercise).label, input: targetInput }),
-        createControl({ labelText: "Peso (kg)", input: weightInput })
+        createControl({ labelText: exerciseTargetMeta(exercise).label, input: targetInput })
       );
+      const acceptsLoad = exerciseSettings.weightKg !== "" || /\bkg\b/i.test(`${exercise.weightSuggestion || ""} ${exercise.caution || ""}`);
+      if (acceptsLoad) controls.append(createControl({ labelText: "Peso (kg)", input: weightInput }));
 
       const series = document.createElement("div");
       series.className = "series-checks";
@@ -4293,6 +4481,20 @@ function renderRoutines() {
             updateCounter();
             updateExerciseComplete();
             updateRoutineSessionPreview(routine, progress, settings, dateISO);
+            renderActiveSessionDock();
+            const checkboxes = [...series.querySelectorAll('input[type="checkbox"]')];
+            if (input.checked && checkboxes.length && checkboxes.every(item => item.checked)) {
+              const current = loadRoutineSession();
+              const nextExercise = displayedExercises.slice(exerciseIndex + 1).find(item => {
+                const nextSettings = currentExerciseSettings(routine, item, settings);
+                return Array.from({ length: nextSettings.sets }, (_, nextIndex) => progress[routineProgressKey(dateISO, routine.id, item.id, nextIndex)])
+                  .some(done => !done);
+              });
+              if (current?.status === "active" && current.routineId === routine.id) {
+                saveRoutineSession({ ...current, activeExerciseId: nextExercise?.id || "abdominals-finisher" });
+                requestAnimationFrame(() => { renderRoutines(); scrollToRoutineProgress(routine.id); });
+              }
+            }
           });
           series.append(input, label);
         });
@@ -4320,9 +4522,14 @@ function renderRoutines() {
       exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
       body.append(exerciseCard);
     });
-    body.append(createRoutineAbsFinisher(routine, session, abdominalRecord, displayedExercises.length));
+    const abdominalFinisher = createRoutineAbsFinisher(routine, session, abdominalRecord, displayedExercises.length);
+    abdominalFinisher.classList.toggle("focus-current", focusId === "abdominals-finisher");
+    body.append(abdominalFinisher);
     const finishPanel = createRoutineFinishPanel(routine, session, progress, settings, dateISO);
-    if (finishPanel) body.append(finishPanel);
+    if (finishPanel) {
+      finishPanel.classList.toggle("focus-current", focusId === "abdominals-finisher");
+      body.append(finishPanel);
+    }
     card.append(summary, body);
     container.append(card);
   });
@@ -4652,14 +4859,43 @@ function renderHistoryCoachInsights() {
   insights.forEach(insight => container.append(createCoachInsightDisclosure(insight)));
 }
 
+function renderFourWeekSummary(records) {
+  const summary = rollingFourWeekSummary(records, repository.listNutritionEntries(), wearableData.days, getChileDateISO());
+  const metrics = $("historyFourWeekMetrics");
+  metrics.replaceChildren();
+  const values = [
+    [summary.sessions, "Sesiones"],
+    [summary.minutes, "Minutos"],
+    [summary.tennisSessions, "Tenis"],
+    [summary.physicalSessions, "Físico"],
+    [summary.nutritionDays, "Días con comidas"],
+    [summary.sleepDays, "Noches con sueño"],
+    [summary.painDays, "Días con molestias"]
+  ];
+  values.forEach(([value, labelText]) => metrics.append(balanceMetric(labelText, value)));
+  if (summary.averageSleepMinutes) {
+    metrics.append(balanceMetric("Sueño promedio", `${Math.floor(summary.averageSleepMinutes / 60)} h ${String(summary.averageSleepMinutes % 60).padStart(2, "0")} min`));
+  }
+}
+
 function renderHistory() {
-  const records = repository.list();
+  const allRecords = repository.list();
+  renderFourWeekSummary(allRecords);
+  const category = $("historyCategoryFilter")?.value || "all";
+  const periodDays = Number($("historyPeriodFilter")?.value) || 0;
+  const cutoff = periodDays ? addDaysISO(getChileDateISO(), -(periodDays - 1)) : "";
+  const records = allRecords.filter(record => {
+    if (cutoff && record.dateISO < cutoff) return false;
+    if (category === "all") return true;
+    if (category === "recovery") return ["rest", "warmup", "stretching"].includes(record.category);
+    return record.category === category;
+  });
   const groups = groupRecordsByWeek(records);
   renderHistoryCoachInsights();
-  renderExerciseProgress(records);
-  renderPhysicalRankings(records);
-  renderRunningRankings(records);
-  renderTrekkingRankings(records);
+  renderExerciseProgress(allRecords);
+  renderPhysicalRankings(allRecords);
+  renderRunningRankings(allRecords);
+  renderTrekkingRankings(allRecords);
   $("historyTotal").textContent = `${records.length} ${records.length === 1 ? "registro" : "registros"}`;
   const container = $("historyWeeks");
   container.replaceChildren();
@@ -5046,6 +5282,16 @@ async function registerServiceWorker() {
 }
 
 function bindEvents() {
+  $("activeSessionDockButton").addEventListener("click", openActiveSession);
+  $("dailyBriefAction").addEventListener("click", event => {
+    const action = event.currentTarget.dataset.action;
+    if (action === "active-session") return openActiveSession();
+    if (action === "planned") return openTodayPlannedActivity();
+    if (action === "nutrition") return showView("nutrition");
+    openRegistration();
+  });
+  $("historyCategoryFilter").addEventListener("change", renderHistory);
+  $("historyPeriodFilter").addEventListener("change", renderHistory);
   $("coachQuestionForm").addEventListener("submit", event => {
     event.preventDefault();
     submitCoachQuestion();
@@ -5144,6 +5390,7 @@ function initialize() {
     } else guidedUI.resumePending();
   }
   cloudSync.initialize();
+  queueMicrotask(maybeSyncMatchCalendar);
   registerServiceWorker();
 }
 

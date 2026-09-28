@@ -185,6 +185,32 @@ const coachInsightSchema = {
   required: ["title", "summary", "sections", "encouragement"]
 };
 
+const mealPhotoSchema = {
+  type: "object",
+  properties: {
+    summary: stringSchema,
+    portionNotes: stringSchema,
+    caloriesKcal: nullableNumberSchema,
+    proteinG: nullableNumberSchema,
+    carbsG: nullableNumberSchema,
+    fatG: nullableNumberSchema,
+    confidence: { type: "string", enum: ["low", "medium", "high"] },
+    catalogParts: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        type: "object",
+        properties: {
+          foodId: stringSchema,
+          count: { type: "integer" }
+        },
+        required: ["foodId", "count"]
+      }
+    }
+  },
+  required: ["summary", "portionNotes", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence", "catalogParts"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -220,7 +246,7 @@ export function createAiClient() {
     return ai;
   }
 
-  async function generateJson({ instructions, input, schema, maxOutputTokens, useResponseSchema = true }) {
+  async function generateJson({ instructions, input, parts = [], schema, maxOutputTokens, useResponseSchema = true }) {
     try {
       await initialize();
       const auth = modules.authModule.getAuth();
@@ -237,7 +263,8 @@ export function createAiClient() {
         }
       });
       const schemaGuide = useResponseSchema ? "" : `\n\nFORMATO JSON OBLIGATORIO:\n${JSON.stringify(schema)}`;
-      const result = await model.generateContent(`${input}${schemaGuide}`);
+      const prompt = `${input}${schemaGuide}`;
+      const result = await model.generateContent(parts.length ? [...parts, prompt] : prompt);
       const text = result.response.text();
       if (!text) throw new Error("La IA no devolvió un resultado utilizable.");
       return JSON.parse(text);
@@ -250,6 +277,38 @@ export function createAiClient() {
   }
 
   return {
+    async analyzeMealPhoto(file, context = {}) {
+      if (!(file instanceof File)) throw new Error("Selecciona una foto de la comida.");
+      if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) throw new Error("Usa una foto JPG, PNG o WebP.");
+      if (file.size > 8 * 1024 * 1024) throw new Error("La foto es demasiado grande. Usa una imagen de menos de 8 MB.");
+      const imageData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("No se pudo leer la foto."));
+        reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+        reader.readAsDataURL(file);
+      });
+      const instructions = [
+        "Eres el asistente de registro nutricional de TGTrain. Analiza una sola foto de comida y prepara un borrador editable, nunca un dato exacto.",
+        "Describe solo alimentos visibles. No inventes ingredientes ocultos, aceite, salsas, marcas, método de cocción, peso ni tamaño del plato si el contexto no los entrega.",
+        "Estima un rango visual razonable y devuelve en los campos numéricos el punto medio aproximado. Usa null si la imagen no permite estimarlo.",
+        "Las calorías y macronutrientes deben corresponder al total visible que razonablemente comería la persona, no a 100 gramos.",
+        "catalogParts solo puede usar foodId entregados en catalog y únicamente cuando la coincidencia y la unidad sean razonables. No fuerces coincidencias; puede quedar vacío.",
+        "En portionNotes explica brevemente la principal incertidumbre. Responde en español claro y conciso."
+      ].join("\n");
+      const analysis = await generateJson({
+        instructions,
+        input: JSON.stringify({
+          dateISO: context.dateISO || "",
+          mealSlot: context.slotId || "other",
+          userContext: String(context.userContext || "").slice(0, 1000),
+          catalog: Array.isArray(context.catalog) ? context.catalog.slice(0, 150) : []
+        }),
+        parts: [{ inlineData: { data: imageData, mimeType: file.type } }],
+        schema: mealPhotoSchema,
+        maxOutputTokens: 1200
+      });
+      return { analysis, model: MODEL_NAME };
+    },
     async askCoach(question, context = {}) {
       const catalog = {
         routines: physicalRoutines.map(item => ({ id: item.id, name: item.name })),

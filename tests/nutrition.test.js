@@ -111,6 +111,13 @@ test("una comida ya guardada recibe la estimación visible sin modificar el regi
   assert.equal(nutritionEntryWithEstimate({ ...entry, caloriesKcal: 510, estimateSource: "manual" }).caloriesKcal, 510);
 });
 
+test("conserva el origen editable de una estimación preparada desde foto", () => {
+  const normalized = normalizeNutritionEntries([{ id: "photo-meal", dateISO: "2026-09-28", kind: "meal", slotId: "lunch", text: "Arroz con pollo", caloriesKcal: 620, proteinG: 38, estimateSource: "ai-photo" }]);
+  assert.equal(normalized["photo-meal"].estimateSource, "ai-photo");
+  assert.equal(normalized["photo-meal"].caloriesKcal, 620);
+  assert.equal(normalized["photo-meal"].proteinG, 38);
+});
+
 test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => {
   const entries = Object.values(normalizeNutritionEntries([
     { id: "a", dateISO: "2026-09-22", kind: "meal", text: "Huevo y pan", proteinG: 15 },

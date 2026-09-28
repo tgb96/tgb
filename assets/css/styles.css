@@ -764,6 +764,64 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .data-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .data-actions button { min-height: 46px; border: 1px solid #d0d1cb; border-radius: 13px; background: white; color: var(--ink); font-size: 11px; font-weight: 850; }
 
+.daily-brief-card { margin-top: 15px; padding: 18px; border: 1px solid #cfd8ad; border-radius: 24px; background: linear-gradient(145deg, #fbfff0, #eef6d7); box-shadow: 0 12px 26px rgba(51,70,20,.08); }
+.daily-brief-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.daily-brief-heading h2 { margin: 2px 0 0; font-size: 21px; letter-spacing: -.5px; }
+.daily-brief-status { flex: 0 0 auto; max-width: 145px; padding: 7px 9px; border-radius: 999px; background: #e4e7df; color: #505860; font-size: 10px; font-weight: 900; text-align: center; }
+.daily-brief-status.ready { background: #dff4b2; color: #365600; }
+.daily-brief-status.caution { background: #ffedb8; color: #704900; }
+.daily-brief-status.recover { background: #ffe0d7; color: #8a301e; }
+.daily-brief-card > p { margin: 12px 0 0; color: #3f4930; font-size: 13px; line-height: 1.5; }
+.daily-brief-card ul { margin: 11px 0 0; padding-left: 20px; color: #535d45; font-size: 12px; line-height: 1.5; }
+.daily-brief-card button { width: 100%; min-height: 48px; margin-top: 14px; border: 0; border-radius: 14px; background: var(--night); color: var(--lime); font-size: 13px; font-weight: 900; }
+
+.active-session-dock { position: fixed; z-index: 24; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); margin: auto; padding: 11px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; border: 1px solid rgba(200,255,77,.35); border-radius: 18px; background: rgba(17,21,34,.98); color: white; box-shadow: 0 13px 34px rgba(17,21,34,.34); }
+.active-session-dock div { min-width: 0; }
+.active-session-dock span, .active-session-dock strong, .active-session-dock small { display: block; }
+.active-session-dock span { color: var(--lime); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .7px; }
+.active-session-dock strong { margin-top: 2px; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.active-session-dock small { margin-top: 2px; overflow: hidden; color: #bfc4d0; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.active-session-dock button { min-height: 43px; padding: 0 13px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
+body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-bottom)); }
+
+.routine-focus-controls { margin: 0 0 12px; padding: 10px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; border: 1px solid #cdd7ff; border-radius: 15px; background: #f2f5ff; }
+.routine-focus-controls span { color: var(--blue-dark); font-size: 12px; font-weight: 900; text-align: center; }
+.routine-focus-controls button { min-height: 40px; padding: 7px 10px; border: 0; border-radius: 11px; background: white; color: var(--blue-dark); font-size: 11px; font-weight: 850; }
+.routine-focus-controls button:disabled { opacity: .35; }
+.routine-focus-controls .routine-focus-toggle { grid-column: 1 / -1; background: var(--night); color: white; }
+.routine-body.routine-focus-mode > .exercise-card:not(.focus-current) { display: none; }
+.routine-body.routine-focus-mode > .routine-finish-card:not(.focus-current) { display: none; }
+.routine-body.routine-focus-mode > .routine-finish-card { margin-top: 12px; }
+
+.history-controls { margin-bottom: 13px; padding: 13px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 10px; border: 1px solid var(--line); border-radius: 18px; background: white; }
+.history-controls label { margin: 0; font-size: 12px; }
+.history-controls select { min-width: 0; min-height: 43px; padding: 0 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--ink); }
+.history-four-week { margin-bottom: 14px; padding: 17px; border-radius: 23px; background: var(--night); color: white; }
+.history-four-week h2 { margin: 3px 0 12px; font-size: 20px; }
+.history-four-week-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.history-four-week-metrics > div { padding: 10px; border-radius: 12px; background: rgba(255,255,255,.08); }
+.history-four-week-metrics strong, .history-four-week-metrics span { display: block; }
+.history-four-week-metrics strong { font-size: 17px; }
+.history-four-week-metrics span { margin-top: 3px; color: #bdc3d0; font-size: 10px; }
+
+.nutrition-fast-entry { margin: 10px 0 14px; padding: 12px; border-radius: 14px; background: #f0f4ff; }
+.nutrition-fast-entry > div:first-child strong, .nutrition-fast-entry > div:first-child small { display: block; }
+.nutrition-fast-entry > div:first-child strong { font-size: 13px; }
+.nutrition-fast-entry > div:first-child small { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.nutrition-recent-meals { display: grid; gap: 6px; margin-top: 9px; }
+.nutrition-recent-meals button { min-height: 44px; padding: 8px 9px; border: 1px solid #cdd7ff; border-radius: 10px; background: white; color: var(--blue-dark); text-align: left; }
+.nutrition-recent-meals strong, .nutrition-recent-meals small { display: block; }
+.nutrition-recent-meals strong { overflow: hidden; font-size: 12px; font-weight: 850; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.nutrition-recent-meals small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.nutrition-photo-button, #nutritionAnalyzePhoto { width: 100%; min-height: 43px; margin: 9px 0 0 !important; padding: 10px !important; border: 1px solid #cdd7ff !important; border-radius: 11px !important; background: white !important; color: var(--blue-dark) !important; font-size: 12px !important; font-weight: 900 !important; text-align: center; }
+#nutritionAnalyzePhoto:disabled { opacity: .45; }
+.nutrition-photo-status { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.nutrition-photo-status[data-state="ready"] { color: #426400; font-weight: 750; }
+.nutrition-photo-status[data-state="error"] { color: var(--danger); font-weight: 750; }
+
+#homeCoachFeedback { padding: 2px 0 8px; }
+#homeCoachFeedback + .coach-ask-card { margin-top: 0; }
+
 .bottom-nav { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); min-height: 70px; margin: auto; padding: 7px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 23px; background: rgba(17, 21, 34, 0.96); box-shadow: 0 15px 35px rgba(17, 21, 34, 0.32); backdrop-filter: blur(18px); }
 .nav-item { min-height: 54px; border: 0; border-radius: 17px; background: transparent; color: #949aa8; }
 .nav-item span { display: block; font-size: 21px; line-height: 1; }
@@ -877,6 +935,21 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 
 .empty-history { padding: 28px 18px; border: 1px dashed #c8cac5; border-radius: 23px; color: var(--muted); text-align: center; }
 .hidden { display: none !important; }
+
+@media (max-width: 600px) {
+  .brand small, .cloud-dialog > small, .ai-privacy-note, .ai-confirm-note { font-size: 11px; }
+  .eyebrow { font-size: 11px; letter-spacing: 1.25px; }
+  .routine-duration-average, .routine-abs-record, .exercise-phase { font-size: 10px !important; }
+  .routine-progress, .routine-session-status, .exercise-controls label > span, .abdominal-record-feedback { font-size: 11px; }
+  .routine-balance-grid span, .evolution-metric span, .evolution-metric small, .history-routine-balance span, .history-monthly-stats span { font-size: 10px; }
+  .exercise-progress-card-heading small, .exercise-progress-item summary p, .exercise-attempts span, .exercise-attempts em { font-size: 11px; }
+  .history-entry .history-plan-link, .history-coach-insight > summary small { font-size: 10px; }
+  .nutrition-context-card p:not(.eyebrow), .nutrition-slot > p, .nutrition-coach-empty, .nutrition-coach-summary { font-size: 13px; }
+  .nutrition-plan-suggestions summary, .nutrition-plan-suggestions ul, #nutritionCoachInsight ul, .nutrition-summary-card > p, .nutrition-disclaimer { font-size: 12px; }
+  .nutrition-entry strong { font-size: 13px; }
+  .nutrition-entry small, .nutrition-entry-details summary, .nutrition-entry-details p { font-size: 11px; }
+  .nutrition-entry-dialog input, .nutrition-entry-dialog textarea, .history-controls select { font-size: 16px; }
+}
 
 @media (max-width: 390px) {
   body { padding-left: 10px; padding-right: 10px; }

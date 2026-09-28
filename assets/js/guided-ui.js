@@ -17,7 +17,7 @@ const button = (text, className, handler) => {
   return node;
 };
 
-export function createGuidedUI(repository, { showView, showToast, onSaved } = {}) {
+export function createGuidedUI(repository, { showView, showToast, onSaved, onStateChanged } = {}) {
   let state = null;
   let previewKind = "";
   let previewPlanId = "";
@@ -44,6 +44,7 @@ export function createGuidedUI(repository, { showView, showToast, onSaved } = {}
       if (next) window.localStorage.setItem(KEY, JSON.stringify(next));
       else window.localStorage.removeItem(KEY);
     } catch { showToast?.("No se pudo guardar el avance local. Mantén la app abierta durante la sesión."); }
+    onStateChanged?.(state);
   }
 
   function playStepSound() {

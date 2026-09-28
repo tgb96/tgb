@@ -1,7 +1,7 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=67";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=93";
-import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=87";
-import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=78";
+import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
+import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";

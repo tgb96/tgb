@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=87";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=91";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
+import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=94";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=67";
 
@@ -15,14 +15,102 @@ export function createNutritionUI(repository, {
   getTrainingSession = () => null,
   getNutritionInsight = () => null,
   analyzeNutritionDay = () => {},
-  isNutritionAnalysisLoading = () => false
+  isNutritionAnalysisLoading = () => false,
+  analyzeMealPhoto = null
 } = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
   let selectedSlot = "other";
   let selectedParts = {};
   let estimateSource = "";
+  let selectedPhotoFile = null;
+  let photoAnalysisLoading = false;
   const dialog = byId("nutritionEntryDialog");
+
+  function setPhotoStatus(message = "", state = "") {
+    const status = byId("nutritionPhotoStatus");
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
+  function mealSourceLabel(source) {
+    return ({ label: "Etiqueta", generic: "Estimación promedio", manual: "Ajustado manualmente", "ai-photo": "Borrador estimado por foto" })[source] || "";
+  }
+
+  function applyMealDraft(entry) {
+    selectedParts = { ...(entry.parts || {}) };
+    byId("nutritionMealText").value = entry.note || (Object.keys(selectedParts).length ? "" : entry.text || "");
+    for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
+      byId(field).value = entry[key] ?? "";
+    }
+    estimateSource = entry.estimateSource || "manual";
+    renderSelectedParts({ updateEstimate: false });
+    byId("nutritionMacrosDetails").open = true;
+    byId("nutritionEstimateNote").textContent = `${mealSourceLabel(estimateSource)}. Revisa las cantidades antes de guardar.`;
+  }
+
+  function renderRecentMeals() {
+    const container = byId("nutritionRecentMeals");
+    container.replaceChildren();
+    const seen = new Set();
+    const recent = repository.listNutritionEntries()
+      .filter(entry => !entry.deleted && entry.kind === "meal" && entry.id !== editingId)
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+      .filter(entry => {
+        const key = `${summarizeParts(entry.parts || {})}|${entry.note || entry.text || ""}`.toLowerCase();
+        if (!key.replace("|", "") || seen.has(key)) return false;
+        seen.add(key); return true;
+      }).slice(0, 3);
+    if (!recent.length) {
+      const empty = document.createElement("small");
+      empty.textContent = "Tus comidas habituales aparecerán aquí después del primer registro.";
+      container.append(empty); return;
+    }
+    recent.forEach(entry => {
+      const button = document.createElement("button"); button.type = "button";
+      const title = document.createElement("strong");
+      title.textContent = summarizeParts(entry.parts || {}) || entry.note || entry.text;
+      const detail = document.createElement("small");
+      const metrics = nutritionEntryWithEstimate(entry);
+      detail.textContent = [entry.dateISO, metrics.caloriesKcal !== null ? `${Math.round(metrics.caloriesKcal)} kcal` : ""].filter(Boolean).join(" · ");
+      button.append(title, detail);
+      button.addEventListener("click", () => applyMealDraft(entry));
+      container.append(button);
+    });
+  }
+
+  async function analyzeSelectedPhoto() {
+    if (!selectedPhotoFile || typeof analyzeMealPhoto !== "function" || photoAnalysisLoading) return;
+    photoAnalysisLoading = true;
+    const button = byId("nutritionAnalyzePhoto");
+    button.disabled = true;
+    setPhotoStatus("Analizando la foto y preparando un borrador…", "loading");
+    try {
+      const catalog = Object.values(foodCatalog).map(item => ({ id: item.id, name: item.name, portion: item.portion }));
+      const result = await analyzeMealPhoto(selectedPhotoFile, { dateISO: selectedDate, slotId: selectedSlot, catalog });
+      const analysis = result?.analysis || result;
+      const parts = {};
+      for (const item of analysis?.catalogParts || []) {
+        if (foodCatalog[item.foodId] && Number.isInteger(item.count) && item.count > 0 && item.count <= 20) parts[item.foodId] = item.count;
+      }
+      applyMealDraft({
+        parts,
+        note: [analysis?.summary, analysis?.portionNotes].filter(Boolean).join(". "),
+        caloriesKcal: analysis?.caloriesKcal ?? null,
+        proteinG: analysis?.proteinG ?? null,
+        carbsG: analysis?.carbsG ?? null,
+        fatG: analysis?.fatG ?? null,
+        estimateSource: "ai-photo"
+      });
+      const confidence = ({ high: "alta", medium: "media", low: "baja" })[analysis?.confidence] || "no indicada";
+      setPhotoStatus(`Borrador listo · confianza ${confidence}. Revisa ingredientes, porciones y cifras antes de guardar.`, "ready");
+    } catch (error) {
+      setPhotoStatus(error?.message || "No fue posible analizar la foto.", "error");
+    } finally {
+      photoAnalysisLoading = false;
+      button.disabled = !selectedPhotoFile;
+    }
+  }
 
   function estimateNote(parts) {
     const subtotal = knownPartsSubtotal(parts);
@@ -97,6 +185,11 @@ export function createNutritionUI(repository, {
     byId("nutritionMealTime").value = entry?.time || localTime();
     byId("nutritionMealText").value = entry ? (entry.parts && Object.keys(entry.parts).length ? entry.note || "" : entry.text) : "";
     byId("nutritionIngredientSearch").value = "";
+    selectedPhotoFile = null;
+    byId("nutritionMealPhoto").value = "";
+    byId("nutritionAnalyzePhoto").disabled = true;
+    setPhotoStatus(typeof analyzeMealPhoto === "function" ? "Solo al pulsar Analizar se envía la foto a Gemini; TGTrain no guarda la imagen." : "El análisis por foto requiere iniciar sesión y tener la IA configurada.");
+    renderRecentMeals();
     renderIngredientChoices();
     renderSelectedParts({ updateEstimate: false });
     const estimate = estimateParts(selectedParts);
@@ -164,13 +257,14 @@ export function createNutritionUI(repository, {
       const metricParts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
         .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
       const quick = document.createElement("small");
-      quick.textContent = metricParts.length ? `${metrics.estimateSource === "generic" ? "≈ " : ""}${metricParts.slice(0, 2).join(" · ")}` : "Sin kcal ni macros estimados";
+      const approximate = ["generic", "ai-photo"].includes(metrics.estimateSource);
+      quick.textContent = metricParts.length ? `${approximate ? "≈ " : ""}${metricParts.slice(0, 2).join(" · ")}` : "Sin kcal ni macros estimados";
       body.append(quick);
       if (hasParts || metricParts.length > 2) {
         const details = document.createElement("details"); details.className = "nutrition-entry-details";
         const summary = document.createElement("summary"); summary.textContent = "Ver detalle"; details.append(summary);
         if (hasParts) { const exact = document.createElement("p"); exact.textContent = describeParts(entry.parts); details.append(exact); }
-        if (metricParts.length) { const macros = document.createElement("small"); macros.textContent = `${metrics.estimateSource === "generic" ? "Valores aproximados · " : ""}${metricParts.join(" · ")}`; details.append(macros); }
+        if (metricParts.length) { const macros = document.createElement("small"); macros.textContent = `${mealSourceLabel(metrics.estimateSource) ? `${mealSourceLabel(metrics.estimateSource)} · ` : ""}${metricParts.join(" · ")}`; details.append(macros); }
         body.append(details);
       }
     }
@@ -415,6 +509,12 @@ export function createNutritionUI(repository, {
     byId("nutritionExtraMeal").addEventListener("click", () => openMeal());
     byId("nutritionCoachButton").addEventListener("click", () => analyzeNutritionDay(selectedDate));
     byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
+    byId("nutritionMealPhoto").addEventListener("change", event => {
+      selectedPhotoFile = event.target.files?.[0] || null;
+      byId("nutritionAnalyzePhoto").disabled = !selectedPhotoFile || typeof analyzeMealPhoto !== "function";
+      setPhotoStatus(selectedPhotoFile ? `${selectedPhotoFile.name} · lista para analizar; aún no se ha enviado.` : "Solo al pulsar Analizar se envía la foto; TGTrain no guarda la imagen.");
+    });
+    byId("nutritionAnalyzePhoto").addEventListener("click", analyzeSelectedPhoto);
     for (const id of ["nutritionMealCalories", "nutritionMealProtein", "nutritionMealCarbs", "nutritionMealFat"])
       byId(id).addEventListener("input", () => { estimateSource = "manual"; });
     byId("nutritionEntryClose").addEventListener("click", () => dialog.close());

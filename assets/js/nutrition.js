@@ -183,7 +183,7 @@ export function normalizeNutritionEntries(value) {
     }));
     return [[id, { id, dateISO, kind, slotId: kind === "meal" ? String(item?.slotId || "other").slice(0, 40) : "",
       time: String(item?.time || "").slice(0, 5), text, note: kind === "meal" ? String(item?.note || "").trim().slice(0, 1000) : "",
-      parts: kind === "meal" ? parts : {}, estimateSource: kind === "meal" && ["label", "generic", "manual"].includes(item?.estimateSource) ? item.estimateSource : "",
+      parts: kind === "meal" ? parts : {}, estimateSource: kind === "meal" && ["label", "generic", "manual", "ai-photo"].includes(item?.estimateSource) ? item.estimateSource : "",
       amountMl, planMode, ...metrics,
       title: ["nutrition-analysis", "monthly-summary"].includes(kind) ? String(item?.title || "Comentario del entrenador").trim().slice(0, 200) : "",
       summary: ["nutrition-analysis", "monthly-summary"].includes(kind) ? String(item?.summary || "").trim().slice(0, 3000) : "",

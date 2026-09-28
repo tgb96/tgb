@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=89">
+  <link rel="stylesheet" href="assets/css/styles.css?v=94">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -56,6 +56,16 @@
         </div>
       </div>
 
+      <section id="homeDailyBrief" class="daily-brief-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
+        <div class="daily-brief-heading">
+          <div><p class="eyebrow dark">Centro de hoy</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
+          <span id="dailyBriefStatus" class="daily-brief-status neutral">Contexto parcial</span>
+        </div>
+        <p id="dailyBriefSummary"></p>
+        <ul id="dailyBriefSignals"></ul>
+        <button id="dailyBriefAction" type="button">Continuar mi día</button>
+      </section>
+
       <section class="wearable-card" aria-labelledby="wearableTitle">
         <div class="wearable-heading">
           <div><p class="eyebrow dark">Smart Band · Health Connect</p><h2 id="wearableTitle">Tu pulsera en TGTrain</h2></div>
@@ -81,8 +91,8 @@
       <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
       <div class="section-title-row coach-home-title">
         <div>
-          <p class="eyebrow dark">Guía del entrenador</p>
-          <h2>Tu último análisis</h2>
+          <p class="eyebrow dark">Entrenamiento · nutrición · recuperación</p>
+          <h2>Tu entrenador</h2>
         </div>
       </div>
       <div id="homeCoachFeedback" aria-live="polite"></div>
@@ -288,6 +298,27 @@
         <span id="historyTotal" class="history-total"></span>
       </div>
 
+      <section class="history-controls" aria-label="Filtrar historial">
+        <label for="historyCategoryFilter">Mostrar</label>
+        <select id="historyCategoryFilter">
+          <option value="all">Todas las actividades</option>
+          <option value="physical">Entrenamiento físico</option>
+          <option value="tennis">Tenis</option>
+          <option value="cardio">Cardio</option>
+          <option value="recovery">Recuperación y complementos</option>
+        </select>
+        <label for="historyPeriodFilter">Período</label>
+        <select id="historyPeriodFilter">
+          <option value="all">Todo el historial</option>
+          <option value="28">Últimas 4 semanas</option>
+          <option value="90">Últimos 3 meses</option>
+        </select>
+      </section>
+      <section id="historyFourWeekSummary" class="history-four-week" aria-labelledby="historyFourWeekTitle">
+        <div><p class="eyebrow dark">Últimas 4 semanas</p><h2 id="historyFourWeekTitle">Carga, recuperación y registro</h2></div>
+        <div id="historyFourWeekMetrics" class="history-four-week-metrics"></div>
+      </section>
+
       <details class="exercise-progress-card" aria-labelledby="exerciseProgressTitle">
         <summary class="exercise-progress-card-summary">
           <span class="exercise-progress-card-heading">
@@ -364,7 +395,7 @@
       <p id="matchSyncStatus" class="cloud-plan-status"></p>
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
-      <a class="wearable-download" href="downloads/tgtrain-sync-0.5.0.apk" download>Descargar TGTrain Sync para Android</a>
+      <a class="wearable-download" href="downloads/tgtrain-sync-0.6.0.apk" download>Descargar TGTrain Sync para Android</a>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
@@ -462,6 +493,14 @@
       </div>
       <label for="nutritionMealTime">Hora</label>
       <input id="nutritionMealTime" type="time" required>
+      <section class="nutrition-fast-entry" aria-labelledby="nutritionFastEntryTitle">
+        <div><strong id="nutritionFastEntryTitle">Registro rápido</strong><small>Reutiliza una comida o deja que la IA prepare un borrador desde una foto.</small></div>
+        <div id="nutritionRecentMeals" class="nutrition-recent-meals"></div>
+        <label class="nutrition-photo-button" for="nutritionMealPhoto">Tomar o elegir foto</label>
+        <input id="nutritionMealPhoto" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+        <button id="nutritionAnalyzePhoto" type="button" disabled>Analizar foto con IA</button>
+        <p id="nutritionPhotoStatus" class="nutrition-photo-status" role="status"></p>
+      </section>
       <label for="nutritionIngredientSearch">Agrega los ingredientes de a uno; puedes repetirlos</label>
       <input id="nutritionIngredientSearch" type="search" placeholder="Buscar otro ingrediente, ej.: arroz o plátano">
       <div id="nutritionIngredientChoices" class="nutrition-ingredient-choices" aria-label="Ingredientes disponibles"></div>
@@ -483,6 +522,15 @@
     </form>
   </dialog>
 
+  <aside id="activeSessionDock" class="active-session-dock hidden" aria-live="polite">
+    <div>
+      <span id="activeSessionDockLabel">Sesión activa</span>
+      <strong id="activeSessionDockTitle"></strong>
+      <small id="activeSessionDockMeta"></small>
+    </div>
+    <button id="activeSessionDockButton" type="button">Volver</button>
+  </aside>
+
   <nav class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item active" type="button" data-view-target="home" aria-current="page">
       <span aria-hidden="true">⌂</span><small>Inicio</small>
@@ -503,6 +551,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=93"></script>
+  <script type="module" src="assets/js/app.js?v=94"></script>
 </body>
 </html>

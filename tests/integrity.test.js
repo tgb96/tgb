@@ -15,6 +15,9 @@ test("el enlace de Android entrega un APK y no lo guarda en la caché PWA", asyn
   assert.ok(html.indexOf(apk[0]) < html.indexOf('</dialog>', html.indexOf('id="cloudDialog"')), "La descarga no debe estar en Inicio");
   assert.match(worker, /url\.pathname\.endsWith\("\.apk"\)/);
   assert.ok((await stat(resolve(root, apk[1]))).size > 1_000_000);
+  const automaticSync = await readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/AutomaticSync.kt"), "utf8");
+  assert.match(automaticSync, /INTERVAL_MINUTES = 15L/);
+  assert.match(automaticSync, /ExistingPeriodicWorkPolicy\.UPDATE/);
 });
 
 test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async () => {
@@ -41,6 +44,8 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="coachProfileDialog"/);
   assert.match(html, /id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
+  assert.match(html, /id="homeDailyBrief"/);
+  assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
   assert.doesNotMatch(html, /id="coachVoiceButton"|coach-voice-button/);
   assert.match(html, /id="coachHistoryToggle"/);
@@ -56,6 +61,10 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="startPlannedActivityButton"/);
   assert.doesNotMatch(html, /id="homeRegisterButton"|id="evolutionMetrics"/);
   assert.match(html, /id="exerciseProgress"/);
+  assert.match(html, /id="historyCategoryFilter"/);
+  assert.match(html, /id="historyFourWeekSummary"/);
+  assert.match(html, /id="nutritionMealPhoto"/);
+  assert.match(html, /id="nutritionAnalyzePhoto"/);
   assert.match(html, /<details class="exercise-progress-card"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
@@ -214,7 +223,7 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
@@ -239,6 +248,8 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /useResponseSchema: false/);
   assert.match(ai, /GoogleAIBackend/);
   assert.match(ai, /gemini-3\.5-flash-lite/);
+  assert.match(ai, /analyzeMealPhoto/);
+  assert.match(ai, /inlineData/);
   assert.match(ai, /Mancuernas ajustables con una capacidad máxima de 40 kg/);
   assert.match(ai, /Kettlebell de 4,5 kg/);
   assert.match(ai, /privateCoachProfile/);
