@@ -23,7 +23,7 @@ import {
   coachTrainingBlock,
   coachWeekForDate,
   withMatchCalendar
-} from "./coach-plan.js?v=95";
+} from "./coach-plan.js?v=96";
 import { createRepository } from "./storage.js?v=94";
 import { createCloudSync } from "./cloud.js?v=74";
 import { createNutritionUI } from "./nutrition-ui.js?v=94";
@@ -31,12 +31,12 @@ import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } fro
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 import { createGuidedUI } from "./guided-ui.js?v=95";
 import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=95";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=93";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=95";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=94";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=96";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
 import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=73";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=68";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -837,11 +837,12 @@ function updateCloudStatus(status) {
   $("cloudPlanStatus").textContent = importedPlan
     ? `Plan activo en este dispositivo: ${activePlan.title}${Number.isFinite(updatedAt) ? ` · actualizado ${new Date(updatedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}` : ""}.`
     : "Plan activo: el plan incluido en TGTrain. Aún no hay una planificación importada en este dispositivo.";
-  const matchCount = activePlan.matchCalendar?.length || 0;
+  const importedMatches = activePlan.matchCalendar?.length || 0;
+  const futureMatches = (activePlan.matchCalendar || []).filter(item => item.status !== "played" && item.dateISO >= getChileDateISO()).length;
   const matchSyncedAt = Date.parse(activePlan.matchCalendarSyncedAt || "");
   $("matchSyncStatus").textContent = Number.isFinite(matchSyncedAt)
-    ? `${matchCount} partidos futuros desde Open Tennis · actualizado ${new Date(matchSyncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}.`
-    : "Usando las fechas incluidas en TGTrain. Puedes consultar ahora la programación pública de Tomás Gómez.";
+    ? `${importedMatches} partidos importados · ${futureMatches} vigentes · actualizado ${new Date(matchSyncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}.`
+    : "Usando las fechas incluidas en TGTrain. Puedes importar todos los partidos públicos de Tomás Gómez.";
 
   const identity = $("cloudIdentity");
   const hasUser = Boolean(status.user);
@@ -932,6 +933,33 @@ async function syncCloudNow() {
   }
 }
 
+function requestWearableBridgeSync() {
+  const button = $("wearableSyncButton");
+  const status = $("wearableSyncStatus");
+  if (!button) return;
+  if (!/Android/i.test(navigator.userAgent)) {
+    status.textContent = "Abre TGTrain desde tu Android para lanzar TGTrain Sync y leer Health Connect.";
+    showToast("La sincronización de la pulsera se inicia desde TGTrain Sync en Android.");
+    return;
+  }
+  button.disabled = true;
+  status.textContent = "Abriendo TGTrain Sync… al volver, los datos aparecerán aquí automáticamente.";
+  let returned = false;
+  const restore = () => {
+    if (returned) return;
+    returned = true;
+    button.disabled = false;
+    document.removeEventListener("visibilitychange", restore);
+    if (document.visibilityState === "visible") {
+      status.textContent = "Esperando la actualización de Health Connect…";
+      showToast("Al terminar TGTrain Sync, vuelve aquí para ver los datos de la pulsera.");
+    }
+  };
+  document.addEventListener("visibilitychange", restore);
+  window.location.href = "tgtrain://sync";
+  window.setTimeout(restore, 2200);
+}
+
 function openRegistrationOrActiveRoutine() {
   const session = loadRoutineSession();
   if (session?.status === "active") {
@@ -1010,12 +1038,18 @@ function renderCoachQuestions() {
 
 async function syncMatchCalendar(options = {}) {
   const silent = options?.silent === true;
+  const importAll = options?.all === true;
   const button = $("syncMatchesButton");
   const originalText = button.textContent;
   button.disabled = true;
   if (!silent) button.textContent = "Consultando Open Tennis…";
   try {
-    const result = await syncOpenTennisMatches({ playerName: "Tomás Gómez", todayISO: getChileDateISO() });
+    const result = await syncOpenTennisMatches({
+      playerName: "Tomás Gómez",
+      todayISO: getChileDateISO(),
+      includePast: importAll,
+      includePlayed: importAll
+    });
     const sourceBlock = newestTrainingBlock(repository.listTrainingBlocks()) || coachBaseTrainingBlock;
     repository.saveTrainingBlock({
       ...sourceBlock,
@@ -1029,7 +1063,7 @@ async function syncMatchCalendar(options = {}) {
     updateCloudStatus(currentCloudStatus);
     window.localStorage.setItem(MATCH_SYNC_CHECK_KEY, result.syncedAt);
     const pending = result.matches.filter(item => item.status !== "scheduled").length;
-    if (!silent) showToast(`${result.matches.length} partidos actualizados${pending ? `; ${pending} todavía no confirmado${pending === 1 ? "" : "s"}` : ""}.`);
+    if (!silent) showToast(`${result.matches.length} partidos importados${pending ? `; ${pending} todavía no confirmado${pending === 1 ? "" : "s"}` : ""}.`);
   } catch (error) {
     if (!silent) showToast(error?.message || "No fue posible actualizar los partidos.");
   } finally {
@@ -2651,7 +2685,7 @@ function saveTraining(event) {
     showView("home");
     showToast(message);
   }
-  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(candidate.id, [], { interactive: false });
+  maybeRequestRoutineAiAnalysis(candidate.id, [], { interactive: false });
 }
 
 function editRecord(id) {
@@ -3382,6 +3416,16 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
   }
 }
 
+function maybeRequestRoutineAiAnalysis(recordId, planDetails = [], options = {}) {
+  const record = repository.get(recordId);
+  // La primera evaluación debe esperar a que la pulsera complete las
+  // métricas. Así el comentario no se genera con duración/calorías vacías.
+  if (record?.metricsPending && !record.wearableSessionId) return false;
+  if (!cloudSync.currentUser || !repository.getCoachProfile()) return false;
+  requestRoutineAiAnalysis(recordId, planDetails, options);
+  return true;
+}
+
 function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
@@ -3531,7 +3575,7 @@ function finishRoutineSession(routine) {
   renderRoutines();
   renderHome();
   renderCoachPlanDialog();
-  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(record.id, session.planDetails || [], { interactive: false });
+  maybeRequestRoutineAiAnalysis(record.id, session.planDetails || [], { interactive: false });
   const bandCandidates = wearableCandidates(record, wearableData.sessions, repository.list());
   if (bandCandidates.length) {
     openHistoryRecord(record.id);
@@ -5002,8 +5046,10 @@ function linkWearableSession(recordId, sessionId) {
   renderHistory();
   renderHome();
   if (loadRoutineSession()?.status === "complete") renderRoutines();
-  showToast("Sesión vinculada. El registro manual y la pulsera siguen siendo una sola actividad.");
-  if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(recordId, [], { interactive: false });
+  const evaluationStarted = maybeRequestRoutineAiAnalysis(recordId, [], { interactive: false });
+  showToast(evaluationStarted
+    ? "Sesión vinculada. El entrenador está preparando el comentario con las métricas de la pulsera."
+    : "Sesión vinculada. El registro manual y la pulsera siguen siendo una sola actividad.");
 }
 
 function unlinkWearableSession(recordId) {
@@ -5374,7 +5420,8 @@ function bindEvents() {
   $("coachProfileForm").addEventListener("submit", saveCoachProfile);
   $("cloudSignInButton").addEventListener("click", signInToCloud);
   $("cloudSyncButton").addEventListener("click", syncCloudNow);
-  $("syncMatchesButton").addEventListener("click", syncMatchCalendar);
+  $("wearableSyncButton").addEventListener("click", requestWearableBridgeSync);
+  $("syncMatchesButton").addEventListener("click", () => syncMatchCalendar({ all: true }));
   $("cloudSignOutButton").addEventListener("click", async () => {
     try { await cloudSync.signOut(); } catch { showToast("No fue posible cerrar la sesión."); }
   });

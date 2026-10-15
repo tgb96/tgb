@@ -37,3 +37,11 @@ test("la sincronización consulta las dos hojas públicas sin usar credenciales"
   assert.equal(result.matches.length, 2);
   assert.match(result.source, /opentennis\.cl\/partidos\.html/);
 });
+
+test("la importación completa puede incluir partidos anteriores al día actual", () => {
+  const pastFixture = `${fixture}\n9,1,3 (15:30-17:00),A,Felipe Reyes,Tomás Gómez,01/09/2026,Programado,,m-past`;
+  const futureOnly = parseOpenTennisMatches(pastFixture, results, { todayISO: "2026-09-28" });
+  const allMatches = parseOpenTennisMatches(pastFixture, results, { todayISO: "2026-09-28", includePast: true, includePlayed: true });
+  assert.equal(futureOnly.some(item => item.dateISO === "2026-09-01"), false);
+  assert.equal(allMatches.some(item => item.dateISO === "2026-09-01"), true);
+});

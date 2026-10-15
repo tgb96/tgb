@@ -41,6 +41,8 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /TGTrain/);
   assert.match(html, /id="cloudStatusButton"/);
   assert.match(html, /id="cloudDialog"/);
+  assert.match(html, /id="wearableSyncButton"/);
+  assert.match(html, /id="syncMatchesButton"/);
   assert.match(html, /id="coachProfileDialog"/);
   assert.match(html, /id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
@@ -150,6 +152,8 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /attempts\.slice\(0, 3\)/);
   assert.match(app, /Duración aprox\./);
   assert.match(app, /requestRoutineAiAnalysis/);
+  assert.match(app, /tgtrain:\/\/sync/);
+  assert.match(app, /metricsPending && !record\.wearableSessionId/);
   assert.match(app, /routineAiAnalysis/);
   assert.match(app, /routineEffort-/);
   assert.match(app, /routinePain-/);
@@ -169,6 +173,8 @@ test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", a
   assert.doesNotMatch(home, /coachBlockCard|openAiPlanButton|Plan activo/);
   assert.match(cloud, /id="openAiPlanButton"/);
   assert.match(cloud, /Importar planificación con IA/);
+  assert.match(cloud, /Sincronizar datos de la pulsera/);
+  assert.match(cloud, /Importar todos los partidos/);
 });
 
 test("integra el plan y el calendario competitivo con sesiones y alternativas", async () => {
@@ -341,7 +347,7 @@ test("al finalizar una rutina permite conservar o descartar los ajustes", async 
 test("la guía también analiza registros manuales y el plan reconoce actividades equivalentes", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   assert.match(app, /attachMatchingPlan\(formRecord\(\)\)/);
-  assert.match(app, /requestRoutineAiAnalysis\(candidate\.id/);
+  assert.match(app, /maybeRequestRoutineAiAnalysis\(candidate\.id/);
   assert.match(app, /comparableActivity\(record, item\)/);
   assert.match(app, /currentPlan/);
   assert.match(app, /status: concreteChanges\.length \? "pending" : "reviewed"/);

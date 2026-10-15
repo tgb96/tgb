@@ -8,7 +8,7 @@ import {
   trekkingRoutes,
   TZ
 } from "./data.js?v=67";
-import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=67";
+import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=68";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {

@@ -19,7 +19,7 @@ function normalizeMatchCalendar(value) {
     const opponent = text(item?.opponent, 200);
     if (!isValidISODate(dateISO) || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || !opponent) return [];
     const info = isoWeekInfo(dateISO);
-    const status = ["scheduled", "likely-suspended", "suspended", "pending"].includes(item?.status) ? item.status : "scheduled";
+    const status = ["scheduled", "likely-suspended", "suspended", "pending", "played"].includes(item?.status) ? item.status : "scheduled";
     const courtValue = Number(item?.court);
     return [{
       dateISO,

@@ -1,5 +1,6 @@
 package cl.tgtrain.sync
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var signOutButton: Button
     private var sources: List<String> = emptyList()
     private var busy = false
+    private var syncRequestedFromTgtrain = false
 
     private val permissionLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildScreen()
+        handleSyncIntent(intent)
         refreshAccount()
         val sdkStatus = HealthConnectClient.getSdkStatus(this)
         if (sdkStatus != HealthConnectClient.SDK_AVAILABLE) {
@@ -84,7 +87,25 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::status.isInitialized && sources.isNotEmpty()) maybeSyncOnOpen()
+        if (::status.isInitialized) {
+            maybeStartRequestedSync()
+            if (sources.isNotEmpty()) maybeSyncOnOpen()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleSyncIntent(intent)
+        maybeStartRequestedSync()
+    }
+
+    private fun handleSyncIntent(intent: Intent?) {
+        val data = intent?.data
+        if (intent?.action == Intent.ACTION_VIEW && data?.scheme == "tgtrain" && data.host == "sync") {
+            syncRequestedFromTgtrain = true
+            if (::status.isInitialized) status.text = "Solicitud recibida desde TGTrain. Preparando sincronización…"
+        }
     }
 
     private fun buildScreen() {
@@ -176,7 +197,7 @@ class MainActivity : ComponentActivity() {
                 status.text = "Cuenta conectada. Usa el mismo Gmail que en TGTrain."
             } catch (error: Exception) {
                 status.text = "No se pudo iniciar sesión: ${error.localizedMessage}"
-            } finally { setBusy(false); maybeSyncOnOpen() }
+            } finally { setBusy(false); maybeSyncOnOpen(); maybeStartRequestedSync() }
         }
     }
 
@@ -210,13 +231,14 @@ class MainActivity : ComponentActivity() {
                 refreshAccount()
             } catch (error: Exception) {
                 status.text = "No se pudieron buscar fuentes: ${error.localizedMessage}"
-            } finally { setBusy(false); maybeSyncOnOpen() }
+            } finally { setBusy(false); maybeSyncOnOpen(); maybeStartRequestedSync() }
         }
     }
 
     private fun syncNow() {
         val source = sources.getOrNull(sourcePicker.selectedItemPosition)
         if (source == null) { status.text = "Elige primero una fuente."; return }
+        syncRequestedFromTgtrain = false
         lifecycleScope.launch {
             setBusy(true, "Leyendo Health Connect y subiendo datos a tu cuenta…")
             try {
@@ -242,8 +264,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun maybeStartRequestedSync() {
+        if (!syncRequestedFromTgtrain || busy) return
+        if (auth.currentUser == null) {
+            status.text = "TGTrain pidió sincronizar la pulsera. Inicia sesión con tu cuenta de TGTrain y se ejecutará después."
+            return
+        }
+        if (sources.isEmpty()) {
+            status.text = "TGTrain pidió sincronizar la pulsera. Busca primero la fuente Mi Fitness."
+            return
+        }
+        syncNow()
+    }
+
     private fun maybeSyncOnOpen() {
-        if (busy || auth.currentUser == null) return
+        if (busy || syncRequestedFromTgtrain || auth.currentUser == null) return
         val source = SyncPreferences.source(this)
         if (source.isBlank() || source !in sources) return
         lifecycleScope.launch {

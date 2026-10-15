@@ -392,11 +392,13 @@
     <div class="cloud-actions">
       <button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button>
       <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
-      <button id="syncMatchesButton" type="button">↻ Sincronizar fechas de partidos</button>
+      <button id="wearableSyncButton" type="button">↻ Sincronizar datos de la pulsera</button>
+      <p id="wearableSyncStatus" class="cloud-plan-status"></p>
+      <button id="syncMatchesButton" type="button">↻ Importar todos los partidos</button>
       <p id="matchSyncStatus" class="cloud-plan-status"></p>
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
-      <a class="wearable-download" href="downloads/tgtrain-sync-0.6.0.apk" download>Descargar TGTrain Sync para Android</a>
+      <a class="wearable-download" href="downloads/tgtrain-sync-0.6.1.apk" download>Descargar TGTrain Sync para Android</a>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
@@ -552,6 +554,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=95"></script>
+<script type="module" src="assets/js/app.js?v=96"></script>
 </body>
 </html>

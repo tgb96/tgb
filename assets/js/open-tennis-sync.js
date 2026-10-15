@@ -102,7 +102,12 @@ function matchStatus(fixtureStatus, fixtureObservations, result) {
   return "scheduled";
 }
 
-export function parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName = "Tomás Gómez", todayISO = "0000-00-00" } = {}) {
+export function parseOpenTennisMatches(fixtureCsv, resultsCsv, {
+  playerName = "Tomás Gómez",
+  todayISO = "0000-00-00",
+  includePast = false,
+  includePlayed = false
+} = {}) {
   const player = normalized(playerName);
   const results = resultRows(resultsCsv);
   return parseCsv(fixtureCsv).slice(1).flatMap(columns => {
@@ -112,11 +117,11 @@ export function parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName = "T
     if (!week || normalized(week).startsWith("semana") || !player1 || !player2) return [];
     if (normalized(player1) !== player && normalized(player2) !== player) return [];
     const dateISO = isoDate(columns[6] || columns[10]);
-    if (!dateISO || dateISO < todayISO) return [];
+    if (!dateISO || (!includePast && dateISO < todayISO)) return [];
     const matchId = clean(columns[9]);
     const result = results.byId.get(matchId) || results.byPair.get(pairKey(player1, player2));
     let status = matchStatus(columns[7], columns[8], result);
-    if (status === "played") return [];
+    if (status === "played" && !includePlayed) return [];
     const opponent = normalized(player1) === player ? player2 : player1;
     const { startTime, endTime } = shiftTimes(columns[2]);
     if (!startTime || !endTime) return [];
@@ -189,7 +194,13 @@ async function fetchText(url, fetchImpl) {
   return response.text();
 }
 
-export async function syncOpenTennisMatches({ playerName = "Tomás Gómez", todayISO, fetchImpl = fetch } = {}) {
+export async function syncOpenTennisMatches({
+  playerName = "Tomás Gómez",
+  todayISO,
+  includePast = false,
+  includePlayed = false,
+  fetchImpl = fetch
+} = {}) {
   let fixtureCsv;
   let resultsCsv;
   try {
@@ -202,7 +213,12 @@ export async function syncOpenTennisMatches({ playerName = "Tomás Gómez", toda
     wrapped.cause = error;
     throw wrapped;
   }
-  const matches = applyMatchDateOverrides(parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName, todayISO }), todayISO);
+  const matches = applyMatchDateOverrides(parseOpenTennisMatches(fixtureCsv, resultsCsv, {
+    playerName,
+    todayISO,
+    includePast,
+    includePlayed
+  }), todayISO);
   if (!matches.length) throw new Error("Open Tennis no publicó partidos futuros con fecha y horario para Tomás Gómez.");
   return { matches, syncedAt: new Date().toISOString(), source: OPEN_TENNIS_PAGE_URL };
 }

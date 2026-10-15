@@ -347,8 +347,12 @@ export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalend
   const block = structuredClone(sourceBlock);
   block.weeks = Array.isArray(block.weeks) ? block.weeks : [];
   const calendar = Array.isArray(events) && events.length ? events : matchCalendar;
+  // Conservamos también los partidos jugados en el calendario importado para
+  // que el historial competitivo quede completo, pero no los convertimos en
+  // sesiones futuras ni alteramos semanas ya cerradas.
   block.matchCalendar = structuredClone(calendar);
-  for (const event of calendar) {
+  const planningCalendar = calendar.filter(event => event.status !== "played");
+  for (const event of planningCalendar) {
     const isConfirmed = event.status === "scheduled";
     let week = block.weeks.find(item => item.weekKey === event.weekKey || (event.dateISO >= item.startISO && event.dateISO <= item.endISO));
     if (!week) { week = calendarWeek(event); block.weeks.push(week); }
