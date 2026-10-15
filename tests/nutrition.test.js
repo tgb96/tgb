@@ -34,7 +34,7 @@ test("la nutrición sigue la actividad y la hora de la planificación deportiva"
   assert.deepEqual(plannedNutritionContext(match("13:45")), { mode: "early", title: "Partido de escalerilla", summary: undefined, time: "13:45", category: "tennis", isMatch: true });
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "rest", options: [{ id: "rest", category: "rest" }] }), "recovery");
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "trek", options: [{ id: "trek", category: "cardio", prefill: { cardioTypeId: "trekking" } }] }), "trekking");
-  assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-17")), { mode: "early", title: "Partido vs. Jose Astete", summary: "13:45–15:15 · cancha 1 · categoría A", time: "13:45", category: "tennis", isMatch: true });
+  assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-17")), { mode: "early", title: "Partido vs. Felipe Reyes", summary: "13:45–15:15 · cancha 1 · categoría A", time: "13:45", category: "tennis", isMatch: true });
   assert.equal(plannedNutritionContext(coachSessionForDate("2026-10-03")).mode, "recovery");
 });
 

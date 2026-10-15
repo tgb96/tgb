@@ -103,6 +103,16 @@ test("valida entrenamientos, descansos y campos especiales", () => {
   }).valid, true);
 });
 
+test("permite registrar primero la actividad y completar métricas desde la pulsera", () => {
+  const pending = validateRecord({
+    id: "watch-pending", dateISO: "2026-10-15", category: "cardio", categoryName: "Cardio",
+    cardioTypeId: "running", cardioTypeName: "Trote", metricsPending: true,
+    durationMinutes: "", durationSeconds: "", distanceKm: "", calories: "", sensations: "Ritmo cómodo"
+  });
+  assert.equal(pending.valid, true);
+  assert.equal(pending.record.metricsPending, true);
+});
+
 test("registra descanso planificado o por molestia con detalle obligatorio", () => {
   assert.equal(validateRecord({
     id: "rest-1",

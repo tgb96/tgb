@@ -23,18 +23,18 @@ import {
   coachTrainingBlock,
   coachWeekForDate,
   withMatchCalendar
-} from "./coach-plan.js?v=93";
+} from "./coach-plan.js?v=95";
 import { createRepository } from "./storage.js?v=94";
 import { createCloudSync } from "./cloud.js?v=74";
 import { createNutritionUI } from "./nutrition-ui.js?v=94";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
-import { createGuidedUI } from "./guided-ui.js?v=94";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=94";
+import { createGuidedUI } from "./guided-ui.js?v=95";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=95";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=93";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=93";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=95";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
-import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=72";
+import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=73";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=67";
 import {
@@ -61,7 +61,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=67";
+} from "./utils.js?v=68";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1884,7 +1884,9 @@ function updateCardioExtraFields(values = {}) {
       input.max = String(max);
       input.step = "1";
       input.value = String(value);
-      input.required = cardio.id === "trekking";
+      // La distancia real llegará desde Health Connect; no bloquear el
+      // registro manual por no repetir lo que ya mide el reloj.
+      input.required = false;
       input.setAttribute("aria-label", caption);
       const unit = document.createElement("small");
       unit.textContent = caption;
@@ -1902,13 +1904,15 @@ function updateCardioExtraFields(values = {}) {
     };
 
     if (cardio.id === "running") {
+      const distanceGroup = document.createElement("div");
+      distanceGroup.className = "watch-metric-group";
       const label = document.createElement("label");
       label.htmlFor = "runningDistanceSelect";
       label.textContent = "Distancia del trote";
       const select = document.createElement("select");
       select.id = "runningDistanceSelect";
       select.className = "running-distance-select";
-      select.required = true;
+      select.required = false;
       [
         ["", "Selecciona una distancia"],
         ["3", "3K"],
@@ -1935,17 +1939,23 @@ function updateCardioExtraFields(values = {}) {
       const updateCustom = () => custom.classList.toggle("hidden", select.value !== "other");
       select.addEventListener("change", updateCustom);
       updateCustom();
-      box.append(label, select, helper, custom);
+      distanceGroup.append(label, select, helper, custom);
+      box.append(distanceGroup);
     } else {
+      const distanceGroup = document.createElement("div");
+      distanceGroup.className = "watch-metric-group";
       const label = document.createElement("label");
       label.textContent = cardio.id === "trekking" ? "Distancia del trekking" : "Distancia recorrida";
       const helper = document.createElement("small");
       helper.className = "distance-helper";
       helper.textContent = "Anota los kilómetros y metros por separado.";
-      box.append(label, helper, createDistanceFields());
+      distanceGroup.append(label, helper, createDistanceFields());
+      box.append(distanceGroup);
     }
   }
   if (cardio.id === "trekking") {
+    const trekkingMetrics = document.createElement("div");
+    trekkingMetrics.className = "watch-metric-group";
     const elevationLabel = document.createElement("label");
     elevationLabel.htmlFor = "elevationGainM";
     elevationLabel.textContent = "Desnivel positivo (metros)";
@@ -1958,8 +1968,8 @@ function updateCardioExtraFields(values = {}) {
     elevation.step = "1";
     elevation.value = values.elevationGainM === "" || values.elevationGainM === null || values.elevationGainM === undefined ? "0" : values.elevationGainM;
     elevation.placeholder = "Ej: 650";
-    elevation.required = true;
-    box.append(elevationLabel, elevation);
+    elevation.required = false;
+    trekkingMetrics.append(elevationLabel, elevation);
 
     const ascentLabel = document.createElement("label");
     ascentLabel.textContent = "Tiempo de subida (HH:MM)";
@@ -1970,7 +1980,8 @@ function updateCardioExtraFields(values = {}) {
       durationPart({ id: "ascentHours", label: "Horas", max: 12, value: ascentParts.hours }),
       durationPart({ id: "ascentMinutes", label: "Min", max: 59, value: ascentParts.minutes })
     );
-    box.append(ascentLabel, ascentFields);
+    trekkingMetrics.append(ascentLabel, ascentFields);
+    box.append(trekkingMetrics);
   }
 }
 
@@ -2461,7 +2472,12 @@ function selectCategory(categoryId, record = null) {
   $("activityStartTimeRow").classList.toggle("hidden", !["cardio", "tennis"].includes(categoryId));
   $("activityStartTime").value = record?.activityStartTime || "";
   $("saveTrainingButton").classList.toggle("hidden", isRoutineLauncher);
-  $("calories").required = !isRest && !isRoutineLauncher;
+  // La pulsera aporta las métricas de la sesión. La hora aproximada queda
+  // disponible porque es la señal más útil para ofrecer el vínculo correcto.
+  $("commonMetrics")?.classList.add("hidden");
+  $("commonMetrics")?.setAttribute("aria-hidden", "true");
+  $("watchMetricsNote")?.classList.toggle("hidden", isRest || isRoutineLauncher);
+  $("calories").required = false;
   if (isRest || isRoutineLauncher) {
     $("durationField").replaceChildren();
     $("calories").value = "";
@@ -2500,7 +2516,7 @@ function resetRegistration({ keepPlan = false } = {}) {
   $("activityStartTimeRow").classList.add("hidden");
   $("registrationDateRow").classList.remove("hidden");
   $("saveTrainingButton").classList.remove("hidden");
-  $("calories").required = true;
+  $("calories").required = false;
   $("recordDate").value = getChileDateISO();
 }
 
@@ -2521,7 +2537,8 @@ function formRecord() {
   const routineId = document.querySelector('input[name="routineId"]:checked')?.value || "";
   const cardioTypeId = document.querySelector('input[name="cardioTypeId"]:checked')?.value || "";
   const isRest = currentCategory === "rest";
-  const duration = isRest ? { durationMinutes: "", durationSeconds: "" } : currentDurationValues();
+  const metricsPending = currentCategory !== "rest" && (!editingRecordId || Boolean(existing?.metricsPending));
+  const duration = metricsPending || isRest ? { durationMinutes: "", durationSeconds: "" } : currentDurationValues();
   const preserveRoutineBalance = existing?.category === "physical" && existing.routineId === routineId;
   const customPhysical = currentCategory === "physical" && !routineId && Boolean(plannedRegistrationContext?.customPhysical || existing?.routineName);
   return {
@@ -2542,14 +2559,15 @@ function formRecord() {
       : selectedLocation("cardioLocationSelect", "cardioLocationOther"),
     surface: $("tennisSurface")?.value || "",
     trekkingRoute: $("trekkingRoute")?.value || "",
-    distanceKm: currentDistanceKm(),
-    elevationGainM: $("elevationGainM")?.value ?? "",
-    ascentDurationSeconds: currentAscentDurationSeconds(),
+    distanceKm: metricsPending ? "" : currentDistanceKm(),
+    elevationGainM: metricsPending ? "" : $("elevationGainM")?.value ?? "",
+    ascentDurationSeconds: metricsPending ? "" : currentAscentDurationSeconds(),
     durationMinutes: duration.durationMinutes,
     durationSeconds: duration.durationSeconds,
     durationPrecision: durationMode(),
     activityStartTime: ["cardio", "tennis"].includes(currentCategory) ? $("activityStartTime").value : existing?.activityStartTime || "",
-    calories: isRest ? "" : $("calories").value,
+    calories: isRest || metricsPending ? "" : $("calories").value,
+    metricsPending,
     sensations: isRest ? "" : $("sensations").value,
     routineCompletedSets: preserveRoutineBalance ? existing.routineCompletedSets : "",
     routinePlannedSets: preserveRoutineBalance ? existing.routinePlannedSets : "",
@@ -2618,10 +2636,21 @@ function saveTraining(event) {
   const pending = loadPlannedActivity();
   if (pending?.status === "finished" && pending.blockId === candidate.planBlockId && pending.sessionId === candidate.planSessionId) savePlannedActivity(null);
   resetRegistration();
-  renderHome();
   renderCoachPlanDialog();
-  showView("home");
-  showToast(message);
+  const saved = repository.get(candidate.id);
+  const bandCandidates = saved && saved.category !== "rest"
+    ? wearableCandidates(saved, wearableData.sessions, repository.list()) : [];
+  if (bandCandidates.length) {
+    // No vinculamos automáticamente: abrimos las opciones ordenadas por
+    // fecha/hora/tipo para que el usuario confirme la sesión correcta.
+    showView("history");
+    openHistoryRecord(candidate.id);
+    showToast(`${message} Hay una sesión de la pulsera para revisar y vincular.`);
+  } else {
+    renderHome();
+    showView("home");
+    showToast(message);
+  }
   if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(candidate.id, [], { interactive: false });
 }
 
@@ -3178,6 +3207,8 @@ function routineForAi(record) {
     ascentDurationSeconds: record.ascentDurationSeconds,
     durationSeconds: timing.durationSeconds,
     durationHms: timing.durationHms,
+    metricsPending: Boolean(record.metricsPending),
+    wearableLinked: Boolean(record.wearableSessionId),
     dateISO: record.dateISO,
     routineId: record.routineId,
     routineName: record.routineName,
@@ -3354,14 +3385,15 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
 function finishRoutineSession(routine) {
   const session = loadRoutineSession();
   if (!session || session.status !== "active" || session.routineId !== routine.id) return;
-  const caloriesInput = $(`routineCalories-${routine.id}`);
   const absInput = $(`routineAbsCount-${routine.id}`);
   const sensationsInput = $(`routineSensations-${routine.id}`);
   const effortInput = $(`routineEffort-${routine.id}`);
   const painInput = $(`routinePain-${routine.id}`);
   const painDetailInput = $(`routinePainDetail-${routine.id}`);
   const message = $(`routineFinishMessage-${routine.id}`);
-  const calories = caloriesInput?.value === "" ? null : Number(caloriesInput?.value);
+  // Las calorías, duración y distancia no se preguntan al cerrar la rutina:
+  // quedan pendientes de la sesión registrada en el reloj.
+  const calories = "";
   const absCount = absInput?.value === "" ? null : Number(absInput?.value);
   const sensations = sensationsInput?.value.trim() || "";
   const effort = effortInput?.value === "" ? null : Number(effortInput?.value);
@@ -3382,12 +3414,6 @@ function finishRoutineSession(routine) {
     message.textContent = "Anota cuántos abdominales realizaste al terminar.";
     message.classList.remove("hidden");
     absInput?.focus();
-    return;
-  }
-  if (calories === null || !Number.isFinite(calories) || calories < 0) {
-    message.textContent = "Anota las calorías quemadas para registrar la sesión.";
-    message.classList.remove("hidden");
-    caloriesInput?.focus();
     return;
   }
   if (!sensations) {
@@ -3446,6 +3472,7 @@ function finishRoutineSession(routine) {
     routineEffort: effort,
     routinePain: pain,
     routinePainDetail: painDetail,
+    metricsPending: true,
     routineExercises: summary.exercises,
     routineSummary: "",
     routineAiAnalysis: null,
@@ -3505,6 +3532,12 @@ function finishRoutineSession(routine) {
   renderHome();
   renderCoachPlanDialog();
   if (cloudSync.currentUser && repository.getCoachProfile()) requestRoutineAiAnalysis(record.id, session.planDetails || [], { interactive: false });
+  const bandCandidates = wearableCandidates(record, wearableData.sessions, repository.list());
+  if (bandCandidates.length) {
+    openHistoryRecord(record.id);
+    showToast("Rutina registrada. Revisa la sesión de la pulsera para vincularla.");
+    return;
+  }
   showToast(saveSettingsForNextTime
     ? "Rutina registrada y cambios guardados para la próxima vez."
     : settingsChangeCount > 0
@@ -4154,21 +4187,6 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   eyebrow.textContent = "Cierre de la sesión";
   heading.textContent = "Finaliza y guarda tu entrenamiento";
   copy.textContent = "Puedes terminar aunque la rutina haya quedado parcial. Solo se contará lo que marcaste.";
-  const caloriesLabel = document.createElement("label");
-  caloriesLabel.htmlFor = `routineCalories-${routine.id}`;
-  caloriesLabel.textContent = "Calorías quemadas";
-  const calories = document.createElement("input");
-  calories.id = `routineCalories-${routine.id}`;
-  calories.type = "number";
-  calories.inputMode = "numeric";
-  calories.min = "0";
-  calories.step = "1";
-  calories.placeholder = "Ej: 420";
-  calories.value = session.calories ?? "";
-  calories.addEventListener("input", () => {
-    const current = loadRoutineSession();
-    if (current?.status === "active" && current.routineId === routine.id) saveRoutineSession({ ...current, calories: calories.value });
-  });
   const loadSelect = ({ id, label, min, max, blank = false, value }) => {
     const wrapper = document.createElement("label");
     wrapper.className = "routine-rating-control";
@@ -4253,9 +4271,9 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   finish.id = `routineFinishButton-${routine.id}`;
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), session.calories || "", session.absCount, true, session.effort, session.pain), caloriesLabel, calories, ratings, painDetailWrap, sensations, defaultsOption, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true, session.effort, session.pain), ratings, painDetailWrap, sensations, defaultsOption, message, finish);
   const note = document.createElement("small");
-  note.textContent = "El volumen es estimado y usa los pesos, repeticiones y series que dejaste registrados.";
+  note.textContent = "El volumen es estimado. Duración y calorías quedan pendientes de la sesión de la pulsera para no pedirte datos duplicados.";
   panel.append(note);
   updateRoutineDefaultsChoice(routine, session, settings);
   return panel;

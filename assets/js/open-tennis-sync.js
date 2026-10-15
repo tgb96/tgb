@@ -1,8 +1,15 @@
-import { isoWeekInfo } from "./utils.js?v=67";
+import { isoWeekInfo } from "./utils.js?v=68";
 
 export const OPEN_TENNIS_PAGE_URL = "https://opentennis.cl/partidos.html";
 export const OPEN_TENNIS_FIXTURE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4Uc2YiXkim8OTwSbwK4AYfC1oWWNTX1TCE4RXFyzaK5azjuaHx4nWT1v6Ubiq2Lm9kpYFTJmY6C1d/pub?gid=0&single=true&output=csv";
 export const OPEN_TENNIS_RESULTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4Uc2YiXkim8OTwSbwK4AYfC1oWWNTX1TCE4RXFyzaK5azjuaHx4nWT1v6Ubiq2Lm9kpYFTJmY6C1d/pub?gid=1046180821&single=true&output=csv";
+
+// El partido de Felipe Reyes que figuraba el 03/10 fue coordinado nuevamente
+// para el sábado 17/10. Es una excepción explícita del usuario y prevalece
+// sobre una fila antigua que todavía pueda permanecer publicada en Open Tennis.
+export const MATCH_DATE_OVERRIDES = Object.freeze([
+  { opponent: "Felipe Reyes", fromISO: "2026-10-03", toISO: "2026-10-17", startTime: "13:45", endTime: "15:15", court: 1, status: "scheduled", note: "Partido recuperado y coordinado para este sábado." }
+]);
 
 function clean(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -136,6 +143,45 @@ export function parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName = "T
   }).sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.startTime.localeCompare(b.startTime));
 }
 
+function applyMatchDateOverrides(matches, todayISO = "0000-00-00") {
+  const normalizedToday = String(todayISO || "0000-00-00");
+  let next = (matches || []).map(item => ({ ...item }));
+  for (const override of MATCH_DATE_OVERRIDES) {
+    const isBeforeTarget = normalizedToday <= override.toISO;
+    const old = next.find(item => item.dateISO === override.fromISO && normalized(item.opponent) === normalized(override.opponent));
+    const target = next.find(item => item.dateISO === override.toISO && normalized(item.opponent) === normalized(override.opponent));
+    if (!isBeforeTarget && !target) continue;
+    if (old) {
+      old.dateISO = override.toISO;
+      old.weekKey = isoWeekInfo(override.toISO).weekKey;
+      old.weekNumber = isoWeekInfo(override.toISO).weekNumber;
+      old.weekStartISO = isoWeekInfo(override.toISO).startISO;
+      old.weekEndISO = isoWeekInfo(override.toISO).endISO;
+      old.startTime = override.startTime;
+      old.endTime = override.endTime;
+      old.court = override.court;
+      old.status = override.status;
+      old.note = override.note;
+    } else if (isBeforeTarget && !target) {
+      // Si la página ya retiró la fila antigua, conservamos la coordinación
+      // confirmada para que la preparación del 17 no desaparezca del plan.
+      const info = isoWeekInfo(override.toISO);
+      next.push({
+        dateISO: override.toISO, weekKey: info.weekKey, weekNumber: info.weekNumber,
+        weekStartISO: info.startISO, weekEndISO: info.endISO,
+        startTime: override.startTime, endTime: override.endTime, court: override.court,
+        category: "A", opponent: override.opponent, homeSide: false, status: override.status,
+        matchId: `manual-${override.toISO}-${normalized(override.opponent).replace(/[^a-z0-9]+/g, "-")}`,
+        note: override.note, source: OPEN_TENNIS_PAGE_URL
+      });
+    }
+    // Evitar dos rivales para la misma fecha después de la reprogramación.
+    const hasOverrideTarget = next.some(item => item.dateISO === override.toISO && normalized(item.opponent) === normalized(override.opponent));
+    if (hasOverrideTarget) next = next.filter(item => item.dateISO !== override.toISO || normalized(item.opponent) === normalized(override.opponent));
+  }
+  return next.sort((a, b) => a.dateISO.localeCompare(b.dateISO) || a.startTime.localeCompare(b.startTime));
+}
+
 async function fetchText(url, fetchImpl) {
   const separator = url.includes("?") ? "&" : "?";
   const response = await fetchImpl(`${url}${separator}_tgtrain=${Date.now()}`, { cache: "no-store" });
@@ -156,7 +202,7 @@ export async function syncOpenTennisMatches({ playerName = "Tomás Gómez", toda
     wrapped.cause = error;
     throw wrapped;
   }
-  const matches = parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName, todayISO });
+  const matches = applyMatchDateOverrides(parseOpenTennisMatches(fixtureCsv, resultsCsv, { playerName, todayISO }), todayISO);
   if (!matches.length) throw new Error("Open Tennis no publicó partidos futuros con fecha y horario para Tomás Gómez.");
   return { matches, syncedAt: new Date().toISOString(), source: OPEN_TENNIS_PAGE_URL };
 }

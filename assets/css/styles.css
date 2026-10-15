@@ -374,6 +374,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .rest-detail-box label { margin-top: 0; color: #5f3f91; }
 .rest-detail-box small { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .common-fields { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
+.watch-metrics-note { display: block; margin: 10px 1px 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.watch-metric-group { display: none !important; }
 .suggestion-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 1px 8px; }
 .suggestion-heading span { color: var(--ink); font-size: 11px; font-weight: 850; }
 .suggestion-heading small { color: var(--muted); font-size: 10px; }

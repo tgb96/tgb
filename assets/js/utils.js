@@ -184,6 +184,9 @@ export function normalizeRecord(record) {
     durationMinutes,
     durationSeconds,
     durationPrecision: ["minutes", "hm", "hms"].includes(record?.durationPrecision) ? record.durationPrecision : "minutes",
+    // Cuando el usuario registra primero en TGTrain y completa las métricas con
+    // la pulsera, no obligamos a inventar duración, distancia ni calorías.
+    metricsPending: Boolean(record?.metricsPending || record?.wearableMetricsPending),
     activityStartTime: String(record?.activityStartTime || "").slice(0, 5),
     calories: optionalNumber(record?.calories, { min: 0 }),
     sensations,
@@ -232,11 +235,12 @@ export function normalizeRecord(record) {
 export function validateRecord(record) {
   const normalized = normalizeRecord(record);
   const errors = [];
+  const metricsPending = normalized.metricsPending;
   if (!isValidISODate(normalized.dateISO)) errors.push("Selecciona una fecha válida.");
   if (!categoryById(normalized.category)) errors.push("Selecciona un tipo de entrenamiento.");
   if (normalized.activityStartTime && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized.activityStartTime)) errors.push("La hora de inicio no es válida.");
-  if (normalized.category !== "rest" && (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0)) errors.push("Ingresa una duración mayor que cero.");
-  if (!["rest", "warmup", "stretching"].includes(normalized.category) && (normalized.calories === "" || normalized.calories === null)) errors.push("Ingresa las calorías quemadas.");
+  if (!metricsPending && normalized.category !== "rest" && (normalized.durationMinutes === "" || normalized.durationMinutes === null || normalized.durationMinutes <= 0)) errors.push("Ingresa una duración mayor que cero.");
+  if (!metricsPending && !["rest", "warmup", "stretching"].includes(normalized.category) && (normalized.calories === "" || normalized.calories === null)) errors.push("Ingresa las calorías quemadas.");
   if (["warmup", "stretching"].includes(normalized.category)) {
     if (!normalized.guidedSessionId) errors.push("Selecciona una guía para esta sesión.");
     if (normalized.calories === null || (normalized.calories !== "" && (!Number.isInteger(normalized.calories) || normalized.calories > 5000))) errors.push("Las calorías deben estar entre 0 y 5000, o dejarse vacías.");
@@ -249,11 +253,11 @@ export function validateRecord(record) {
   if (normalized.category === "cardio") {
     const cardio = cardioTypeById(normalized.cardioTypeId);
     if (!cardio) errors.push("Selecciona un tipo de cardio.");
-    if (cardio?.id === "running" && (normalized.distanceKm === "" || normalized.distanceKm === null || normalized.distanceKm <= 0)) errors.push("Selecciona la distancia del trote.");
+    if (!metricsPending && cardio?.id === "running" && (normalized.distanceKm === "" || normalized.distanceKm === null || normalized.distanceKm <= 0)) errors.push("Selecciona la distancia del trote.");
     if (cardio?.id === "trekking" && !normalized.location.trim()) errors.push("Ingresa el cerro o lugar del trekking.");
-    if (cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
-    if (cardio?.id === "trekking" && (normalized.elevationGainM === "" || normalized.elevationGainM === null)) errors.push("Ingresa el desnivel del trekking.");
-    if (cardio?.id === "trekking" && (normalized.ascentDurationSeconds === "" || normalized.ascentDurationSeconds === null || normalized.ascentDurationSeconds <= 0)) errors.push("Ingresa el tiempo de subida.");
+    if (!metricsPending && cardio?.id === "trekking" && (normalized.distanceKm === "" || normalized.distanceKm === null)) errors.push("Ingresa la distancia del trekking.");
+    if (!metricsPending && cardio?.id === "trekking" && (normalized.elevationGainM === "" || normalized.elevationGainM === null)) errors.push("Ingresa el desnivel del trekking.");
+    if (!metricsPending && cardio?.id === "trekking" && (normalized.ascentDurationSeconds === "" || normalized.ascentDurationSeconds === null || normalized.ascentDurationSeconds <= 0)) errors.push("Ingresa el tiempo de subida.");
     if (cardio?.id === "trekking" && (trekkingRoutes[normalized.location] || []).length && !(trekkingRoutes[normalized.location] || []).includes(normalized.trekkingRoute)) errors.push("Selecciona la ruta del trekking.");
   }
   if (normalized.category === "tennis") {
@@ -726,7 +730,7 @@ export function recordsToCSV(records) {
     ["cardio", "cardioTypeName"], ["tipo_tenis", "tennisTypeName"], ["tipo_descanso", "restTypeId"], ["detalle_molestia", "restDetail"],
     ["lugar", "location"], ["ruta_trekking", "trekkingRoute"], ["superficie", "surface"],
     ["distancia_km", "distanceKm"], ["desnivel_m", "elevationGainM"], ["tiempo_subida_seg", "ascentDurationSeconds"], ["duración_min", "durationMinutes"], ["duración_seg", "durationSeconds"],
-    ["precisión_duración", "durationPrecision"], ["calorías", "calories"],
+    ["precisión_duración", "durationPrecision"], ["calorías", "calories"], ["métricas_pendientes_pulsera", "metricsPending"],
     ["hora_inicio_manual", "activityStartTime"],
     ["guía_id", "guidedSessionId"], ["guía_nombre", "guidedSessionName"], ["guía_pasos", "guidedStepsExport"],
     ["guía_molestia_0_10", "guidedPainScore"], ["guía_detalle_molestia", "guidedPainNotes"], ["guía_inicio", "guidedStartedAt"], ["guía_fin", "guidedEndedAt"],

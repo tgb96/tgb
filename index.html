@@ -143,13 +143,14 @@
             <input id="activityStartTime" name="activityStartTime" type="time">
             <small>Ayuda a encontrar la sesión correcta de la pulsera; no inicia ningún reloj.</small>
           </div>
-          <div class="two-columns common-metrics">
+          <div id="commonMetrics" class="two-columns common-metrics hidden" aria-hidden="true">
             <div id="durationField"></div>
             <div>
               <label for="calories">Calorías quemadas</label>
-              <input id="calories" name="calories" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 420" required>
+              <input id="calories" name="calories" type="number" inputmode="numeric" min="0" step="1" placeholder="Ej: 420">
             </div>
           </div>
+          <small id="watchMetricsNote" class="watch-metrics-note">Duración, distancia y calorías se tomarán de la pulsera cuando vincules la sesión. Aquí solo necesitas registrar la actividad y cómo te sentiste.</small>
 
           <label id="sensationsLabel" for="sensations">Impresiones o sensaciones</label>
           <div id="suggestionHeading" class="suggestion-heading">
@@ -551,6 +552,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script type="module" src="assets/js/app.js?v=94"></script>
+  <script type="module" src="assets/js/app.js?v=95"></script>
 </body>
 </html>

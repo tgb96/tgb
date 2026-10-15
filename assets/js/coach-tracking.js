@@ -83,6 +83,7 @@ export function planAssessment(record, match, block = null) {
   if (record.category === "rest" && match.option.category !== "rest") return { status: "recovery", label: "Descanso", reason: "Descanso registrado en lugar del entrenamiento. La guía evaluará su relación con la recuperación." };
   if (labels[assessment?.status] && analysisMatchesCurrentPlan(record, match, block)) return { ...assessment, label: labels[assessment.status] };
   if (!recordMatchesPlanOption(record, match.option)) return { status: "different", label: "Otra actividad", reason: "Actividad relacionada con el día; falta evaluar si cubre el objetivo del plan." };
+  if (record.metricsPending) return { status: "pending", label: "Pendiente de pulsera", reason: "La actividad está registrada; duración, distancia y calorías se completarán al vincular la sesión del reloj." };
   const target = match.option.prefill || {};
   if (record.category === "cardio" && Number(target.distanceKm) > 0 && Number(record.distanceKm) !== Number(target.distanceKm)) return { status: "adapted", label: "Distancia adaptada", reason: `${record.distanceKm || 0} km realizados frente a ${target.distanceKm} km previstos. Más distancia no implica mejor cumplimiento.` };
   if (record.category === "physical" && Number(record.routineCompletedSets) < Number(record.routinePlannedSets)) return { status: "partial", label: "Rutina parcial", reason: "Se registró una ejecución parcial; la guía comparará los ejercicios con el objetivo original." };

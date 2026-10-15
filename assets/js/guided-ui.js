@@ -1,5 +1,5 @@
 import { guidedElapsedMs, guidedOptions, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "./guided-sessions.js?v=68";
-import { getChileDateISO } from "./utils.js?v=67";
+import { getChileDateISO } from "./utils.js?v=68";
 
 const KEY = "tgtrain-guided-session-v1";
 const pad = n => String(Math.max(0, n)).padStart(2, "0");
@@ -157,10 +157,6 @@ export function createGuidedUI(repository, { showView, showToast, onSaved, onSta
     const dateLabel = element("label", "", "Fecha del registro");
     const date = element("input"); date.type = "date"; date.value = editingRecord?.dateISO || getChileDateISO(new Date(state.startedAt)); date.required = true;
     dateLabel.append(date);
-    const caloriesLabel = element("label", "", "Calorías (opcional)");
-    const calories = element("input"); calories.type = "number"; calories.inputMode = "numeric"; calories.min = "0"; calories.max = "5000"; calories.step = "1";
-    calories.placeholder = "Déjalo vacío si no sabes"; calories.value = editingRecord?.calories ?? "";
-    caloriesLabel.append(calories);
     const painLabel = element("label", "", "Molestia durante la sesión (0–10)");
     const pain = element("select");
     pain.append(new Option("Sin evaluar", ""));
@@ -189,14 +185,10 @@ export function createGuidedUI(repository, { showView, showToast, onSaved, onSta
     actions.append(button(editingRecord ? "Cancelar" : "Descartar sin guardar", "guided-secondary", editingRecord
       ? () => { editingRecord = null; showView?.("history"); }
       : discard));
-    form.append(dateLabel, caloriesLabel, painLabel, notesLabel, sensationsLabel, chips, error, actions);
+    form.append(dateLabel, painLabel, notesLabel, sensationsLabel, chips, error, actions);
     form.addEventListener("submit", event => {
       event.preventDefault();
-      const kcal = calories.value.trim();
       const painValue = pain.value;
-      if (kcal && (!/^\d+$/.test(kcal) || Number(kcal) > 5000)) {
-        error.textContent = "Las calorías deben estar entre 0 y 5000, o dejarse vacías."; error.classList.remove("hidden"); return;
-      }
       const now = new Date().toISOString();
       const steps = plan.steps.map(step => ({ id: step.id, title: step.title, seconds: step.seconds,
         status: (editingRecord?.guidedSteps || state?.results || []).find(item => item.id === step.id)?.status === "done" ? "done" : "skipped" }));
@@ -204,7 +196,7 @@ export function createGuidedUI(repository, { showView, showToast, onSaved, onSta
       const record = { ...editingRecord, id: editingRecord?.id || (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`),
         category: plan.category, categoryName: plan.category === "warmup" ? "Calentamiento" : "Estiramientos",
         dateISO: date.value, durationSeconds: seconds, durationMinutes: seconds / 60, durationPrecision: "hms",
-        calories: kcal, sensations: sensations.value.trim(), guidedSessionId: plan.id, guidedSessionName: plan.title,
+        calories: "", metricsPending: true, sensations: sensations.value.trim(), guidedSessionId: plan.id, guidedSessionName: plan.title,
         guidedSteps: steps, guidedPainScore: painValue, guidedPainNotes: notes.value.trim(),
         guidedStartedAt: editingRecord?.guidedStartedAt || state?.startedAt || "",
         guidedEndedAt: editingRecord?.guidedEndedAt || state?.endedAt || now,

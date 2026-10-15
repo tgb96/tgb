@@ -34,6 +34,6 @@ test("la sincronización consulta las dos hojas públicas sin usar credenciales"
   };
   const result = await syncOpenTennisMatches({ playerName: "Tomás Gómez", todayISO: "2026-09-28", fetchImpl });
   assert.equal(requested.length, 2);
-  assert.equal(result.matches.length, 3);
+  assert.equal(result.matches.length, 2);
   assert.match(result.source, /opentennis\.cl\/partidos\.html/);
 });

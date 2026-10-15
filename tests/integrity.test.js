@@ -176,8 +176,8 @@ test("integra el plan y el calendario competitivo con sesiones y alternativas", 
   const { physicalRoutines, trainingCategories } = await import("../assets/js/data.js");
   const sessions = coachTrainingBlock.weeks.flatMap(week => week.sessions);
   assert.equal(coachTrainingBlock.weeks.length, 9);
-  assert.equal(sessions.length, 43);
-  assert.equal(new Set(sessions.map(session => session.dateISO)).size, 43);
+  assert.equal(sessions.length, 63);
+  assert.equal(new Set(sessions.map(session => session.dateISO)).size, 63);
   assert.equal(coachTrainingBlock.startISO, "2026-09-14");
   assert.equal(coachTrainingBlock.endISO, "2026-11-22");
   assert.ok(sessions.some(session => session.options.length > 1));
@@ -197,7 +197,7 @@ test("integra el plan y el calendario competitivo con sesiones y alternativas", 
   const importedAgain = withMatchCalendar(imported);
   const importedMatch = importedAgain.weeks.find(item => item.weekKey === "2026-W42").sessions.find(item => item.dateISO === "2026-10-17");
   assert.equal(importedMatch.options.filter(item => item.id === "calendar-match-2026-10-17").length, 1);
-  assert.equal(importedMatch.opponent, "Jose Astete");
+  assert.equal(importedMatch.opponent, "Felipe Reyes");
   const categoryIds = new Set(trainingCategories.map(category => category.id));
   const routines = new Map(physicalRoutines.map(routine => [routine.id, routine]));
   sessions.flatMap(session => session.options).forEach(option => {
@@ -227,7 +227,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
-  assert.match(worker, /coach-tracking\.js\?v=72/);
+  assert.match(worker, /coach-tracking\.js\?v=73/);
 });
 
 test("la vista de nutrición enlaza todos sus controles", async () => {

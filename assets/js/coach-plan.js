@@ -220,7 +220,7 @@ export const matchCalendar = Object.freeze([
     startTime: "15:30", endTime: "17:00", court: 1, category: "A", opponent: "Felipe Reyes", homeSide: false,
     status: "likely-suspended", note: "Probable suspensión por viaje a la playa. No contar como carga competitiva hasta confirmarlo."
   },
-  { dateISO: "2026-10-17", weekKey: "2026-W42", weekNumber: 42, weekStartISO: "2026-10-12", weekEndISO: "2026-10-18", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Jose Astete", homeSide: true, status: "scheduled" },
+  { dateISO: "2026-10-17", weekKey: "2026-W42", weekNumber: 42, weekStartISO: "2026-10-12", weekEndISO: "2026-10-18", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Felipe Reyes", homeSide: false, status: "scheduled", note: "Partido recuperado y coordinado para este sábado." },
   { dateISO: "2026-10-24", weekKey: "2026-W43", weekNumber: 43, weekStartISO: "2026-10-19", weekEndISO: "2026-10-25", startTime: "13:45", endTime: "15:15", court: 2, category: "A", opponent: "Nicolás Collao", homeSide: false, status: "scheduled" },
   { dateISO: "2026-11-07", weekKey: "2026-W45", weekNumber: 45, weekStartISO: "2026-11-02", weekEndISO: "2026-11-08", startTime: "13:45", endTime: "15:15", court: 1, category: "A", opponent: "Angelo Basualto", homeSide: false, status: "scheduled" },
   { dateISO: "2026-11-14", weekKey: "2026-W46", weekNumber: 46, weekStartISO: "2026-11-09", weekEndISO: "2026-11-15", startTime: "13:45", endTime: "15:15", court: 2, category: "A", opponent: "Luis Flores", homeSide: false, status: "scheduled" },
@@ -291,6 +291,57 @@ function calendarWeek(event) {
     objective: "Llegar con energía al partido y recuperar sin acumular fatiga innecesaria.", sessions: [] };
 }
 
+function cadenceSession(dateISO, dayNumber) {
+  const suffix = dateISO.replaceAll("-", "");
+  if (dayNumber === 1) return {
+    id: `cadence-${suffix}-physical-legs`, dateISO,
+    objective: "Fuerza de piernas y core sin comprometer el tenis de la semana.",
+    primaryOptionId: `cadence-legs-${suffix}`,
+    options: [physical(`cadence-legs-${suffix}`, "Día 1 · Piernas + glúteos + core", "Físico de piernas controlado", "legs", ["Mantener técnica y dejar 2–3 repeticiones en reserva", "Si hay fatiga del partido anterior, reducir una serie por ejercicio"]) ]
+  };
+  if (dayNumber === 2 || dayNumber === 4) return {
+    id: `cadence-${suffix}-tennis`, dateISO,
+    objective: dayNumber === 2 ? "Tenis: timing, pies activos y consistencia." : "Tenis: consolidar desplazamiento sin acumular fatiga.",
+    primaryOptionId: `cadence-tennis-${suffix}`,
+    options: [tennis(`cadence-tennis-${suffix}`, "Entrenamiento grupal", "Tenis y desplazamientos moderados", ["Priorizar timing y recuperación al centro", "Si llueve o la cancha no está disponible, usar peloteo suave o movilidad"], "group-training")]
+  };
+  if (dayNumber === 3) return {
+    id: `cadence-${suffix}-physical-upper`, dateISO,
+    objective: "Fuerza de tren superior y estabilidad para transferir mejor la energía a la raqueta.",
+    primaryOptionId: `cadence-upper-${suffix}`,
+    options: [physical(`cadence-upper-${suffix}`, "Día 2 · Tren superior + estabilidad", "Físico de tren superior moderado", "upper", ["No buscar el fallo", "Bajar carga si el tenis del martes dejó el brazo fatigado"]) ]
+  };
+  if (dayNumber === 5) return {
+    id: `cadence-${suffix}-physical-agility`, dateISO,
+    objective: "Potencia técnica y desplazamientos, sin convertirlo en cardio matador.",
+    primaryOptionId: `cadence-agility-${suffix}`,
+    options: [physical(`cadence-agility-${suffix}`, "Día 3 · Potencia + desplazamientos", "Físico específico de tenis", "agility", ["Eliminar saltos si hay molestias de rodilla o si el sábado hay partido", "Mantener volumen reducido cuando corresponda"]) ]
+  };
+  return null;
+}
+
+function ensureWeeklyCadence(week, event) {
+  // Para cada semana competitiva completamos los días que no venían en un
+  // plan importado. Así el calendario no queda reducido solo al partido.
+  const first = new Date(`${week.startISO}T12:00:00Z`);
+  for (let dayNumber = 1; dayNumber <= 5; dayNumber += 1) {
+    const date = new Date(first);
+    date.setUTCDate(first.getUTCDate() + dayNumber - 1);
+    const dateISO = date.toISOString().slice(0, 10);
+    if (week.sessions.some(session => session.dateISO === dateISO)) continue;
+    const session = cadenceSession(dateISO, dayNumber);
+    if (session) week.sessions.push(session);
+  }
+  // Un partido confirmado siempre prevalece sobre la sesión del sábado y
+  // deja el domingo para observar recuperación.
+  if (event?.status === "scheduled") {
+    for (const offset of [0, 1]) {
+      const dateISO = dateOffset(event.dateISO, offset);
+      if (offset === 1 && !week.sessions.some(session => session.dateISO === dateISO)) week.sessions.push(supportingSession(event, offset));
+    }
+  }
+}
+
 export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalendar?.length ? sourceBlock.matchCalendar : matchCalendar) {
   if (!sourceBlock?.weeks) return sourceBlock;
   const block = structuredClone(sourceBlock);
@@ -326,6 +377,8 @@ export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalend
       }
     }
     week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+    ensureWeeklyCadence(week, event);
+    week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
   }
   block.weeks.sort((a, b) => a.startISO.localeCompare(b.startISO));
   block.startISO = [block.startISO, ...block.weeks.map(week => week.startISO)].filter(Boolean).sort()[0];
@@ -333,7 +386,8 @@ export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalend
   const calendarRules = [
     "El calendario de partidos de escalerilla prevalece al adaptar carga, recuperación y nutrición de cada semana.",
     "En las 48 horas previas a un partido confirmado evita piernas pesadas, pliometría intensa y cardio exigente.",
-    "El partido del 3 de octubre contra Felipe Reyes está probablemente suspendido por viaje a la playa: no se cuenta como carga hasta confirmarlo."
+    "La estructura base conserva físico lunes, miércoles y viernes, y tenis martes y jueves; si hay partido, el viernes se convierte en activación.",
+    "El partido recuperado contra Felipe Reyes queda el sábado 17 de octubre; el sábado 24 se mantiene como partido independiente según Open Tennis."
   ];
   block.rules = [...new Set([...(block.rules || []), ...calendarRules])];
   return block;
