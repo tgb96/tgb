@@ -22,8 +22,9 @@ import {
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate,
-  withMatchCalendar
-} from "./coach-plan.js?v=96";
+  withMatchCalendar,
+  withWeeklyCadenceForDate
+} from "./coach-plan.js?v=97";
 import { createRepository } from "./storage.js?v=94";
 import { createCloudSync } from "./cloud.js?v=74";
 import { createNutritionUI } from "./nutrition-ui.js?v=94";
@@ -89,7 +90,7 @@ const cloudSync = createCloudSync({
 const nutritionUI = createNutritionUI(repository, {
   showToast: message => showToast(message),
   getWearableData: () => wearableData,
-  getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock()),
+  getTrainingSession: dateISO => coachSessionForDate(dateISO, activeTrainingBlock(dateISO)),
   getNutritionInsight: dateISO => repository.getNutritionEntry(`nutrition-analysis-${dateISO}`),
   analyzeNutritionDay: dateISO => requestNutritionAnalysis(dateISO),
   isNutritionAnalysisLoading: dateISO => nutritionAnalysisInFlight.has(dateISO),
@@ -272,9 +273,10 @@ function openQuickRestRegistration(dateISO) {
   selectCategory("rest", { dateISO, restTypeId: "planned" });
 }
 
-function activeTrainingBlock() {
+function activeTrainingBlock(referenceDateISO = getChileDateISO()) {
   const saved = newestTrainingBlock(repository.listTrainingBlocks());
-  return saved ? withMatchCalendar(saved) : coachTrainingBlock;
+  const block = saved ? withMatchCalendar(saved) : coachTrainingBlock;
+  return withWeeklyCadenceForDate(block, referenceDateISO);
 }
 
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
@@ -303,7 +305,7 @@ function createPlanActualFeedback(session, records, block = activeTrainingBlock(
 }
 
 function attachMatchingPlan(record) {
-  const block = activeTrainingBlock();
+  const block = activeTrainingBlock(record.dateISO);
   const match = plannedContextForRecord(record, block);
   if (!match) return record.planBlockId === block.id
     ? { ...record, planBlockId: "", planWeekKey: "", planSessionId: "", planOptionId: "", plannedTitle: "" }
@@ -1104,7 +1106,7 @@ function wearableDayForCoach(day) {
   };
 }
 
-function nutritionDayForCoach(dateISO, block = activeTrainingBlock()) {
+function nutritionDayForCoach(dateISO, block = activeTrainingBlock(dateISO)) {
   const entries = repository.listNutritionEntries(dateISO).filter(item => !item.deleted);
   const meals = entries.filter(item => item.kind === "meal").map(nutritionEntryWithEstimate);
   const totals = nutritionDayTotals(entries.filter(item => item.kind !== "plan").map(nutritionEntryWithEstimate));
@@ -1287,7 +1289,7 @@ async function maybeGenerateMonthlySummary() {
 
 function applyCoachPlanAdjustment(item) {
   const adjustment = item.planAdjustment;
-  const block = activeTrainingBlock();
+  const block = activeTrainingBlock(adjustment.targetDateISO);
   const copy = JSON.parse(JSON.stringify(block));
   const session = copy.weeks.flatMap(week => week.sessions || []).find(candidate => candidate.dateISO === adjustment.targetDateISO);
   if (!session) { showToast("Esa fecha ya no está en el plan activo. Pídele una nueva propuesta a la guía."); return; }
@@ -3333,7 +3335,7 @@ function routineAiContext(record) {
       wearableHeartRateAvgBpm: item.wearableSnapshot?.heartRateAvgBpm ?? null,
       wearableActiveCaloriesKcal: item.wearableSnapshot?.activeCaloriesKcal ?? null
     }));
-  const block = activeTrainingBlock();
+  const block = activeTrainingBlock(record.dateISO);
   const next48Hours = (block?.weeks || []).flatMap(week => week.sessions || [])
     .filter(session => session.dateISO > record.dateISO && session.dateISO <= endISO)
     .map(session => {

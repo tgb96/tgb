@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionModeForPlannedSession, nutritionPlanForDate, normalizeNutritionEntries, plannedActivityTime, plannedNutritionContext } from "../assets/js/nutrition.js";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
-import { coachSessionForDate } from "../assets/js/coach-plan.js";
+import { coachSessionForDate, withWeeklyCadenceForDate } from "../assets/js/coach-plan.js";
 
 function memoryStorage() {
   const values = new Map();
@@ -36,6 +36,10 @@ test("la nutrición sigue la actividad y la hora de la planificación deportiva"
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "trek", options: [{ id: "trek", category: "cardio", prefill: { cardioTypeId: "trekking" } }] }), "trekking");
   assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-17")), { mode: "early", title: "Partido vs. Felipe Reyes", summary: "13:45–15:15 · cancha 1 · categoría A", time: "13:45", category: "tennis", isMatch: true });
   assert.equal(plannedNutritionContext(coachSessionForDate("2026-10-03")).mode, "recovery");
+  const coordinated = withWeeklyCadenceForDate({ id: "partial", startISO: "2026-09-14", endISO: "2026-10-25", weeks: [{ weekKey: "2026-W43", number: 43, startISO: "2026-10-19", endISO: "2026-10-25", sessions: [] }] }, "2026-10-21");
+  assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-21", coordinated)), {
+    mode: "physical", title: "Día 2 · Tren superior + estabilidad", summary: "Físico de tren superior moderado", time: "", category: "physical", isMatch: false
+  });
 });
 
 test("los rangos de kcal del entrenador dependen del día y del escenario real", () => {

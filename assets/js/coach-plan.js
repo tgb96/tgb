@@ -233,6 +233,27 @@ function dateOffset(dateISO, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function cadenceWeekInfo(dateISO) {
+  const date = new Date(`${dateISO}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return null;
+  const isoDay = date.getUTCDay() || 7;
+  const start = new Date(date);
+  start.setUTCDate(date.getUTCDate() - isoDay + 1);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  const thursday = new Date(date);
+  thursday.setUTCDate(date.getUTCDate() + 4 - isoDay);
+  const weekYear = thursday.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+  const weekNumber = Math.ceil((((thursday - yearStart) / 86400000) + 1) / 7);
+  return {
+    weekKey: `${weekYear}-W${String(weekNumber).padStart(2, "0")}`,
+    weekNumber,
+    startISO: start.toISOString().slice(0, 10),
+    endISO: end.toISOString().slice(0, 10)
+  };
+}
+
 function calendarMatchOption(event) {
   const conditional = event.status === "likely-suspended" ? " (si finalmente se juega)" : "";
   return {
@@ -340,6 +361,36 @@ function ensureWeeklyCadence(week, event) {
       if (offset === 1 && !week.sessions.some(session => session.dateISO === dateISO)) week.sessions.push(supportingSession(event, offset));
     }
   }
+}
+
+export function withWeeklyCadenceForDate(sourceBlock, dateISO) {
+  if (!sourceBlock?.weeks || !dateISO || (sourceBlock.startISO && dateISO < sourceBlock.startISO)) return sourceBlock;
+  const info = cadenceWeekInfo(dateISO);
+  if (!info) return sourceBlock;
+  const block = structuredClone(sourceBlock);
+  block.weeks = Array.isArray(block.weeks) ? block.weeks : [];
+  let week = block.weeks.find(item => item.weekKey === info.weekKey || (dateISO >= item.startISO && dateISO <= item.endISO));
+  if (!week) {
+    week = {
+      weekKey: info.weekKey,
+      number: info.weekNumber,
+      startISO: info.startISO,
+      endISO: info.endISO,
+      label: "Semana de fortalecimiento",
+      context: "Cadencia activa de fuerza y tenis, ajustable según partidos, clima y recuperación.",
+      objective: "Mantener continuidad entre fuerza, tenis y recuperación sin acumular fatiga innecesaria.",
+      sessions: []
+    };
+    block.weeks.push(week);
+  }
+  week.sessions = Array.isArray(week.sessions) ? week.sessions : [];
+  const event = (block.matchCalendar || []).find(item => item.status !== "played" && item.dateISO >= week.startISO && item.dateISO <= week.endISO);
+  ensureWeeklyCadence(week, event);
+  week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  block.weeks.sort((a, b) => a.startISO.localeCompare(b.startISO));
+  block.startISO = [block.startISO, ...block.weeks.map(item => item.startISO)].filter(Boolean).sort()[0];
+  block.endISO = [block.endISO, ...block.weeks.map(item => item.endISO)].filter(Boolean).sort().at(-1);
+  return block;
 }
 
 export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalendar?.length ? sourceBlock.matchCalendar : matchCalendar) {

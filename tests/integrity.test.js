@@ -190,7 +190,7 @@ test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", a
 });
 
 test("integra el plan y el calendario competitivo con sesiones y alternativas", async () => {
-  const { coachTrainingBlock, coachSessionForDate, matchCalendar, withMatchCalendar } = await import("../assets/js/coach-plan.js");
+  const { coachTrainingBlock, coachSessionForDate, matchCalendar, withMatchCalendar, withWeeklyCadenceForDate } = await import("../assets/js/coach-plan.js");
   const { physicalRoutines, trainingCategories } = await import("../assets/js/data.js");
   const sessions = coachTrainingBlock.weeks.flatMap(week => week.sessions);
   assert.equal(coachTrainingBlock.weeks.length, 9);
@@ -216,6 +216,17 @@ test("integra el plan y el calendario competitivo con sesiones y alternativas", 
   const importedMatch = importedAgain.weeks.find(item => item.weekKey === "2026-W42").sessions.find(item => item.dateISO === "2026-10-17");
   assert.equal(importedMatch.options.filter(item => item.id === "calendar-match-2026-10-17").length, 1);
   assert.equal(importedMatch.opponent, "Felipe Reyes");
+  const partial = {
+    id: "partial-current-plan", startISO: "2026-09-14", endISO: "2026-10-25", matchCalendar: [],
+    weeks: [{ weekKey: "2026-W43", number: 43, startISO: "2026-10-19", endISO: "2026-10-25", label: "Semana de partido", sessions: [
+      { id: "existing-friday", dateISO: "2026-10-23", primaryOptionId: "activation", options: [{ id: "activation", title: "Activación prepartido", category: "physical", prefill: { routineId: "agility" } }] }
+    ] }]
+  };
+  const coordinated = withWeeklyCadenceForDate(partial, "2026-10-21");
+  assert.equal(coachSessionForDate("2026-10-21", coordinated).options[0].prefill.routineId, "upper");
+  assert.equal(coachSessionForDate("2026-10-22", coordinated).options[0].prefill.tennisTypeId, "group-training");
+  assert.equal(coachSessionForDate("2026-10-23", coordinated).id, "existing-friday");
+  assert.equal(coordinated.weeks.find(item => item.weekKey === "2026-W43").sessions.length, 5);
   const categoryIds = new Set(trainingCategories.map(category => category.id));
   const routines = new Map(physicalRoutines.map(routine => [routine.id, routine]));
   sessions.flatMap(session => session.options).forEach(option => {
