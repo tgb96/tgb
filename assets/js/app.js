@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=68";
+} from "./data.js?v=69";
 import {
   coachOption,
   coachBaseTrainingBlock,
@@ -25,20 +25,20 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=98";
-import { createRepository } from "./storage.js?v=96";
+import { createRepository } from "./storage.js?v=97";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=96";
+import { createNutritionUI } from "./nutrition-ui.js?v=97";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
-import { createGuidedUI } from "./guided-ui.js?v=97";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=97";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=96";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=98";
-import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
+import { createGuidedUI } from "./guided-ui.js?v=98";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=98";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=97";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=99";
+import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=95";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
-import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=2";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=68";
+import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=69";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -58,12 +58,13 @@ import {
   runningBestTimes,
   routineExerciseLine,
   routineCompletionSummary,
+  routineComparison,
   trekkingBestTimes,
   validateRecord,
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=70";
+} from "./utils.js?v=71";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -990,11 +991,11 @@ function renderCoachQuestions() {
   const history = $("coachQuestionHistory");
   history.replaceChildren();
   const allQuestions = repository.listCoachQuestions();
-  const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 5)).reverse();
+  const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 3)).reverse();
   const toggle = $("coachHistoryToggle");
   $("coachHistoryClear").classList.toggle("hidden", allQuestions.length === 0);
-  toggle.classList.toggle("hidden", allQuestions.length <= 5);
-  toggle.textContent = coachHistoryExpanded ? "Mostrar solo las 5 más recientes" : `Ver todas las preguntas (${allQuestions.length})`;
+  toggle.classList.toggle("hidden", allQuestions.length <= 3);
+  toggle.textContent = coachHistoryExpanded ? "Mostrar solo las 3 más recientes" : `Ver todas las preguntas (${allQuestions.length})`;
   if (!questions.length) {
     const hint = document.createElement("p");
     hint.className = "coach-question-hint";
@@ -1016,7 +1017,7 @@ function renderCoachQuestions() {
       const proposal = document.createElement("div");
       proposal.className = `coach-plan-proposal ${item.adjustmentStatus || "pending"}`;
       const heading = document.createElement("strong");
-      heading.textContent = item.adjustmentStatus === "applied" ? "Ajuste aplicado" : item.adjustmentStatus === "dismissed" ? "Propuesta descartada" : "Propuesta para confirmar";
+      heading.textContent = item.adjustmentStatus === "applied" ? "Ajuste aplicado" : item.adjustmentStatus === "reverted" ? "Ajuste deshecho" : item.adjustmentStatus === "dismissed" ? "Propuesta descartada" : "Propuesta para confirmar";
       const title = document.createElement("span");
       title.textContent = `${formatShortDate(item.planAdjustment.targetDateISO)} · ${item.planAdjustment.title}`;
       const reason = document.createElement("small");
@@ -1025,7 +1026,7 @@ function renderCoachQuestions() {
       if ((item.adjustmentStatus || "pending") === "pending") {
         const actions = document.createElement("div");
         const apply = document.createElement("button");
-        apply.type = "button"; apply.textContent = "Aplicar al plan y nutrición";
+        apply.type = "button"; apply.textContent = "Revisar y aplicar";
         apply.addEventListener("click", () => applyCoachPlanAdjustment(item));
         const dismiss = document.createElement("button");
         dismiss.type = "button"; dismiss.className = "secondary"; dismiss.textContent = "Descartar";
@@ -1034,6 +1035,13 @@ function renderCoachQuestions() {
           renderCoachQuestions();
         });
         actions.append(apply, dismiss); proposal.append(actions);
+      } else if (item.adjustmentStatus === "applied") {
+        const undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "secondary";
+        undo.textContent = "Deshacer ajuste";
+        undo.addEventListener("click", () => revertCoachPlanAdjustment(item));
+        proposal.append(undo);
       }
       exchange.append(proposal);
     }
@@ -1300,6 +1308,14 @@ function applyCoachPlanAdjustment(item) {
       : category === "tennis" ? tennisTypeById(adjustment.tennisTypeId)
         : restTypes.some(type => type.id === adjustment.restTypeId);
   if (!valid) { showToast("La propuesta usa una actividad que TGTrain no reconoce. Vuelve a preguntarle a la guía."); return; }
+  const originalOption = coachOption(session, session.primaryOptionId) || session.options?.[0];
+  const previewLines = [
+    `Fecha: ${formatShortDate(adjustment.targetDateISO)}`,
+    `Plan actual: ${originalOption?.title || "Sin actividad principal"}`,
+    `Nuevo plan: ${adjustment.title}`,
+    adjustment.summary ? `Detalle: ${adjustment.summary}` : ""
+  ].filter(Boolean).join("\n");
+  if (!window.confirm(`Revisa el cambio antes de aplicarlo:\n\n${previewLines}\n\nTambién se coordinará la guía de alimentación de ese día. Podrás deshacer el ajuste.`)) return;
   const optionId = `coach-${adjustment.targetDateISO}-${item.id.slice(0, 12)}`;
   const option = {
     id: optionId, title: adjustment.title, category, summary: adjustment.summary,
@@ -1320,11 +1336,45 @@ function applyCoachPlanAdjustment(item) {
       id: planId, dateISO: adjustment.targetDateISO, kind: "plan", planMode: adjustment.nutritionMode || "default",
       createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()
     });
-    repository.saveCoachQuestion({ ...item, adjustmentStatus: "applied", appliedOptionId: optionId, originalOptionId, appliedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    repository.saveCoachQuestion({ ...item, adjustmentStatus: "applied", appliedOptionId: optionId, originalOptionId, originalNutritionMode: previous?.planMode || "", appliedAt: new Date().toISOString(), revertedAt: "", updatedAt: new Date().toISOString() });
     renderHome(); renderCoachPlanDialog(); nutritionUI.render();
     showToast("Ajuste aplicado al entrenamiento y a la guía de alimentación.");
   } catch (error) {
     showToast(error.message || "No se pudo aplicar la propuesta.");
+  }
+}
+
+function revertCoachPlanAdjustment(item) {
+  const adjustment = item.planAdjustment;
+  const block = activeTrainingBlock(adjustment?.targetDateISO);
+  const copy = JSON.parse(JSON.stringify(block));
+  const session = copy.weeks.flatMap(week => week.sessions || []).find(candidate => candidate.dateISO === adjustment?.targetDateISO);
+  const original = session?.options?.find(option => option.id === item.originalOptionId);
+  if (!session || !original) return showToast("El plan cambió y ya no se puede restaurar automáticamente esa versión.");
+  if (!window.confirm(`Se restaurará ${original.title} para ${formatShortDate(adjustment.targetDateISO)}. ¿Continuar?`)) return;
+  session.primaryOptionId = original.id;
+  session.options = session.options.filter(option => option.id !== item.appliedOptionId);
+  const timestamp = new Date().toISOString();
+  try {
+    repository.saveTrainingBlock({ ...copy, updatedAt: timestamp });
+    const planId = `nutrition-plan-${adjustment.targetDateISO}`;
+    const previous = repository.getNutritionEntry(planId);
+    repository.saveNutritionEntry({
+      id: planId,
+      dateISO: adjustment.targetDateISO,
+      kind: "plan",
+      planMode: item.originalNutritionMode || "default",
+      createdAt: previous?.createdAt || timestamp,
+      updatedAt: timestamp
+    });
+    repository.saveCoachQuestion({ ...item, adjustmentStatus: "reverted", revertedAt: timestamp, updatedAt: timestamp });
+    renderHome();
+    renderCoachPlanDialog();
+    renderCoachQuestions();
+    nutritionUI.render();
+    showToast("Ajuste deshecho. Se restauró el plan anterior.");
+  } catch (error) {
+    showToast(error.message || "No se pudo restaurar el plan anterior.");
   }
 }
 
@@ -1414,9 +1464,16 @@ async function submitCoachQuestion(existing = null) {
 
 function renderDailyBriefing(todayISO, todayPlan, records) {
   const option = todayPlan ? coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0] : null;
+  const block = activeTrainingBlock(todayISO);
+  const upcomingMatchOffset = Array.from({ length: 3 }, (_, index) => index).find(index => {
+    const session = coachSessionForDate(addDaysISO(todayISO, index), block);
+    return (session?.options || []).some(item => item.category === "tennis" && item.prefill?.tennisTypeId === "match");
+  });
   const brief = dailyBrief({
     dateISO: todayISO,
     planTitle: option?.title || "",
+    planCategory: option?.category || "",
+    matchWithinDays: upcomingMatchOffset ?? null,
     records,
     wearableDays: wearableData.days,
     nutritionEntries: repository.listNutritionEntries()
@@ -1435,10 +1492,13 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
   });
   const active = loadRoutineSession()?.status === "active" || guidedUI.hasPending() || Boolean(plannedActivityContext(loadPlannedActivity()));
   const button = $("dailyBriefAction");
-  button.dataset.action = active ? "active-session" : !brief.hasTodayActivity && todayPlan ? "planned" : brief.meals ? "nutrition" : "register";
+  // El banner principal y la barra de sesión ya contienen esas acciones.
+  // La recomendación diaria conserva un botón solo cuando aporta un destino distinto.
+  button.classList.toggle("hidden", active || (!brief.hasTodayActivity && Boolean(todayPlan)));
+  button.dataset.action = active ? "active-session" : !brief.hasTodayActivity && todayPlan ? "planned" : brief.hasTodayActivity ? "history" : "register";
   button.textContent = active ? "Volver a mi sesión"
     : !brief.hasTodayActivity && todayPlan ? "Iniciar actividad de hoy"
-      : brief.meals ? "Revisar nutrición de hoy" : "Registrar lo que hice";
+      : brief.hasTodayActivity ? "Ver actividad de hoy" : "Registrar lo que hice";
 }
 
 function renderHome() {
@@ -1463,16 +1523,17 @@ function renderHome() {
     : `Semana ${week.weekNumber} · ${week.weekYear}`;
   $("todayStatus").textContent = dayActivitySummary(todayRecords).label;
   $("homeTitle").textContent = formatLongDate(todayISO);
-  $("heroWeekTheme").textContent = plannedWeek
-    ? `Semana ${plannedWeek.number} · ${formatShortDate(plannedWeek.startISO)} al ${formatShortDate(plannedWeek.endISO)}`
-    : "";
+  $("heroWeekTheme").textContent = "";
+  $("heroWeekTheme").classList.add("hidden");
   renderHeroEvolution(allRecords);
   const plannedPanel = $("heroPlannedActivity");
-  plannedPanel.classList.toggle("hidden", !todayPlan);
+  const plannedInProgress = Boolean(todayPlan && activePlanned?.session.id === todayPlan.id);
+  const showPlannedPanel = Boolean(todayPlan && (plannedInProgress || !todayMainRecords.length));
+  plannedPanel.classList.toggle("hidden", !showPlannedPanel);
   if (todayPlan) {
     const option = coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0];
     const overview = dayPlanOverview(todayPlan, todayMainRecords);
-    const inProgress = activePlanned?.session.id === todayPlan.id;
+    const inProgress = plannedInProgress;
     $("heroPlannedLabel").textContent = inProgress ? "Actividad en curso" : todayMainRecords.length ? "Actividad de hoy" : "Plan de hoy";
     $("heroPlannedTitle").textContent = !inProgress && todayMainRecords.length ? todayMainRecords.map(recordTitle).join(" · ") : option.title;
     $("heroPlannedSummary").textContent = inProgress ? todayPlan.objective : todayMainRecords.length
@@ -1496,10 +1557,18 @@ function renderHome() {
     .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
       .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
   if (lastAnalyzed) {
-    const date = document.createElement("p");
-    date.className = "coach-home-date";
-    date.textContent = `Comentario del ${formatShortDate(lastAnalyzed.dateISO)} · ${recordTitle(lastAnalyzed)}`;
-    feedback.append(date, createRoutineAiCard(lastAnalyzed));
+    const disclosure = document.createElement("details");
+    disclosure.className = "home-coach-disclosure";
+    const summary = document.createElement("summary");
+    const summaryCopy = document.createElement("span");
+    const date = document.createElement("small");
+    date.textContent = `${formatShortDate(lastAnalyzed.dateISO)} · ${recordTitle(lastAnalyzed)}`;
+    const headline = document.createElement("strong");
+    headline.textContent = lastAnalyzed.routineAiAnalysis.headline || "Último comentario del entrenador";
+    summaryCopy.append(date, headline);
+    summary.append(summaryCopy, document.createElement("span"));
+    disclosure.append(summary, createRoutineAiCard(lastAnalyzed));
+    feedback.append(disclosure);
   } else {
     const empty = document.createElement("p");
     empty.className = "coach-home-empty";
@@ -2991,50 +3060,62 @@ function renderWearable() {
   }
   sleepDetails.classList.toggle("hidden", !lastSleep);
   const newestSync = days.map(day => day.syncedAt).filter(Boolean).sort().at(-1);
-  $("wearableSyncTime").textContent = newestSync
-    ? `Actualizado ${new Date(newestSync).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}`
+  const syncAgeMinutes = newestSync ? Math.max(0, Math.round((Date.now() - Date.parse(newestSync)) / 60000)) : null;
+  const syncLabel = $("wearableSyncTime");
+  syncLabel.textContent = newestSync
+    ? `Actualizado ${new Date(newestSync).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}${syncAgeMinutes > 30 ? " · datos atrasados" : ""}`
     : "Sin sincronizar";
+  syncLabel.classList.toggle("stale", syncAgeMinutes === null || syncAgeMinutes > 30);
   $("wearableHelp").textContent = days.length
     ? "Datos medidos por la pulsera. Las sesiones detectadas no se suman automáticamente al historial para evitar duplicados."
     : "Instala TGTrain Sync, elige Mi Fitness y sincroniza una vez; después se actualizará automáticamente si concedes el permiso de segundo plano.";
   const list = $("wearableSessions");
   list.replaceChildren();
   const records = repository.list();
-  const linkedSessionIds = new Set(records.map(record => record.wearableSessionId).filter(Boolean));
-  const recent = sessions.filter(session => session.startTime && session.endTime && !linkedSessionIds.has(session.id))
-    .sort((a, b) => String(b.startTime).localeCompare(String(a.startTime))).slice(0, 8);
-  if (!recent.length) return;
+  const pendingRecords = records.filter(record => record.metricsPending && !record.wearableSessionId && record.category !== "rest");
+  const inbox = wearableInbox(sessions, records).slice(0, 10);
+  if (!inbox.length && !pendingRecords.length) return;
+  const disclosure = document.createElement("details");
+  disclosure.className = "wearable-inbox";
+  const disclosureSummary = document.createElement("summary");
+  const summaryCopy = document.createElement("span");
   const heading = document.createElement("strong");
-  heading.textContent = "Entrenamientos por vincular";
-  list.append(heading);
-  for (const session of recent) {
+  heading.textContent = `${inbox.length} entrenamiento${inbox.length === 1 ? "" : "s"} por vincular`;
+  const summaryHint = document.createElement("small");
+  summaryHint.textContent = inbox.length ? "Ordenados por fecha y hora" : "Aún no aparece una sesión compatible de Health Connect";
+  summaryCopy.append(heading, summaryHint);
+  disclosureSummary.append(summaryCopy, document.createElement("span"));
+  disclosure.append(disclosureSummary);
+  for (const { session, candidates, recommended, state } of inbox) {
     const row = document.createElement("div");
-    row.className = "wearable-session";
+    row.className = `wearable-session ${state}`;
+    const stateBadge = document.createElement("small");
+    stateBadge.className = "wearable-session-state";
+    stateBadge.textContent = state === "recommended" ? "Coincidencia recomendada" : state === "ambiguous" ? "Revisar coincidencia" : "Sin registro compatible";
     const title = document.createElement("strong");
     title.textContent = session.title || "Entrenamiento";
     const details = document.createElement("span");
     const minutes = Math.round((Number(session.durationSeconds) || 0) / 60);
+    const start = new Date(session.startTime);
+    const hour = Number.isFinite(start.getTime()) ? start.toLocaleTimeString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit" }) : "hora no disponible";
     const distance = Number(session.distanceMeters) > 0 ? ` · ${(Number(session.distanceMeters) / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} km` : "";
     const calories = Number(session.caloriesKcal) > 0 ? ` · ${Math.round(Number(session.caloriesKcal))} kcal` : "";
     const bpm = Number(session.heartRateAvgBpm) > 0 ? ` · ${Math.round(Number(session.heartRateAvgBpm))} lpm media` : "";
-    details.textContent = `${formatShortDate(session.dateISO)} · ${minutes} min${distance}${calories}${bpm}`;
-    row.append(title, details);
-    const candidates = records.filter(record => !record.wearableSessionId && record.category !== "rest")
-      .map(record => ({ record, match: wearableMatch(record, session) })).filter(item => item.match)
-      .sort((a, b) => b.match.score - a.match.score);
-    if (candidates.length === 1) {
+    details.textContent = `${formatShortDate(session.dateISO)} · ${hour} · ${minutes} min${distance}${calories}${bpm}`;
+    row.append(stateBadge, title, details);
+    if (recommended) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = `Vincular con ${recordTitle(candidates[0].record)}`;
-      button.addEventListener("click", () => linkWearableSession(candidates[0].record.id, session.id));
+      button.textContent = `Vincular con ${recordTitle(recommended.record)}`;
+      button.addEventListener("click", () => linkWearableSession(recommended.record.id, session.id));
       row.append(button);
-    } else if (candidates.length > 1) {
+    } else if (candidates.length) {
       const select = document.createElement("select");
       select.setAttribute("aria-label", `Elegir registro para ${session.title || "entrenamiento detectado"}`);
-      candidates.slice(0, 8).forEach(({ record }) => {
+      candidates.slice(0, 8).forEach(({ record, match }) => {
         const option = document.createElement("option");
         option.value = record.id;
-        option.textContent = `${formatShortDate(record.dateISO)} · ${recordTitle(record)}`;
+        option.textContent = `${formatShortDate(record.dateISO)} · ${recordTitle(record)} · ${match.reason}`;
         select.append(option);
       });
       const button = document.createElement("button");
@@ -3047,8 +3128,15 @@ function renderWearable() {
       status.textContent = "Sin un registro compatible para vincular.";
       row.append(status);
     }
-    list.append(row);
+    disclosure.append(row);
   }
+  if (!inbox.length && pendingRecords.length) {
+    const waiting = document.createElement("p");
+    waiting.className = "wearable-inbox-waiting";
+    waiting.textContent = `${pendingRecords.length} registro${pendingRecords.length === 1 ? "" : "s"} espera${pendingRecords.length === 1 ? "" : "n"} las mediciones. Sincroniza Mi Fitness y luego TGTrain Sync.`;
+    disclosure.append(waiting);
+  }
+  list.append(disclosure);
 }
 
 function renderHeroEvolution(records) {
@@ -3532,7 +3620,10 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
           effortRpe: context.progressionEvidence.effortRpe,
           painScore: context.progressionEvidence.painScore,
           technique: context.progressionEvidence.technique,
-          repsInReserve: context.progressionEvidence.repsInReserve
+          repsInReserve: context.progressionEvidence.repsInReserve,
+          fatigueHits: context.progressionEvidence.fatigueHits,
+          deloadRecommended: context.progressionEvidence.deloadRecommended,
+          stalledExercises: context.progressionEvidence.exercises.filter(exercise => exercise.stalled).map(exercise => exercise.exerciseName)
         } : null,
         progressionFollowUp: context.progressionFollowUp,
         status: concreteChanges.length ? "pending" : "reviewed",
@@ -3792,7 +3883,8 @@ function saveRoutineAiStatus(record, status, appliedChanges = []) {
       ...record.routineAiAnalysis,
       status,
       appliedAt: status === "applied" ? new Date().toISOString() : "",
-      appliedChanges: status === "applied" ? appliedChanges : []
+      revertedAt: status === "reverted" ? new Date().toISOString() : "",
+      appliedChanges: ["applied", "reverted"].includes(status) ? appliedChanges : []
     },
     updatedAt: new Date().toISOString()
   });
@@ -3836,16 +3928,56 @@ function applyRoutineAiChanges(record, selectedChanges = actionableRoutineAiChan
     const weightKg = requestedWeight === "" || requestedWeight === null || requestedWeight === undefined
       ? ""
       : Math.min(40, Math.max(0, Number(requestedWeight) || 0));
-    const next = { ...change, proposedSets: sets, proposedTarget: target, proposedWeightKg: weightKg };
+    const next = {
+      ...change,
+      currentSets: current.sets,
+      currentTarget: current.target,
+      currentWeightKg: current.weightKg,
+      previousSets: current.sets,
+      previousTarget: current.target,
+      previousWeightKg: current.weightKg,
+      proposedSets: sets,
+      proposedTarget: target,
+      proposedWeightKg: weightKg
+    };
     if (change.action !== "substitute") settings[routineSettingsKey(routine.id, exercise.id)] = { sets, target, weightKg };
     applied.push(next);
   });
+  if (!applied.length) return showToast("No había cambios concretos para guardar.");
+  const preview = applied.flatMap(change => routineAiChangeSummary(change).map(value => `${change.exerciseName}: ${value}`)).join("\n");
+  if (!window.confirm(`Se guardarán estos ajustes para la próxima rutina:\n\n${preview}\n\nPodrás deshacerlos desde este comentario.`)) return;
   saveRoutineSettings(settings);
   saveRoutineAiStatus(record, "applied", applied);
   renderRoutines();
   renderHistory();
-  showToast(applied.length ? "Cambios guardados como base de la próxima rutina." : "No había cambios concretos para guardar.");
+  showToast("Cambios guardados como base de la próxima rutina.");
   renderHome();
+}
+
+function undoRoutineAiChanges(record) {
+  const changes = record.routineAiAnalysis?.appliedChanges || [];
+  const routine = physicalRoutineById(record.routineId);
+  if (!routine || !changes.length) return showToast("No hay cambios aplicados para deshacer.");
+  if (!window.confirm("Se restaurará la configuración que tenías antes de aplicar esta propuesta. ¿Continuar?")) return;
+  const allowed = new Set(routine.exercises.map(exercise => exercise.id));
+  const settings = loadRoutineSettings();
+  let restored = 0;
+  changes.forEach(change => {
+    if (!allowed.has(change.exerciseId)) return;
+    settings[routineSettingsKey(routine.id, change.exerciseId)] = {
+      sets: Number(change.previousSets ?? change.currentSets),
+      target: String(change.previousTarget ?? change.currentTarget),
+      weightKg: change.previousWeightKg ?? change.currentWeightKg ?? ""
+    };
+    restored += 1;
+  });
+  if (!restored) return showToast("No fue posible recuperar la configuración anterior.");
+  saveRoutineSettings(settings);
+  saveRoutineAiStatus(record, "reverted", changes);
+  renderRoutines();
+  renderHistory();
+  renderHome();
+  showToast(`Se restauró la configuración anterior de ${restored} ${restored === 1 ? "ejercicio" : "ejercicios"}.`);
 }
 
 function revertProgressionFollowUp(record) {
@@ -3994,6 +4126,18 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       ].filter(Boolean);
       basis.textContent = `Base de progresión: ${parts.join(" · ")}. ${analysis.progressionBasis.reason || ""}`;
       card.append(basis);
+      if (analysis.progressionBasis.deloadRecommended) {
+        const deload = document.createElement("p");
+        deload.className = "routine-ai-deload";
+        deload.textContent = "Descarga sugerida: mantén los movimientos, evita aumentos y reduce temporalmente una serie o una pequeña parte de la carga.";
+        card.append(deload);
+      }
+      if (analysis.progressionBasis.stalledExercises?.length) {
+        const stalled = document.createElement("p");
+        stalled.className = "routine-ai-stalled";
+        stalled.textContent = `Estancamiento a revisar: ${analysis.progressionBasis.stalledExercises.join(", ")}.`;
+        card.append(stalled);
+      }
     }
     if (analysis.progressionFollowUp?.assessments?.length && record.category === "physical") {
       const followUp = document.createElement("div");
@@ -4129,13 +4273,27 @@ function createRoutineAiCard(record, { compact = false } = {}) {
       const statusText = analysis.status === "pending" && !proposedChanges.length ? "No hay cambios concretos de peso, series o repeticiones para guardar. Mantén la configuración actual y usa las recomendaciones como guía."
         : analysis.status === "reviewed" && record.category === "physical" && !proposedChanges.length ? "No hay cambios concretos para aplicar en la próxima rutina."
           : analysis.status === "reviewed" ? ""
-        : analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina." : "Propuesta descartada; no se cambió la rutina.";
+        : analysis.status === "applied" ? "Propuesta aplicada a la próxima rutina."
+          : analysis.status === "reverted" ? "Cambio deshecho: se restauró la configuración anterior."
+            : "Propuesta descartada; no se cambió la rutina.";
       if (statusText) {
         const status = document.createElement("p");
         status.className = `routine-ai-status ${analysis.status}`;
         status.textContent = statusText;
         card.append(status);
       }
+    }
+    if (analysis.status === "applied" && analysis.appliedChanges?.length) {
+      const audit = document.createElement("div");
+      audit.className = "routine-ai-audit";
+      const appliedAt = document.createElement("small");
+      appliedAt.textContent = `Aplicado ${analysis.appliedAt ? new Date(analysis.appliedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "recientemente"} · ${analysis.appliedChanges.length} ${analysis.appliedChanges.length === 1 ? "ajuste" : "ajustes"}`;
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.textContent = "Deshacer cambios aplicados";
+      undo.addEventListener("click", () => undoRoutineAiChanges(record));
+      audit.append(appliedAt, undo);
+      card.append(audit);
     }
     const refresh = document.createElement("button");
     refresh.type = "button";
@@ -5201,7 +5359,10 @@ function renderExerciseProgress(records) {
       ? ` · ${latestWeight > previousWeight ? "+" : ""}${(latestWeight - previousWeight).toLocaleString("es-CL")} kg`
       : "";
     latest.textContent = `Último: ${exercise.latest.target || "sin objetivo"}${latestWeight ? ` · ${latestWeight.toLocaleString("es-CL")} kg` : ""}${weightChange}`;
-    copy.append(title, latest);
+    const trend = document.createElement("span");
+    trend.className = `exercise-progress-trend ${exercise.trend}`;
+    trend.textContent = exercise.trendLabel;
+    copy.append(title, latest, trend);
     const best = document.createElement("div");
     best.className = "exercise-progress-best";
     const bestLabel = document.createElement("span");
@@ -5514,16 +5675,25 @@ function createHistoryEntry(sourceRecord) {
   const details = document.createElement("p");
   details.textContent = recordDetails(record);
   copy.append(titleRow, details);
+  const comparison = routineComparison(record, repository.list());
+  if (comparison) {
+    const comparisonLine = document.createElement("p");
+    comparisonLine.className = "history-session-comparison";
+    comparisonLine.textContent = `Vs. ${formatShortDate(comparison.previousDateISO)}: ${comparison.text}.`;
+    copy.append(comparisonLine);
+  }
+  const expanded = document.createElement("div");
+  expanded.className = "history-entry-expanded";
   if (record.plannedTitle) {
     const planned = document.createElement("p");
     planned.className = "history-plan-link";
     planned.textContent = `Plan del entrenador · ${record.plannedTitle}`;
-    copy.append(planned);
+    expanded.append(planned);
   }
   if (record.sensations) {
     const sensations = document.createElement("p");
     sensations.textContent = record.sensations;
-    copy.append(sensations);
+    expanded.append(sensations);
   }
   if (["warmup", "stretching"].includes(record.category) && record.guidedSteps.length) {
     const disclosure = document.createElement("details");
@@ -5536,10 +5706,10 @@ function createHistoryEntry(sourceRecord) {
       item.textContent = `${step.title} · ${step.status === "done" ? "realizado" : "omitido"} · ${step.seconds} s sugeridos`;
       list.append(item);
     });
-    disclosure.append(summary, list); copy.append(disclosure);
+    disclosure.append(summary, list); expanded.append(disclosure);
     if (record.guidedPainNotes) {
       const note = document.createElement("p"); note.className = "history-pain-detail";
-      note.textContent = `Molestia: ${record.guidedPainNotes}`; copy.append(note);
+      note.textContent = `Molestia: ${record.guidedPainNotes}`; expanded.append(note);
     }
   }
   if (record.category === "physical" && record.routinePlannedSets !== "") {
@@ -5556,27 +5726,27 @@ function createHistoryEntry(sourceRecord) {
       ["Técnica final", { solid: "Sólida", acceptable: "Aceptable", declined: "Se deterioró" }[record.routineTechnique] || "—"],
       ["Reps. en reserva", record.routineRepsInReserve === "" ? "—" : Number(record.routineRepsInReserve) >= 5 ? "5+" : String(record.routineRepsInReserve)]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
-    copy.append(balance);
+    expanded.append(balance);
     if (record.routinePainDetail) {
       const painDetail = document.createElement("p");
       painDetail.className = "history-pain-detail";
       painDetail.textContent = `Molestia: ${record.routinePainDetail}`;
-      copy.append(painDetail);
+      expanded.append(painDetail);
     }
     if (record.routineSummary) {
       const automaticSummary = document.createElement("p");
       automaticSummary.className = "history-auto-summary";
       automaticSummary.textContent = record.routineSummary;
-      copy.append(automaticSummary);
+      expanded.append(automaticSummary);
     }
   }
   const wearablePanel = createWearableLinkPanel(record);
-  if (wearablePanel) copy.append(wearablePanel);
+  if (wearablePanel) expanded.append(wearablePanel);
   if (record.category === "physical" && record.routinePlannedSets === "" && record.routineSummary) {
     const notes = document.createElement("p");
     notes.className = "history-auto-summary";
     notes.textContent = `Ejercicios y cargas realizados: ${record.routineSummary}`;
-    copy.append(notes);
+    expanded.append(notes);
   }
   const aiCard = createRoutineAiCard(record, { compact: true });
   if (record.category === "physical" && record.routineExercises.length) {
@@ -5595,7 +5765,15 @@ function createHistoryEntry(sourceRecord) {
       exerciseList.append(item);
     });
     exerciseDisclosure.append(exerciseSummary, exerciseList);
-    copy.append(exerciseDisclosure);
+    expanded.append(exerciseDisclosure);
+  }
+  if (expanded.childElementCount) {
+    const recordDisclosure = document.createElement("details");
+    recordDisclosure.className = "history-record-disclosure";
+    const recordSummary = document.createElement("summary");
+    recordSummary.textContent = "Ver registro completo";
+    recordDisclosure.append(recordSummary, expanded);
+    copy.append(recordDisclosure);
   }
   const actions = document.createElement("div");
   actions.className = "entry-actions";
@@ -5611,12 +5789,14 @@ function createHistoryEntry(sourceRecord) {
   actions.append(edit, remove);
   top.append(copy, actions);
   entry.append(top);
-  const disclosure = document.createElement("details");
-  disclosure.className = "history-ai-disclosure";
-  const summary = document.createElement("summary");
-  summary.textContent = record.routineAiAnalysis ? "Comentario del entrenador IA" : "Análisis del entrenador IA pendiente";
-  disclosure.append(summary, aiCard);
-  entry.append(disclosure);
+  if (record.routineAiAnalysis || (isMainDayRecord(record) && record.category !== "rest")) {
+    const disclosure = document.createElement("details");
+    disclosure.className = "history-ai-disclosure";
+    const summary = document.createElement("summary");
+    summary.textContent = record.routineAiAnalysis ? "Comentario del entrenador IA" : "Análisis del entrenador IA pendiente";
+    disclosure.append(summary, aiCard);
+    entry.append(disclosure);
+  }
   return entry;
 }
 
@@ -5721,7 +5901,7 @@ function bindEvents() {
     const action = event.currentTarget.dataset.action;
     if (action === "active-session") return openActiveSession();
     if (action === "planned") return openTodayPlannedActivity();
-    if (action === "nutrition") return showView("nutrition");
+    if (action === "history") return showView("history");
     openRegistration();
   });
   $("historyCategoryFilter").addEventListener("change", renderHistory);

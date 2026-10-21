@@ -6,13 +6,47 @@ test("el centro diario prioriza dolor reciente sobre métricas favorables", () =
   const brief = dailyBrief({
     dateISO: "2026-09-28",
     planTitle: "Tren superior",
+    planCategory: "physical",
     records: [{ dateISO: "2026-09-27", category: "tennis", durationMinutes: 90, routinePain: 6 }],
     wearableDays: [{ dateISO: "2026-09-28", sleepMinutes: 480 }],
     nutritionEntries: []
   });
   assert.equal(brief.tone, "recover");
-  assert.match(brief.title, /Tren superior/);
+  assert.equal(brief.adaptation, "recover");
+  assert.match(brief.title, /recuperación/i);
+  assert.match(brief.signals.join(" "), /Tren superior/);
   assert.match(brief.signals.join(" "), /dolor 6\/10/);
+});
+
+test("el centro diario reduce volumen cuando se acumulan sesiones exigentes", () => {
+  const brief = dailyBrief({
+    dateISO: "2026-09-28",
+    planTitle: "Día 2 · Tren superior",
+    planCategory: "physical",
+    records: [
+      { dateISO: "2026-09-26", category: "tennis", durationMinutes: 100 },
+      { dateISO: "2026-09-27", category: "physical", durationMinutes: 80, routineEffort: 8 },
+      { dateISO: "2026-09-28", category: "tennis", durationMinutes: 70 }
+    ],
+    wearableDays: [{ dateISO: "2026-09-28", sleepMinutes: 430 }]
+  });
+  assert.equal(brief.adaptation, "reduce");
+  assert.match(brief.summary, /reduce una serie/i);
+  assert.equal(brief.recentLoadMinutes, 250);
+});
+
+test("protege el partido cercano aunque todavía falten datos de sueño", () => {
+  const brief = dailyBrief({
+    dateISO: "2026-10-23",
+    planTitle: "Activación prepartido",
+    planCategory: "physical",
+    matchWithinDays: 1,
+    records: [],
+    wearableDays: []
+  });
+  assert.equal(brief.label, "Proteger el próximo partido");
+  assert.match(brief.title, /frescura/i);
+  assert.equal(brief.adaptation, "maintain");
 });
 
 test("el centro diario distingue datos parciales y resume alimentación", () => {

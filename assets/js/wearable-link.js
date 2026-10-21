@@ -96,6 +96,23 @@ export function wearableCandidates(record, sessions, records = []) {
     .slice(0, 8);
 }
 
+export function wearableInbox(sessions = [], records = []) {
+  const linked = new Set(records.map(record => record.wearableSessionId).filter(Boolean));
+  const availableRecords = records.filter(record => !record.wearableSessionId && record.category !== "rest");
+  return sessions.filter(session => session?.id && session.startTime && session.endTime && !linked.has(session.id))
+    .map(session => {
+      const candidates = availableRecords.map(record => ({ record, match: wearableMatch(record, session) }))
+        .filter(item => item.match)
+        .sort((a, b) => b.match.score - a.match.score);
+      const best = candidates[0] || null;
+      const margin = best && candidates[1] ? best.match.score - candidates[1].match.score : Infinity;
+      const state = best && best.match.score >= 60 && margin >= 25 ? "recommended"
+        : candidates.length ? "ambiguous" : "unmatched";
+      return { session, candidates, recommended: state === "recommended" ? best : null, state };
+    })
+    .sort((a, b) => String(b.session.startTime).localeCompare(String(a.session.startTime)));
+}
+
 export function wearableSummaryText(snapshot) {
   const data = normalizeWearableSnapshot(snapshot);
   if (!data) return "";

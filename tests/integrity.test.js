@@ -59,6 +59,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
   assert.match(html, /id="homeDailyBrief"/);
+  assert.match(html, /Ajuste recomendado/);
   assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
   assert.doesNotMatch(html, /id="coachVoiceButton"|coach-voice-button/);
@@ -170,6 +171,11 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.match(app, /routineEffort-/);
   assert.match(app, /routinePain-/);
   assert.match(app, /actionableRoutineAiChanges/);
+  assert.match(app, /undoRoutineAiChanges/);
+  assert.match(app, /revertCoachPlanAdjustment/);
+  assert.match(app, /wearableInbox/);
+  assert.match(app, /history-record-disclosure/);
+  assert.match(app, /home-coach-disclosure/);
   assert.match(app, /Guardar ajustes editados para la próxima rutina/);
   assert.match(app, /No hay cambios concretos para aplicar/);
   assert.match(app, /Descartar/);
@@ -296,7 +302,9 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   ]);
   assert.match(ai, /hasPlanAdjustment/);
   assert.match(ai, /nutritionContext/);
-  assert.match(app, /Aplicar al plan y nutrición/);
+  assert.match(app, /Revisar y aplicar/);
+  assert.match(app, /También se coordinará la guía de alimentación/);
+  assert.match(app, /revertCoachPlanAdjustment/);
   assert.match(app, /sleepStagesMinutes/);
   assert.match(html, /wearableSleepDetails/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
@@ -318,10 +326,14 @@ test("la guía registra comentarios nutricionales, pliega el historial y prepara
 });
 
 test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya vinculadas", async () => {
-  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
-  assert.match(app, /linkedSessionIds\.has\(session\.id\)/);
-  assert.match(app, /Vincular con \$\{recordTitle\(candidates\[0\]\.record\)\}/);
-  assert.match(app, /linkWearableSession\(candidates\[0\]\.record\.id, session\.id\)/);
+  const [app, wearable] = await Promise.all([
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "assets/js/wearable-link.js"), "utf8")
+  ]);
+  assert.match(wearable, /linked\.has\(session\.id\)/);
+  assert.match(app, /Coincidencia recomendada/);
+  assert.match(app, /Vincular con \$\{recordTitle\(recommended\.record\)\}/);
+  assert.match(app, /linkWearableSession\(recommended\.record\.id, session\.id\)/);
   assert.doesNotMatch(app, /Vinculada: \$\{recordTitle\(linkedRecord\)\}/);
   assert.doesNotMatch(app, /Revisar vínculo/);
 });
@@ -405,7 +417,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=102/);
+  assert.match(html, /assets\/js\/app\.js\?v=103/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

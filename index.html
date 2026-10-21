@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=98">
+  <link rel="stylesheet" href="assets/css/styles.css?v=99">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -41,7 +41,7 @@
         </div>
         <p class="eyebrow">Hoy</p>
         <h1 id="homeTitle"></h1>
-        <button id="heroWeekTheme" class="hero-week-theme" type="button" aria-label="Ver planificación de la semana"></button>
+        <button id="heroWeekTheme" class="hero-week-theme hidden" type="button" aria-label="Ver planificación de la semana"></button>
         <div class="hero-stats" aria-label="Resumen semanal">
           <div><strong id="weekSessionCount">0</strong><span>Sesiones</span><small id="weekSessionDelta"></small></div>
           <div><strong id="weekMinutes">0</strong><span>Minutos</span><small id="weekMinutesDelta"></small></div>
@@ -58,7 +58,7 @@
 
       <section id="homeDailyBrief" class="daily-brief-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
         <div class="daily-brief-heading">
-          <div><p class="eyebrow dark">Centro de hoy</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
+          <div><p class="eyebrow dark">Ajuste recomendado</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
           <span id="dailyBriefStatus" class="daily-brief-status neutral">Contexto parcial</span>
         </div>
         <p id="dailyBriefSummary"></p>
@@ -565,6 +565,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=102"></script>
+<script type="module" src="assets/js/app.js?v=103"></script>
 </body>
 </html>

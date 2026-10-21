@@ -1,5 +1,5 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=70";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=96";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=71";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=97";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
 import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 
@@ -93,11 +93,13 @@ export function normalizeCoachQuestions(value) {
       deleted: Boolean(item?.deleted),
       source: item?.source === "voice" ? "voice" : "text",
       planAdjustment,
-      adjustmentStatus: ["pending", "applied", "dismissed"].includes(item?.adjustmentStatus)
+      adjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.adjustmentStatus)
         ? item.adjustmentStatus : planAdjustment ? "pending" : "",
       appliedOptionId: String(item?.appliedOptionId || "").slice(0, 120),
       originalOptionId: String(item?.originalOptionId || "").slice(0, 120),
+      originalNutritionMode: nutritionModes.includes(item?.originalNutritionMode) ? item.originalNutritionMode : "",
       appliedAt: String(item?.appliedAt || ""),
+      revertedAt: String(item?.revertedAt || ""),
       createdAt: String(item?.createdAt || ""),
       updatedAt: String(item?.updatedAt || item?.createdAt || "")
     }]];

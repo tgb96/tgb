@@ -200,3 +200,20 @@ test("limpiar preguntas deja marcas de borrado para que no reaparezcan desde la 
   assert.equal(repository.listCoachQuestions().length, 0);
   assert.equal(repository.clearCoachQuestions(), 0);
 });
+
+test("conserva la auditoría necesaria para deshacer un ajuste del plan", () => {
+  const storage = new FakeStorage();
+  const repository = createRepository(storage);
+  repository.saveCoachQuestion({
+    id: "q-undo", question: "Cambia el partido", answer: "Propongo una sesión suave.",
+    planAdjustment: { targetDateISO: "2026-10-24", title: "Peloteo suave", category: "tennis" },
+    adjustmentStatus: "reverted", appliedOptionId: "ai-option", originalOptionId: "calendar-match",
+    originalNutritionMode: "match", appliedAt: "2026-10-21T10:00:00Z", revertedAt: "2026-10-21T10:05:00Z",
+    createdAt: "2026-10-21T09:55:00Z", updatedAt: "2026-10-21T10:05:00Z"
+  });
+  const saved = createRepository(storage).listCoachQuestions()[0];
+  assert.equal(saved.adjustmentStatus, "reverted");
+  assert.equal(saved.originalOptionId, "calendar-match");
+  assert.equal(saved.originalNutritionMode, "match");
+  assert.match(saved.revertedAt, /10:05/);
+});

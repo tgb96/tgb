@@ -7,8 +7,8 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=68";
-import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=68";
+} from "./data.js?v=69";
+import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=69";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -470,6 +470,10 @@ export function physicalRoutineDurationAverages(records) {
 }
 
 export function exerciseProgress(records) {
+  const targetValue = target => {
+    const match = String(target || "").match(/\d+(?:[.,]\d+)?/);
+    return match ? Number(match[0].replace(",", ".")) : 0;
+  };
   const groups = new Map();
   records.map(normalizeRecord)
     .filter(record => record.category === "physical" && record.routineExercises.length)
@@ -491,17 +495,68 @@ export function exerciseProgress(records) {
       }));
   return [...groups.values()].map(group => {
     const attempts = group.attempts.sort((a, b) => b.dateISO.localeCompare(a.dateISO) || String(b.createdAt).localeCompare(String(a.createdAt)));
+    const latest = attempts[0];
+    const previous = attempts[1] || null;
+    const latestWeight = Number(latest?.weightKg) || 0;
+    const previousWeight = Number(previous?.weightKg) || 0;
+    const latestTarget = targetValue(latest?.target);
+    const previousTarget = targetValue(previous?.target);
+    const recentThree = attempts.slice(0, 3);
+    const sameConfiguration = recentThree.length === 3 && recentThree.every(attempt =>
+      (Number(attempt.weightKg) || 0) === latestWeight && String(attempt.target || "") === String(latest.target || ""));
+    const oldestRecentVolume = Number(recentThree.at(-1)?.volumeKg) || 0;
+    const latestVolume = Number(latest?.volumeKg) || 0;
+    const stalled = sameConfiguration && oldestRecentVolume > 0 && latestVolume <= oldestRecentVolume * 1.02;
+    const improved = Boolean(previous) && (latestWeight > previousWeight
+      || (latestWeight === previousWeight && latestTarget > previousTarget)
+      || (latestVolume > (Number(previous.volumeKg) || 0) * 1.05));
     return {
       ...group,
       attempts,
-      latest: attempts[0],
-      previous: attempts[1] || null,
+      latest,
+      previous,
       bestWeightKg: Math.max(0, ...attempts.map(attempt => Number(attempt.weightKg) || 0)),
-      bestVolumeKg: Math.max(0, ...attempts.map(attempt => Number(attempt.volumeKg) || 0))
+      bestVolumeKg: Math.max(0, ...attempts.map(attempt => Number(attempt.volumeKg) || 0)),
+      trend: stalled ? "stalled" : improved ? "improving" : "stable",
+      trendLabel: stalled ? "3 sesiones sin avance" : improved ? "Avance reciente" : "Carga estable"
     };
   })
     .filter(group => group.bestWeightKg > 0)
     .sort((a, b) => b.latest.dateISO.localeCompare(a.latest.dateISO) || a.name.localeCompare(b.name, "es"));
+}
+
+export function routineComparison(sourceRecord, records = []) {
+  const record = normalizeRecord(sourceRecord);
+  if (record.category !== "physical" || !record.routineId) return null;
+  const previous = records.map(normalizeRecord)
+    .filter(item => item.id !== record.id && item.category === "physical" && item.routineId === record.routineId
+      && (item.dateISO < record.dateISO || (item.dateISO === record.dateISO && String(item.createdAt) < String(record.createdAt))))
+    .sort((a, b) => b.dateISO.localeCompare(a.dateISO) || String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (!previous) return null;
+  const parts = [];
+  const volumeDelta = Math.round((Number(record.routineVolumeKg) || 0) - (Number(previous.routineVolumeKg) || 0));
+  if (volumeDelta) parts.push(`volumen ${volumeDelta > 0 ? "+" : ""}${volumeDelta.toLocaleString("es-CL")} kg`);
+  const setDelta = (Number(record.routineCompletedSets) || 0) - (Number(previous.routineCompletedSets) || 0);
+  if (setDelta) parts.push(`${setDelta > 0 ? "+" : ""}${setDelta} series completadas`);
+  const previousExercises = new Map(previous.routineExercises.map(exercise => [exercise.id, exercise]));
+  const loadChanges = record.routineExercises.flatMap(exercise => {
+    const before = previousExercises.get(exercise.id);
+    const currentWeight = Number(exercise.weightKg) || 0;
+    const previousWeight = Number(before?.weightKg) || 0;
+    return before && currentWeight !== previousWeight ? [{ name: exercise.name, delta: currentWeight - previousWeight }] : [];
+  });
+  if (loadChanges.length) {
+    const higher = loadChanges.filter(item => item.delta > 0).length;
+    const lower = loadChanges.filter(item => item.delta < 0).length;
+    if (higher) parts.push(`${higher} ${higher === 1 ? "carga mayor" : "cargas mayores"}`);
+    if (lower) parts.push(`${lower} ${lower === 1 ? "carga menor" : "cargas menores"}`);
+  }
+  return {
+    previousDateISO: previous.dateISO,
+    previousRecordId: previous.id,
+    text: parts.length ? parts.join(" · ") : "misma carga, series y volumen estimado",
+    loadChanges
+  };
 }
 
 export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6) {
@@ -534,10 +589,11 @@ function normalizeRoutineAiAnalysis(value) {
   if (!headline && !summary) return null;
   const decisions = new Set(["progress", "maintain", "reduce", "recover"]);
   const actions = new Set(["increase", "maintain", "reduce", "substitute"]);
-  const statuses = new Set(["pending", "applied", "discarded", "reviewed"]);
-  const changes = Array.isArray(value.changes) ? value.changes.slice(0, 12).map((change, index) => {
+  const statuses = new Set(["pending", "applied", "reverted", "discarded", "reviewed"]);
+  const normalizedChange = (change, index) => {
     const currentWeightKg = optionalNumber(change?.currentWeightKg, { min: 0 });
     const proposedWeightKg = optionalNumber(change?.proposedWeightKg, { min: 0 });
+    const previousWeightKg = optionalNumber(change?.previousWeightKg, { min: 0 });
     return {
       exerciseId: String(change?.exerciseId || "").slice(0, 100),
       exerciseName: String(change?.exerciseName || `Ejercicio ${index + 1}`).slice(0, 300),
@@ -548,9 +604,17 @@ function normalizeRoutineAiAnalysis(value) {
       proposedTarget: String(change?.proposedTarget || "").slice(0, 100),
       currentWeightKg: currentWeightKg === null ? "" : currentWeightKg,
       proposedWeightKg: proposedWeightKg === null ? "" : proposedWeightKg,
+      previousSets: Math.min(10, Math.max(1, Math.floor(Number(change?.previousSets ?? change?.currentSets) || 1))),
+      previousTarget: String(change?.previousTarget ?? change?.currentTarget ?? "").slice(0, 100),
+      previousWeightKg: previousWeightKg === null
+        ? currentWeightKg === null ? "" : currentWeightKg
+        : previousWeightKg,
       progressionStep: String(change?.progressionStep || "").slice(0, 40),
       reason: String(change?.reason || "").slice(0, 1000)
     };
+  };
+  const changes = Array.isArray(value.changes) ? value.changes.slice(0, 12).map((change, index) => {
+    return normalizedChange(change, index);
   }).filter(change => change.exerciseId) : [];
   return {
     decision: decisions.has(value.decision) ? value.decision : "",
@@ -578,7 +642,12 @@ function normalizeRoutineAiAnalysis(value) {
       effortRpe: optionalNumber(value.progressionBasis.effortRpe, { min: 1 }),
       painScore: optionalNumber(value.progressionBasis.painScore, { min: 0 }),
       technique: ["solid", "acceptable", "declined"].includes(value.progressionBasis.technique) ? value.progressionBasis.technique : "",
-      repsInReserve: optionalNumber(value.progressionBasis.repsInReserve, { min: 0 })
+      repsInReserve: optionalNumber(value.progressionBasis.repsInReserve, { min: 0 }),
+      fatigueHits: Math.min(3, Math.max(0, Math.floor(Number(value.progressionBasis.fatigueHits) || 0))),
+      deloadRecommended: Boolean(value.progressionBasis.deloadRecommended),
+      stalledExercises: Array.isArray(value.progressionBasis.stalledExercises)
+        ? value.progressionBasis.stalledExercises.slice(0, 12).map(item => String(item || "").slice(0, 300)).filter(Boolean)
+        : []
     } : null,
     progressionFollowUp: value.progressionFollowUp && typeof value.progressionFollowUp === "object" ? {
       sourceRecordId: String(value.progressionFollowUp.sourceRecordId || "").slice(0, 120),
@@ -600,7 +669,10 @@ function normalizeRoutineAiAnalysis(value) {
     encouragement: String(value.encouragement || "").trim().slice(0, 1000),
     status: statuses.has(value.status) ? value.status : (changes.length || value.decision ? "pending" : ""),
     appliedAt: String(value.appliedAt || "").slice(0, 40),
-    appliedChanges: Array.isArray(value.appliedChanges) ? value.appliedChanges.slice(0, 12).map(change => ({ ...change })) : [],
+    revertedAt: String(value.revertedAt || "").slice(0, 40),
+    appliedChanges: Array.isArray(value.appliedChanges)
+      ? value.appliedChanges.slice(0, 12).map(normalizedChange).filter(change => change.exerciseId)
+      : [],
     profileVersion: String(value.profileVersion || "").slice(0, 100),
     generatedAt: String(value.generatedAt || "").slice(0, 40),
     model: String(value.model || "").slice(0, 100)

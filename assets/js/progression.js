@@ -132,11 +132,20 @@ export function buildProgressionEvidence(current, previousRecords = []) {
   const pain = asNumber(current.painScore ?? current.routinePain);
   const technique = String((current.technique ?? current.routineTechnique) || "");
   const repsInReserve = asNumber(current.repsInReserve ?? current.routineRepsInReserve);
+  const recentForFatigue = [current, ...comparable].slice(0, 3);
+  const fatigueHits = recentForFatigue.filter(record => completionRate(record) < 0.8
+    || asNumber(record?.painScore ?? record?.routinePain) >= 3
+    || asNumber(record?.effortRpe ?? record?.routineEffort) >= 8
+    || ["declined", "poor"].includes(record?.technique ?? record?.routineTechnique)).length;
+  const deloadRecommended = recentForFatigue.length >= 2 && fatigueHits >= 2;
   let readiness = "observe";
   let reason = "Falta repetir la configuración o registrar mejor la calidad de la última serie.";
   if (pain !== null && pain >= 5) {
     readiness = "recover";
     reason = "El dolor informado impide progresar la carga y requiere priorizar recuperación.";
+  } else if (deloadRecommended) {
+    readiness = "reduce";
+    reason = "Dos o más sesiones recientes muestran fatiga, dolor, esfuerzo alto o una caída de ejecución; conviene una sesión de descarga antes de volver a progresar.";
   } else if ((pain !== null && pain >= 3) || technique === "declined") {
     readiness = "reduce";
     reason = technique === "declined" ? "La técnica se deterioró al final de la sesión." : "El dolor informado aconseja reducir antes de progresar.";
@@ -161,7 +170,9 @@ export function buildProgressionEvidence(current, previousRecords = []) {
     });
     const repeatedSuccesses = history.filter(item => sameConfiguration(exercise, item.exercise)
       && exerciseQualityForProgression(item.record, item.exercise)).length;
+    const sameConfigurationAttempts = 1 + history.filter(item => sameConfiguration(exercise, item.exercise)).length;
     const feedback = exerciseFeedback(exercise, current);
+    const stalled = sameConfigurationAttempts >= 3 && !exerciseQualityForProgression(current, exercise);
     const baseEligible = readiness === "progress" && exerciseComplete(exercise) && !blocksAutomaticProgression(exercise)
       && !["declined", "poor"].includes(feedback.technique)
       && (feedback.repsInReserve !== null ? feedback.repsInReserve >= 3 : repeatedSuccesses >= 1);
@@ -176,6 +187,9 @@ export function buildProgressionEvidence(current, previousRecords = []) {
       completedSets: Number(exercise.completedSets) || 0,
       progressionKind: exerciseKind(exercise),
       repeatedSuccessfulSessions: repeatedSuccesses,
+      sameConfigurationAttempts,
+      stalled,
+      stagnationReason: stalled ? "La misma configuración se repitió al menos tres veces sin una ejecución actual suficientemente sólida para progresar." : "",
       technique: feedback.technique,
       repsInReserve: feedback.repsInReserve,
       eligibleForIncrease: Boolean(recommendation),
@@ -193,6 +207,8 @@ export function buildProgressionEvidence(current, previousRecords = []) {
     painScore: pain,
     technique,
     repsInReserve,
+    fatigueHits,
+    deloadRecommended,
     exercises
   };
 }

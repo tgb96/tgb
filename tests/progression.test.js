@@ -182,3 +182,23 @@ test("la evaluación específica de un ejercicio prevalece sobre la sesión gene
   assert.equal(evidence.readiness, "progress");
   assert.equal(evidence.exercises[0].eligibleForIncrease, false);
 });
+
+test("recomienda descarga cuando dos sesiones recientes acumulan señales de fatiga", () => {
+  const current = session({ effortRpe: 8, repsInReserve: 1 });
+  const previous = session({ dateISO: "2026-10-14", painScore: 3, effortRpe: 8 });
+  const evidence = buildProgressionEvidence(current, [previous]);
+  assert.equal(evidence.deloadRecommended, true);
+  assert.equal(evidence.readiness, "reduce");
+  assert.match(evidence.reason, /descarga/i);
+});
+
+test("marca estancamiento tras tres intentos iguales sin calidad suficiente", () => {
+  const current = session({ effortRpe: 8, repsInReserve: 1 });
+  const previous = [
+    session({ dateISO: "2026-10-14", effortRpe: 8, repsInReserve: 1 }),
+    session({ dateISO: "2026-10-07", effortRpe: 8, repsInReserve: 1 })
+  ];
+  const evidence = buildProgressionEvidence(current, previous);
+  assert.equal(evidence.exercises[0].sameConfigurationAttempts, 3);
+  assert.equal(evidence.exercises[0].stalled, true);
+});

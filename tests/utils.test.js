@@ -16,6 +16,7 @@ import {
   runningBestTimes,
   routineExerciseLine,
   routineCompletionSummary,
+  routineComparison,
   trekkingBestTimes,
   validateRecord,
   weekDays,
@@ -242,9 +243,26 @@ test("calcula la evolución semanal y el progreso de cada ejercicio", () => {
   assert.equal(exercises[0].latest.weightKg, 8);
   assert.equal(exercises[0].previous.weightKg, 7);
   assert.equal(exercises[0].bestVolumeKg, 240);
+  assert.equal(exercises[0].trend, "improving");
   assert.equal(exercises.length, 1);
   assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de volumen/);
   assert.match(routineCompletionSummary(latest, [earlier]), /Nuevo récord de abdominales/);
+  const comparison = routineComparison(latest, [earlier, latest]);
+  assert.equal(comparison.previousRecordId, earlier.id);
+  assert.match(comparison.text, /volumen \+30 kg/);
+  assert.match(comparison.text, /carga mayor/);
+});
+
+test("detecta tres configuraciones idénticas sin aumento de volumen", () => {
+  const attempts = ["2026-08-10", "2026-08-17", "2026-08-24"].map((dateISO, index) => ({
+    ...physicalRecord,
+    id: `stalled-${index}`,
+    dateISO,
+    routineExercises: [{ id: "row", name: "Remo", target: "10", weightKg: 8, plannedSets: 3, completedSets: 3, totalReps: 30, volumeKg: 240 }]
+  }));
+  const progress = exerciseProgress(attempts)[0];
+  assert.equal(progress.trend, "stalled");
+  assert.match(progress.trendLabel, /3 sesiones/);
 });
 
 test("migra registros anteriores al nuevo modelo sin perder su contenido", () => {
@@ -441,4 +459,25 @@ test("conserva y exporta comentarios de la guía para cardio y sus sensaciones c
     assert.match(text, /Objetivo cubierto con menor intensidad/);
     assert.match(text, /Escuchar tus sensaciones/);
   }
+});
+
+test("normaliza la auditoría de una progresión aplicada y deshecha", () => {
+  const record = normalizeRecord({
+    ...physicalRecord,
+    routineAiAnalysis: {
+      headline: "Ajuste deshecho", summary: "Se recuperó la configuración anterior.", status: "reverted",
+      revertedAt: "2026-10-21T10:05:00Z",
+      appliedChanges: [{
+        exerciseId: "row", exerciseName: "Remo", action: "increase",
+        currentSets: 3, proposedSets: 3, previousSets: 3,
+        currentTarget: "10", proposedTarget: "10", previousTarget: "10",
+        currentWeightKg: 8, proposedWeightKg: 9, previousWeightKg: 8,
+        reason: "Progresión pequeña"
+      }]
+    }
+  });
+  assert.equal(record.routineAiAnalysis.status, "reverted");
+  assert.equal(record.routineAiAnalysis.appliedChanges[0].previousWeightKg, 8);
+  assert.equal(record.routineAiAnalysis.appliedChanges[0].proposedWeightKg, 9);
+  assert.match(record.routineAiAnalysis.revertedAt, /10:05/);
 });

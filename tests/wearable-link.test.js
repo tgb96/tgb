@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableSummaryText } from "../assets/js/wearable-link.js";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "../assets/js/wearable-link.js";
 import { groupRecordsByWeek, normalizeRecord, recordsToCSV, weeklyReport } from "../assets/js/utils.js";
 import { createRepository } from "../assets/js/storage.js";
 
@@ -32,6 +32,19 @@ test("un registro sin horario solo ofrece la misma fecha para confirmación manu
   const candidates = wearableCandidates(dated, [band, { ...band, id: "tomorrow", dateISO: "2026-09-23" }]);
   assert.equal(candidates.length, 1);
   assert.match(candidates[0].match.reason, /Mismo día/);
+});
+
+test("la bandeja de la pulsera separa coincidencias recomendadas, ambiguas y sin registro", () => {
+  const exact = wearableInbox([band], [manual]);
+  assert.equal(exact[0].state, "recommended");
+  assert.equal(exact[0].recommended.record.id, manual.id);
+  const ambiguous = wearableInbox([band], [
+    { ...manual, id: "a", routineStartedAt: "", routineEndedAt: "" },
+    { ...manual, id: "b", routineStartedAt: "", routineEndedAt: "" }
+  ]);
+  assert.equal(ambiguous[0].state, "ambiguous");
+  const unmatched = wearableInbox([{ ...band, dateISO: "2026-09-25", startTime: "2026-09-25T14:00:00Z", endTime: "2026-09-25T15:00:00Z" }], [manual]);
+  assert.equal(unmatched[0].state, "unmatched");
 });
 
 test("la hora manual de inicio prioriza la sesión correcta de la pulsera", () => {
