@@ -1812,6 +1812,13 @@ function renderHome() {
 
   const ledger = $("weekLedger");
   ledger.replaceChildren();
+  const wearableInboxItems = wearableInbox(wearableData.sessions || [], allRecords);
+  const recommendedWearableByRecord = new Map();
+  const selectableWearableRecords = new Set();
+  for (const item of wearableInboxItems) {
+    if (item.recommended?.record?.id) recommendedWearableByRecord.set(item.recommended.record.id, item);
+    item.candidates.forEach(candidate => selectableWearableRecords.add(candidate.record.id));
+  }
   for (const dateISO of weekDays(todayISO)) {
     const day = dayIndexFromISO(dateISO);
     const dayRecords = records.filter(record => record.dateISO === dateISO);
@@ -1873,9 +1880,31 @@ function renderHome() {
         text.append(title, details);
         copy.append(dot, text);
         const workflow = recordWorkflowState(record);
-        const state = document.createElement("span");
+        const recommendation = workflow.status === "wearable-pending" ? recommendedWearableByRecord.get(record.id) : null;
+        const canChooseWearable = workflow.status === "wearable-pending" && selectableWearableRecords.has(record.id);
+        const state = document.createElement(recommendation || canChooseWearable ? "button" : "span");
         state.className = `record-state-badge ${workflow.status}`;
-        state.textContent = workflow.label;
+        if (recommendation) {
+          state.type = "button";
+          state.classList.add("record-state-action");
+          state.textContent = "Vincular pulsera";
+          state.setAttribute("aria-label", `Vincular la pulsera con ${recordTitle(record)}`);
+          state.title = recommendation.recommended.match.reason;
+          state.addEventListener("click", () => linkWearableSession(record.id, recommendation.session.id));
+        } else if (canChooseWearable) {
+          state.type = "button";
+          state.classList.add("record-state-action");
+          state.textContent = "Elegir pulsera";
+          state.setAttribute("aria-label", `Elegir sesión de la pulsera para ${recordTitle(record)}`);
+          state.addEventListener("click", () => {
+            const inbox = $("wearableSessions")?.querySelector("details.wearable-inbox");
+            if (!inbox) return;
+            inbox.open = true;
+            inbox.scrollIntoView({ behavior: "smooth", block: "center" });
+          });
+        } else {
+          state.textContent = workflow.label;
+        }
         line.append(copy, state);
         activities.append(line);
       }

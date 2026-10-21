@@ -164,6 +164,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .activity-line small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .record-state-badge { flex: 0 0 auto; max-width: 105px; padding: 5px 7px; border-radius: 999px; background: #eceee8; color: #555d62; font-size: 9px; font-weight: 900; line-height: 1.2; text-align: center; text-transform: uppercase; letter-spacing: .25px; }
 .record-state-badge.wearable-pending { background: #fff0ce; color: #7d5400; }
+.record-state-action { border: 0; cursor: pointer; font-family: inherit; }
+.record-state-action.wearable-pending { box-shadow: 0 0 0 1px rgba(125, 84, 0, 0.16); }
+.record-state-action:active { transform: translateY(1px); }
 .record-state-badge.wearable-linked { background: #dfe7ff; color: var(--blue-dark); }
 .record-state-badge.evaluated { background: #e3f2ba; color: #426000; }
 .record-state-badge.rest { background: #eee4ff; color: #694b94; }

@@ -346,6 +346,8 @@ test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya v
   assert.match(app, /Coincidencia recomendada/);
   assert.match(app, /Vincular con \$\{recordTitle\(recommended\.record\)\}/);
   assert.match(app, /linkWearableSession\(recommended\.record\.id, session\.id\)/);
+  assert.match(app, /state\.textContent = "Vincular pulsera"/);
+  assert.match(app, /linkWearableSession\(record\.id, recommendation\.session\.id\)/);
   assert.doesNotMatch(app, /Vinculada: \$\{recordTitle\(linkedRecord\)\}/);
   assert.doesNotMatch(app, /Revisar vínculo/);
 });
@@ -429,7 +431,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=106/);
+  assert.match(html, /assets\/js\/app\.js\?v=107/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
