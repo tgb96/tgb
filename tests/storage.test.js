@@ -217,3 +217,27 @@ test("conserva la auditoría necesaria para deshacer un ajuste del plan", () => 
   assert.equal(saved.originalNutritionMode, "match");
   assert.match(saved.revertedAt, /10:05/);
 });
+
+test("conserva una corrección de registro propuesta por la guía y su versión anterior", () => {
+  const storage = new FakeStorage();
+  const repository = createRepository(storage);
+  repository.saveCoachQuestion({
+    id: "q-record", question: "El descanso fue por lluvia", answer: "Puedo corregir el motivo.",
+    recordAdjustment: {
+      targetRecordId: "rest-20", targetDateISO: "2026-10-20", expectedUpdatedAt: "2026-10-20T22:00:00Z",
+      title: "Descanso por lluvia", reason: "Se suspendió la actividad por clima", restTypeId: "weather",
+      restDetail: "No se pudo entrenar por lluvia", sensationsAppend: "", routineEffort: "", routinePain: "",
+      routinePainDetail: "", activityStartTime: ""
+    },
+    recordAdjustmentStatus: "applied",
+    recordAdjustmentOriginal: { restTypeId: "planned", restDetail: "", sensations: "", routineEffort: "", routinePain: "", routinePainDetail: "", activityStartTime: "", routineAiAnalysis: null },
+    recordAdjustmentAppliedAt: "2026-10-21T12:00:00Z",
+    recordAdjustmentAppliedRecordUpdatedAt: "2026-10-21T12:00:00Z",
+    createdAt: "2026-10-21T11:55:00Z", updatedAt: "2026-10-21T12:00:00Z"
+  });
+  const saved = createRepository(storage).listCoachQuestions()[0];
+  assert.equal(saved.recordAdjustment.restTypeId, "weather");
+  assert.equal(saved.recordAdjustmentStatus, "applied");
+  assert.equal(saved.recordAdjustmentOriginal.restTypeId, "planned");
+  assert.match(saved.recordAdjustmentAppliedRecordUpdatedAt, /12:00/);
+});

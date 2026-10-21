@@ -114,7 +114,7 @@ test("permite registrar primero la actividad y completar métricas desde la puls
   assert.equal(pending.record.metricsPending, true);
 });
 
-test("registra descanso planificado o por molestia con detalle obligatorio", () => {
+test("registra descanso planificado, por clima o por molestia con detalle obligatorio", () => {
   assert.equal(validateRecord({
     id: "rest-1",
     dateISO: "2026-08-25",
@@ -122,6 +122,18 @@ test("registra descanso planificado o por molestia con detalle obligatorio", () 
     categoryName: "Descanso",
     restTypeId: "planned"
   }).valid, true);
+  const weather = validateRecord({
+    id: "rest-weather",
+    dateISO: "2026-08-25",
+    category: "rest",
+    categoryName: "Descanso",
+    restTypeId: "weather",
+    restDetail: "No se pudo jugar por lluvia"
+  });
+  assert.equal(weather.valid, true);
+  assert.equal(recordTitle(weather.record), "Descanso por clima");
+  assert.match(recordDetails(weather.record), /lluvia/);
+  assert.match(weeklyReport([weather.record], isoWeekInfo(weather.record.dateISO)), /Motivo climático: No se pudo jugar por lluvia/);
   assert.equal(validateRecord({
     id: "rest-2",
     dateISO: "2026-08-26",

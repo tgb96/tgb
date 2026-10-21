@@ -43,13 +43,14 @@ export const trainingCategories = [
     id: "rest",
     name: "Descanso",
     shortName: "Descanso",
-    description: "Recuperación planificada o descanso por molestia.",
+    description: "Recuperación planificada, clima o descanso por molestia.",
     accent: "violet"
   }
 ];
 
 export const restTypes = [
   { id: "planned", name: "Día de descanso", description: "Recuperación planificada, sin molestias." },
+  { id: "weather", name: "Descanso por clima", description: "No pudiste realizar la actividad por lluvia u otras condiciones climáticas." },
   { id: "discomfort", name: "Descanso por molestia", description: "No entrenaste debido a dolor o molestia física." }
 ];
 

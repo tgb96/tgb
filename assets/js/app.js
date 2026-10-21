@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=69";
+} from "./data.js?v=70";
 import {
   coachOption,
   coachBaseTrainingBlock,
@@ -25,15 +25,15 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=98";
-import { createRepository } from "./storage.js?v=97";
+import { createRepository } from "./storage.js?v=98";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=97";
+import { createNutritionUI } from "./nutrition-ui.js?v=98";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
-import { createGuidedUI } from "./guided-ui.js?v=98";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=98";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=97";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=99";
+import { createGuidedUI } from "./guided-ui.js?v=99";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=99";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=98";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=95";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
@@ -64,7 +64,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=71";
+} from "./utils.js?v=72";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1013,6 +1013,40 @@ function renderCoachQuestions() {
     answer.className = "coach-exchange-answer";
     answer.textContent = item.answer || "Sin respuesta todavía. Pulsa Reintentar cuando tengas conexión.";
     exchange.append(question, answer);
+    if (item.recordAdjustment) {
+      const proposal = document.createElement("div");
+      proposal.className = `coach-plan-proposal coach-record-proposal ${item.recordAdjustmentStatus || "pending"}`;
+      const heading = document.createElement("strong");
+      heading.textContent = item.recordAdjustmentStatus === "applied" ? "Corrección aplicada"
+        : item.recordAdjustmentStatus === "reverted" ? "Corrección deshecha"
+          : item.recordAdjustmentStatus === "dismissed" ? "Corrección descartada" : "Corrección para confirmar";
+      const title = document.createElement("span");
+      title.textContent = `${formatShortDate(item.recordAdjustment.targetDateISO)} · ${item.recordAdjustment.title}`;
+      const reason = document.createElement("small");
+      reason.textContent = item.recordAdjustment.reason;
+      proposal.append(heading, title, reason);
+      if ((item.recordAdjustmentStatus || "pending") === "pending") {
+        const actions = document.createElement("div");
+        const apply = document.createElement("button");
+        apply.type = "button"; apply.textContent = "Aplicar corrección";
+        apply.addEventListener("click", () => applyCoachRecordAdjustment(item));
+        const dismiss = document.createElement("button");
+        dismiss.type = "button"; dismiss.className = "secondary"; dismiss.textContent = "Descartar";
+        dismiss.addEventListener("click", () => {
+          repository.saveCoachQuestion({ ...item, recordAdjustmentStatus: "dismissed", updatedAt: new Date().toISOString() });
+          renderCoachQuestions();
+        });
+        actions.append(apply, dismiss); proposal.append(actions);
+      } else if (item.recordAdjustmentStatus === "applied") {
+        const undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "secondary";
+        undo.textContent = "Deshacer corrección";
+        undo.addEventListener("click", () => revertCoachRecordAdjustment(item));
+        proposal.append(undo);
+      }
+      exchange.append(proposal);
+    }
     if (item.planAdjustment) {
       const proposal = document.createElement("div");
       proposal.className = `coach-plan-proposal ${item.adjustmentStatus || "pending"}`;
@@ -1296,6 +1330,132 @@ async function maybeGenerateMonthlySummary() {
   }
 }
 
+function coachRecordAdjustmentChanges(record, adjustment) {
+  const patch = {};
+  const lines = [];
+  if (record.category === "rest" && adjustment.restTypeId && adjustment.restTypeId !== record.restTypeId) {
+    const before = restTypes.find(type => type.id === record.restTypeId)?.name || record.restTypeId || "Sin tipo";
+    const after = restTypes.find(type => type.id === adjustment.restTypeId)?.name;
+    if (after) {
+      patch.restTypeId = adjustment.restTypeId;
+      lines.push(`Tipo de descanso: ${before} → ${after}`);
+    }
+  }
+  if (record.category === "rest" && adjustment.restDetail && adjustment.restDetail !== record.restDetail) {
+    patch.restDetail = adjustment.restDetail;
+    lines.push(`Motivo: ${record.restDetail || "Sin detalle"} → ${adjustment.restDetail}`);
+  }
+  if (adjustment.sensationsAppend) {
+    const exists = String(record.sensations || "").toLocaleLowerCase("es").includes(adjustment.sensationsAppend.toLocaleLowerCase("es"));
+    if (!exists) {
+      patch.sensations = [record.sensations, adjustment.sensationsAppend].filter(Boolean).join(" · ");
+      lines.push(`Agregar a sensaciones: ${adjustment.sensationsAppend}`);
+    }
+  }
+  if (record.category === "physical" && adjustment.routineEffort !== "" && Number(adjustment.routineEffort) !== Number(record.routineEffort)) {
+    patch.routineEffort = Number(adjustment.routineEffort);
+    lines.push(`Esfuerzo: ${record.routineEffort === "" ? "Sin dato" : `${record.routineEffort}/10`} → ${patch.routineEffort}/10`);
+  }
+  if (record.category === "physical" && adjustment.routinePain !== "" && Number(adjustment.routinePain) !== Number(record.routinePain)) {
+    patch.routinePain = Number(adjustment.routinePain);
+    lines.push(`Dolor: ${record.routinePain === "" ? "Sin dato" : `${record.routinePain}/10`} → ${patch.routinePain}/10`);
+  }
+  if (record.category === "physical" && adjustment.routinePainDetail && adjustment.routinePainDetail !== record.routinePainDetail) {
+    patch.routinePainDetail = adjustment.routinePainDetail;
+    lines.push(`Detalle de molestia: ${adjustment.routinePainDetail}`);
+  }
+  if (record.category !== "rest" && adjustment.activityStartTime && adjustment.activityStartTime !== record.activityStartTime) {
+    patch.activityStartTime = adjustment.activityStartTime;
+    lines.push(`Hora de inicio: ${record.activityStartTime || "Sin dato"} → ${adjustment.activityStartTime}`);
+  }
+  return { patch, lines };
+}
+
+function applyCoachRecordAdjustment(item) {
+  const adjustment = item.recordAdjustment;
+  const record = repository.get(adjustment?.targetRecordId);
+  if (!record || record.dateISO !== adjustment?.targetDateISO) {
+    showToast("Ese registro ya no está disponible. Pídele una nueva corrección a la guía.");
+    return;
+  }
+  if (adjustment.expectedUpdatedAt && record.updatedAt !== adjustment.expectedUpdatedAt) {
+    showToast("El registro cambió desde esa respuesta. Vuelve a explicarle la corrección para no sobrescribir datos nuevos.");
+    return;
+  }
+  const change = coachRecordAdjustmentChanges(record, adjustment);
+  if (!change.lines.length) {
+    showToast("La propuesta no contiene cambios aplicables a ese registro.");
+    return;
+  }
+  const preview = [`Registro: ${formatShortDate(record.dateISO)} · ${recordTitle(record)}`, ...change.lines].join("\n");
+  if (!window.confirm(`Revisa la corrección antes de aplicarla:\n\n${preview}\n\nEl historial y la lectura del plan usarán estos datos. Podrás deshacerla.`)) return;
+  const timestamp = new Date().toISOString();
+  const original = {
+    restTypeId: record.restTypeId,
+    restDetail: record.restDetail,
+    sensations: record.sensations,
+    routineEffort: record.routineEffort,
+    routinePain: record.routinePain,
+    routinePainDetail: record.routinePainDetail,
+    activityStartTime: record.activityStartTime,
+    routineAiAnalysis: record.routineAiAnalysis
+  };
+  try {
+    repository.upsert({
+      ...record,
+      ...change.patch,
+      routineAiAnalysis: record.routineAiAnalysis ? null : record.routineAiAnalysis,
+      updatedAt: timestamp
+    });
+    repository.saveCoachQuestion({
+      ...item,
+      recordAdjustmentStatus: "applied",
+      recordAdjustmentOriginal: original,
+      recordAdjustmentAppliedAt: timestamp,
+      recordAdjustmentRevertedAt: "",
+      recordAdjustmentAppliedRecordUpdatedAt: timestamp,
+      updatedAt: timestamp
+    });
+    renderHome();
+    renderHistory();
+    renderCoachQuestions();
+    showToast(record.routineAiAnalysis
+      ? "Registro corregido. El comentario anterior se retiró para que la próxima evaluación use los datos nuevos."
+      : "Registro corregido y reflejado en el historial y la planificación.");
+  } catch (error) {
+    showToast(error.message || "No se pudo aplicar la corrección.");
+  }
+}
+
+function revertCoachRecordAdjustment(item) {
+  const adjustment = item.recordAdjustment;
+  const original = item.recordAdjustmentOriginal;
+  const record = repository.get(adjustment?.targetRecordId);
+  if (!record || !original) return showToast("No está disponible la versión anterior del registro.");
+  if (item.recordAdjustmentAppliedRecordUpdatedAt && record.updatedAt !== item.recordAdjustmentAppliedRecordUpdatedAt) {
+    showToast("El registro fue editado después de la corrección. Deshazla manualmente desde Historial para no perder esos cambios.");
+    return;
+  }
+  if (!window.confirm(`Se restaurará la versión anterior de ${recordTitle(record)} del ${formatShortDate(record.dateISO)}. ¿Continuar?`)) return;
+  const timestamp = new Date().toISOString();
+  try {
+    repository.upsert({ ...record, ...original, updatedAt: timestamp });
+    repository.saveCoachQuestion({
+      ...item,
+      recordAdjustmentStatus: "reverted",
+      recordAdjustmentRevertedAt: timestamp,
+      recordAdjustmentAppliedRecordUpdatedAt: "",
+      updatedAt: timestamp
+    });
+    renderHome();
+    renderHistory();
+    renderCoachQuestions();
+    showToast("Corrección deshecha. Se restauró el registro anterior.");
+  } catch (error) {
+    showToast(error.message || "No se pudo restaurar el registro anterior.");
+  }
+}
+
 function applyCoachPlanAdjustment(item) {
   const adjustment = item.planAdjustment;
   const block = activeTrainingBlock(adjustment.targetDateISO);
@@ -1449,7 +1609,15 @@ async function submitCoachQuestion(existing = null) {
     });
     renderCoachQuestions();
     const result = await aiClient.askCoach(question, context);
-    repository.saveCoachQuestion({ ...saved, answer: result.answer, planAdjustment: result.planAdjustment, adjustmentStatus: result.planAdjustment ? "pending" : "", updatedAt: new Date().toISOString() });
+    repository.saveCoachQuestion({
+      ...saved,
+      answer: result.answer,
+      planAdjustment: result.planAdjustment,
+      adjustmentStatus: result.planAdjustment ? "pending" : "",
+      recordAdjustment: result.recordAdjustment,
+      recordAdjustmentStatus: result.recordAdjustment ? "pending" : "",
+      updatedAt: new Date().toISOString()
+    });
     if (!existing) input.value = "";
     $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
   } catch (error) {
@@ -1857,10 +2025,16 @@ function renderRestFields(record = {}) {
   detailBox.append(detailLabel, detail, hint);
 
   const updateDetail = () => {
-    const discomfort = document.querySelector('input[name="restTypeId"]:checked')?.value === "discomfort";
-    detailBox.classList.toggle("hidden", !discomfort);
+    const selected = document.querySelector('input[name="restTypeId"]:checked')?.value;
+    const discomfort = selected === "discomfort";
+    const weather = selected === "weather";
+    detailLabel.textContent = discomfort ? "Detalle de la molestia" : "Motivo climático";
+    detail.placeholder = discomfort
+      ? "¿Dónde está la molestia, cómo se siente y desde cuándo?"
+      : "Por ejemplo: lluvia y canchas suspendidas.";
+    detailBox.classList.toggle("hidden", !discomfort && !weather);
     detail.required = discomfort;
-    if (!discomfort) detail.value = "";
+    if (!discomfort && !weather) detail.value = "";
   };
 
   restTypes.forEach((type, index) => {
@@ -3361,6 +3535,8 @@ function routineForAi(record) {
   const routineDefinition = physicalRoutineById(record.routineId);
   const exerciseDefinitions = new Map((routineDefinition?.exercises || []).map(exercise => [exercise.id, exercise]));
   return {
+    recordId: record.id,
+    recordUpdatedAt: record.updatedAt,
     category: record.category,
     activity: recordTitle(record),
     cardioTypeId: record.cardioTypeId,

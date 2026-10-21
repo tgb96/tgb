@@ -1,5 +1,5 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=69";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=70";
 import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=63";
 
 const FIREBASE_VERSION = "12.18.0";
@@ -141,6 +141,7 @@ const coachQuestionSchema = {
   properties: {
     answer: stringSchema,
     hasPlanAdjustment: { type: "boolean" },
+    hasRecordAdjustment: { type: "boolean" },
     planAdjustment: {
       type: "object",
       properties: {
@@ -158,9 +159,27 @@ const coachQuestionSchema = {
         nutritionReason: stringSchema
       },
       required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "nutritionMode", "nutritionReason"]
+    },
+    recordAdjustment: {
+      type: "object",
+      properties: {
+        targetRecordId: stringSchema,
+        targetDateISO: stringSchema,
+        expectedUpdatedAt: stringSchema,
+        title: stringSchema,
+        reason: stringSchema,
+        restTypeId: stringSchema,
+        restDetail: stringSchema,
+        sensationsAppend: stringSchema,
+        routineEffort: stringSchema,
+        routinePain: stringSchema,
+        routinePainDetail: stringSchema,
+        activityStartTime: stringSchema
+      },
+      required: ["targetRecordId", "targetDateISO", "expectedUpdatedAt", "title", "reason", "restTypeId", "restDetail", "sensationsAppend", "routineEffort", "routinePain", "routinePainDetail", "activityStartTime"]
     }
   },
-  required: ["answer", "hasPlanAdjustment"]
+  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment"]
 };
 
 const coachInsightSchema = {
@@ -322,7 +341,9 @@ export function createAiClient() {
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
         "Integra entrenamiento, comidas registradas, hidratación, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
         "No inventes una calidad de sueño ni un diagnóstico nutricional. Indica cuando las comidas o los macros estén incompletos y usa los rangos del plan como orientación, no como prescripción clínica.",
-        "No modifiques registros ni planificación por tu cuenta. Si el usuario comunica una novedad que requiere cambiar una fecha concreta (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), responde y además devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. La aplicación pedirá confirmación antes de aplicarla. Si solo pregunta o comenta sin pedir/implicar adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
+        "No modifiques registros ni planificación por tu cuenta. La aplicación siempre pedirá confirmación.",
+        "Si el usuario corrige o completa un hecho de una actividad ya registrada, devuelve hasRecordAdjustment=true y una sola recordAdjustment. Usa exclusivamente el recordId, dateISO y recordUpdatedAt exactos de recentActivities. Solo completa los campos que realmente cambian y deja los demás como cadena vacía. No cambies el tipo de actividad ni inventes otro registro. Para lluvia u otra imposibilidad climática en un descanso usa restTypeId weather y explica el motivo en restDetail. sensationsAppend agrega contexto sin borrar las sensaciones existentes. routineEffort admite 1–10, routinePain 0–10 y activityStartTime HH:MM.",
+        "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
         "El calendario competitivo incluido en el contexto es la fuente común para entrenamiento y nutrición. Un evento calendarStatus=scheduled es un partido confirmado para planificar; likely-suspended, suspended y pending no deben contarse como carga competitiva hasta que Open Tennis o el usuario confirme que se jugará. Mantén una alternativa suave o descanso y no compenses una suspensión con carga excesiva.",
         "Para un ajuste usa exclusivamente los identificadores del CATÁLOGO. Un peloteo amistoso es tennisTypeId friendly-hitting; un descanso normal es restTypeId planned. Conserva el objetivo semanal, considera lo ya realizado y evita compensar con exceso de carga. No propongas dos actividades principales para el mismo día.",
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
@@ -335,7 +356,12 @@ export function createAiClient() {
       });
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
-      return { answer, planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null, model: MODEL_NAME };
+      return {
+        answer,
+        planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null,
+        recordAdjustment: response.hasRecordAdjustment ? response.recordAdjustment : null,
+        model: MODEL_NAME
+      };
     },
     async analyzeNutritionDay(context = {}) {
       const instructions = [

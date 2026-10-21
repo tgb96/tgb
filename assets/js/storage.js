@@ -1,5 +1,5 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=71";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=97";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=72";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=98";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
 import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 
@@ -86,6 +86,43 @@ export function normalizeCoachQuestions(value) {
       nutritionMode: nutritionModes.includes(rawAdjustment?.nutritionMode) ? rawAdjustment.nutritionMode : "default",
       nutritionReason: String(rawAdjustment?.nutritionReason || "").trim().slice(0, 1000)
     } : null;
+    const rawRecordAdjustment = item?.recordAdjustment;
+    const recordDateISO = String(rawRecordAdjustment?.targetDateISO || "");
+    const targetRecordId = String(rawRecordAdjustment?.targetRecordId || "").slice(0, 120);
+    const score = (value, min, max) => {
+      if (value === "" || value === null || value === undefined) return "";
+      const number = Number(value);
+      return Number.isFinite(number) && number >= min && number <= max ? number : "";
+    };
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(rawRecordAdjustment?.activityStartTime || ""))
+      ? String(rawRecordAdjustment.activityStartTime) : "";
+    const recordAdjustment = targetRecordId && isValidISODate(recordDateISO) ? {
+      targetRecordId,
+      targetDateISO: recordDateISO,
+      expectedUpdatedAt: String(rawRecordAdjustment?.expectedUpdatedAt || "").slice(0, 40),
+      title: String(rawRecordAdjustment?.title || "Corrección del registro").trim().slice(0, 200),
+      reason: String(rawRecordAdjustment?.reason || "").trim().slice(0, 1000),
+      restTypeId: ["planned", "weather", "discomfort"].includes(rawRecordAdjustment?.restTypeId)
+        ? rawRecordAdjustment.restTypeId : "",
+      restDetail: String(rawRecordAdjustment?.restDetail || "").trim().slice(0, 2000),
+      sensationsAppend: String(rawRecordAdjustment?.sensationsAppend || "").trim().slice(0, 2000),
+      routineEffort: score(rawRecordAdjustment?.routineEffort, 1, 10),
+      routinePain: score(rawRecordAdjustment?.routinePain, 0, 10),
+      routinePainDetail: String(rawRecordAdjustment?.routinePainDetail || "").trim().slice(0, 2000),
+      activityStartTime: time
+    } : null;
+    const rawOriginal = item?.recordAdjustmentOriginal;
+    const recordAdjustmentOriginal = rawOriginal && typeof rawOriginal === "object" ? {
+      restTypeId: String(rawOriginal.restTypeId || "").slice(0, 100),
+      restDetail: String(rawOriginal.restDetail || "").slice(0, 2000),
+      sensations: String(rawOriginal.sensations || "").slice(0, 5000),
+      routineEffort: score(rawOriginal.routineEffort, 1, 10),
+      routinePain: score(rawOriginal.routinePain, 0, 10),
+      routinePainDetail: String(rawOriginal.routinePainDetail || "").slice(0, 2000),
+      activityStartTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(rawOriginal.activityStartTime || ""))
+        ? String(rawOriginal.activityStartTime) : "",
+      routineAiAnalysis: normalizeRecord({ dateISO: recordDateISO, routineAiAnalysis: rawOriginal.routineAiAnalysis }).routineAiAnalysis
+    } : null;
     return [[id, {
       id,
       question,
@@ -93,8 +130,15 @@ export function normalizeCoachQuestions(value) {
       deleted: Boolean(item?.deleted),
       source: item?.source === "voice" ? "voice" : "text",
       planAdjustment,
+      recordAdjustment,
       adjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.adjustmentStatus)
         ? item.adjustmentStatus : planAdjustment ? "pending" : "",
+      recordAdjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.recordAdjustmentStatus)
+        ? item.recordAdjustmentStatus : recordAdjustment ? "pending" : "",
+      recordAdjustmentOriginal,
+      recordAdjustmentAppliedAt: String(item?.recordAdjustmentAppliedAt || ""),
+      recordAdjustmentRevertedAt: String(item?.recordAdjustmentRevertedAt || ""),
+      recordAdjustmentAppliedRecordUpdatedAt: String(item?.recordAdjustmentAppliedRecordUpdatedAt || ""),
       appliedOptionId: String(item?.appliedOptionId || "").slice(0, 120),
       originalOptionId: String(item?.originalOptionId || "").slice(0, 120),
       originalNutritionMode: nutritionModes.includes(item?.originalNutritionMode) ? item.originalNutritionMode : "",

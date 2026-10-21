@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=69";
+} from "./data.js?v=70";
 import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=69";
 
 export function getChileParts(now = new Date()) {
@@ -285,7 +285,9 @@ export function validateRecord(record) {
 
 export function recordTitle(record) {
   const normalized = normalizeRecord(record);
-  if (normalized.category === "rest") return normalized.restTypeId === "discomfort" ? "Descanso por molestia" : "Día de descanso";
+  if (normalized.category === "rest") return normalized.restTypeId === "discomfort"
+    ? "Descanso por molestia"
+    : normalized.restTypeId === "weather" ? "Descanso por clima" : "Día de descanso";
   if (normalized.category === "physical") return normalized.routineName || "Entrenamiento físico";
   if (normalized.category === "warmup" || normalized.category === "stretching") return normalized.guidedSessionName || normalized.categoryName;
   if (normalized.category === "cardio") return normalized.cardioTypeName || "Cardio";
@@ -300,7 +302,9 @@ export function recordDetails(record) {
   const normalized = normalizeRecord(record);
   if (normalized.category === "rest") return normalized.restTypeId === "discomfort"
     ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
-    : "Recuperación planificada";
+    : normalized.restTypeId === "weather"
+      ? normalized.restDetail || "Actividad suspendida por condiciones climáticas"
+      : "Recuperación planificada";
   const displayedDuration = normalized.category === "cardio"
     ? formatDuration({ ...normalized, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
     : formatDuration(normalized);
@@ -773,6 +777,7 @@ export function weeklyReport(records, week) {
       }
       if (record.category === "tennis" && record.tennisTypeName) report += `   Tipo de tenis: ${record.tennisTypeName}\n`;
       if (record.category === "rest" && record.restTypeId === "discomfort") report += `   Molestia: ${record.restDetail}\n`;
+      if (record.category === "rest" && record.restTypeId === "weather") report += `   Motivo climático: ${record.restDetail || "Actividad suspendida por el clima"}\n`;
       if (record.distanceKm !== "") report += `   Distancia: ${formatDistance(record.distanceKm)}\n`;
       if (record.elevationGainM !== "") report += `   Desnivel: ${record.elevationGainM} m\n`;
       if (record.location) report += `   Lugar: ${record.location}\n`;

@@ -301,10 +301,15 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
     readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/HealthSyncService.kt"), "utf8")
   ]);
   assert.match(ai, /hasPlanAdjustment/);
+  assert.match(ai, /hasRecordAdjustment/);
+  assert.match(ai, /restTypeId weather/);
   assert.match(ai, /nutritionContext/);
   assert.match(app, /Revisar y aplicar/);
   assert.match(app, /También se coordinará la guía de alimentación/);
   assert.match(app, /revertCoachPlanAdjustment/);
+  assert.match(app, /applyCoachRecordAdjustment/);
+  assert.match(app, /revertCoachRecordAdjustment/);
+  assert.match(app, /Aplicar corrección/);
   assert.match(app, /sleepStagesMinutes/);
   assert.match(html, /wearableSleepDetails/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
@@ -417,7 +422,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=103/);
+  assert.match(html, /assets\/js\/app\.js\?v=104/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
