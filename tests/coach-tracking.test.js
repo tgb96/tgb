@@ -1,10 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
+import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
 import { normalizeRecord } from "../assets/js/utils.js";
 
 const run = { category: "cardio", cardioTypeId: "running", distanceKm: 5, dateISO: "2026-09-15", sensations: "Comentarios completos" };
+
+test("un día pasado y vacío permite registrar descanso rápido", () => {
+  assert.equal(canQuickRegisterRest("2026-10-20", "2026-10-21", []), true);
+  assert.equal(canQuickRegisterRest("2026-10-21", "2026-10-21", []), false);
+  assert.equal(canQuickRegisterRest("2026-10-22", "2026-10-21", []), false);
+  assert.equal(canQuickRegisterRest("2026-10-20", "2026-10-21", [{ dateISO: "2026-10-20", category: "rest" }]), false);
+});
 
 test("relaciona el trote manual de 5K con el plan del mismo día sin modificarlo", () => {
   const before = JSON.stringify(run);

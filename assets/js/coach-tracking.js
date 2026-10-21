@@ -2,6 +2,11 @@
 export const isComplementaryActivity = record => ["warmup", "stretching"].includes(record?.category);
 export const isMainDayRecord = record => ["physical", "cardio", "tennis", "rest"].includes(record?.category);
 
+export function canQuickRegisterRest(dateISO, todayISO, records = []) {
+  return Boolean(dateISO && todayISO && dateISO < todayISO
+    && !records.some(record => record?.dateISO === dateISO));
+}
+
 export function dayActivitySummary(records = []) {
   const main = records.filter(isMainDayRecord).length;
   const complementary = records.filter(isComplementaryActivity).length;

@@ -245,7 +245,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
-  assert.match(worker, /coach-tracking\.js\?v=73/);
+  assert.match(worker, /coach-tracking\.js\?v=74/);
 });
 
 test("la vista de nutrición enlaza todos sus controles", async () => {
@@ -313,6 +313,17 @@ test("Inicio permite vincular la pulsera directamente y oculta las sesiones ya v
   assert.match(app, /linkWearableSession\(candidates\[0\]\.record\.id, session\.id\)/);
   assert.doesNotMatch(app, /Vinculada: \$\{recordTitle\(linkedRecord\)\}/);
   assert.doesNotMatch(app, /Revisar vínculo/);
+});
+
+test("Inicio ofrece registrar descanso en días pasados que siguen vacíos", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "assets/css/styles.css"), "utf8")
+  ]);
+  assert.match(app, /canQuickRegisterRest\(dateISO, todayISO, records\)/);
+  assert.match(app, /Registrar descanso/);
+  assert.match(app, /selectCategory\("rest", \{ dateISO, restTypeId: "planned" \}\)/);
+  assert.match(styles, /\.quick-rest-button/);
 });
 
 test("la guía no repite que su comentario ya está guardado", async () => {

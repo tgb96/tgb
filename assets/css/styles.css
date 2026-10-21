@@ -132,8 +132,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .day-row.today .day-label { background: var(--blue); color: white; }
 .day-label strong { display: block; font-size: 12px; text-transform: uppercase; }
 .day-label span { display: block; margin-top: 2px; font-size: 19px; font-weight: 900; }
-.day-content { align-self: center; min-width: 0; }
+.day-content { align-self: center; min-width: 0; display: grid; gap: 9px; }
 .day-empty { color: #999eaa; font-size: 13px; }
+.quick-rest-button { width: fit-content; min-height: 34px; padding: 7px 11px; border: 1px solid #b8c2df; border-radius: 11px; background: #f1f4ff; color: var(--blue-dark); font-size: 11px; font-weight: 850; }
+.quick-rest-button:active { transform: translateY(1px); }
 .day-activities { display: grid; gap: 6px; }
 .activity-line { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .activity-line strong { display: block; font-size: 14px; line-height: 1.25; }

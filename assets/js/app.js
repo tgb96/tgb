@@ -34,7 +34,7 @@ import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=94";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=96";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
-import { analysisMatchesCurrentPlan, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=73";
+import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=74";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=68";
 import {
@@ -260,6 +260,16 @@ function openRegistration() {
   clearPlannedRoutineContext({ restore: true });
   resetRegistration();
   showView("register");
+}
+
+function openQuickRestRegistration(dateISO) {
+  const todayISO = getChileDateISO();
+  if (!canQuickRegisterRest(dateISO, todayISO, repository.list())) {
+    showToast("Este día ya tiene un registro o todavía no ha terminado.");
+    return;
+  }
+  openRegistration();
+  selectCategory("rest", { dateISO, restTypeId: "planned" });
 }
 
 function activeTrainingBlock() {
@@ -1510,6 +1520,7 @@ function renderHome() {
 
     const content = document.createElement("div");
     content.className = "day-content";
+    const quickRestAvailable = canQuickRegisterRest(dateISO, todayISO, records);
     if (!dayRecords.length && !plannedSession) {
       const empty = document.createElement("span");
       empty.className = "day-empty";
@@ -1553,6 +1564,15 @@ function renderHome() {
         activities.append(line);
       }
       content.append(activities);
+    }
+    if (quickRestAvailable) {
+      const restButton = document.createElement("button");
+      restButton.type = "button";
+      restButton.className = "quick-rest-button";
+      restButton.textContent = "Registrar descanso";
+      restButton.setAttribute("aria-label", `Registrar descanso del ${formatLongDate(dateISO)}`);
+      restButton.addEventListener("click", () => openQuickRestRegistration(dateISO));
+      content.append(restButton);
     }
     row.append(label, content);
     ledger.append(row);
