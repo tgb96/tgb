@@ -34,7 +34,7 @@ import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=94";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=96";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
-import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment } from "./coach-tracking.js?v=74";
+import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, recordWorkflowState } from "./coach-tracking.js?v=75";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=68";
 import {
@@ -1446,6 +1446,9 @@ function renderHome() {
   const records = allRecords.filter(record => record.dateISO >= week.startISO && record.dateISO <= week.endISO);
   const todayRecords = records.filter(record => record.dateISO === todayISO);
   const activeDays = new Set(records.filter(record => isMainDayRecord(record) && record.category !== "rest").map(record => record.dateISO)).size;
+  const registeredDays = new Set(records.filter(isMainDayRecord).map(record => record.dateISO)).size;
+  const restDays = new Set(records.filter(record => record.category === "rest").map(record => record.dateISO)).size;
+  const pendingWearable = records.filter(record => record.metricsPending && !record.wearableSessionId && record.category !== "rest").length;
   const todayMainRecords = todayRecords.filter(isMainDayRecord);
   const plannedWeek = coachWeekForDate(todayISO, block);
   const plannedState = loadPlannedActivity();
@@ -1478,7 +1481,11 @@ function renderHome() {
         : "Iniciar actividad programada";
   }
   renderDailyBriefing(todayISO, todayPlan, allRecords);
-  $("weekProgress").textContent = `${activeDays}/7 días`;
+  $("weekProgress").textContent = `${registeredDays}/7 registrados`;
+  const weekSummary = [`${activeDays} ${activeDays === 1 ? "día activo" : "días activos"}`];
+  if (restDays) weekSummary.push(`${restDays} ${restDays === 1 ? "descanso" : "descansos"}`);
+  if (pendingWearable) weekSummary.push(`${pendingWearable} ${pendingWearable === 1 ? "sesión por vincular" : "sesiones por vincular"}`);
+  $("weekProgressSummary").textContent = weekSummary.join(" · ");
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
   const lastAnalyzed = allRecords
@@ -1535,7 +1542,7 @@ function renderHome() {
         const overview = dayPlanOverview(plannedSession, dayRecords.filter(isMainDayRecord));
         planLine.className = `planned-activity-line ${overview.status}`;
         const planBadge = document.createElement("span");
-        planBadge.textContent = overview.label;
+        planBadge.textContent = overview.status === "registered" ? "Plan cubierto" : overview.label;
         const planCopy = document.createElement("div");
         const planTitle = document.createElement("strong");
         planTitle.textContent = primary.title;
@@ -1560,7 +1567,11 @@ function renderHome() {
         details.textContent = recordDetails(record);
         text.append(title, details);
         copy.append(dot, text);
-        line.append(copy);
+        const workflow = recordWorkflowState(record);
+        const state = document.createElement("span");
+        state.className = `record-state-badge ${workflow.status}`;
+        state.textContent = workflow.label;
+        line.append(copy, state);
         activities.append(line);
       }
       content.append(activities);
@@ -3796,6 +3807,14 @@ function createRoutineAiCard(record, { compact = false } = {}) {
     const summary = document.createElement("p");
     summary.textContent = analysis.summary;
     card.append(heading, summary);
+    const evidence = document.createElement("p");
+    evidence.className = "routine-ai-evidence";
+    const evidenceParts = ["registro de la actividad"];
+    if (record.wearableSessionId || record.wearableSnapshot) evidenceParts.push("métricas de la pulsera");
+    if (record.sensations || record.routinePainDetail || record.guidedPainNotes) evidenceParts.push("tus comentarios y sensaciones");
+    if (plannedContextForRecord(record, activeTrainingBlock())) evidenceParts.push("plan vigente");
+    evidence.textContent = `Datos considerados: ${evidenceParts.join(" · ")}.`;
+    card.append(evidence);
     if (analysis.planComparison?.status) {
       const comparison = document.createElement("p");
       comparison.className = "routine-ai-plan-comparison";
@@ -5157,11 +5176,18 @@ function createHistoryEntry(sourceRecord) {
   const top = document.createElement("div");
   top.className = "history-entry-top";
   const copy = document.createElement("div");
+  const titleRow = document.createElement("div");
+  titleRow.className = "history-entry-title-row";
   const title = document.createElement("h3");
   title.textContent = isComplementaryActivity(record) ? `Complemento · ${recordTitle(record)}` : recordTitle(record);
+  const workflow = recordWorkflowState(record);
+  const workflowBadge = document.createElement("span");
+  workflowBadge.className = `record-state-badge ${workflow.status}`;
+  workflowBadge.textContent = workflow.label;
+  titleRow.append(title, workflowBadge);
   const details = document.createElement("p");
   details.textContent = recordDetails(record);
-  copy.append(title, details);
+  copy.append(titleRow, details);
   if (record.plannedTitle) {
     const planned = document.createElement("p");
     planned.className = "history-plan-link";
@@ -5257,16 +5283,12 @@ function createHistoryEntry(sourceRecord) {
   actions.append(edit, remove);
   top.append(copy, actions);
   entry.append(top);
-  if (record.routineAiAnalysis) {
-    const disclosure = document.createElement("details");
-    disclosure.className = "history-ai-disclosure";
-    const summary = document.createElement("summary");
-    summary.textContent = "Comentario del entrenador IA";
-    disclosure.append(summary, aiCard);
-    entry.append(disclosure);
-  } else {
-    entry.append(aiCard);
-  }
+  const disclosure = document.createElement("details");
+  disclosure.className = "history-ai-disclosure";
+  const summary = document.createElement("summary");
+  summary.textContent = record.routineAiAnalysis ? "Comentario del entrenador IA" : "Análisis del entrenador IA pendiente";
+  disclosure.append(summary, aiCard);
+  entry.append(disclosure);
   return entry;
 }
 

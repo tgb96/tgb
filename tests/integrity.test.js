@@ -245,7 +245,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
-  assert.match(worker, /coach-tracking\.js\?v=74/);
+  assert.match(worker, /coach-tracking\.js\?v=75/);
 });
 
 test("la vista de nutrición enlaza todos sus controles", async () => {

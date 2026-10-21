@@ -15,6 +15,19 @@ export function dayActivitySummary(records = []) {
   return { main, complementary, label: main || complementary ? `${mainLabel}${complementaryLabel}` : "Sin registrar hoy" };
 }
 
+// Expone una sola secuencia de estados para Inicio e Historial. El estado del
+// registro es distinto del cumplimiento del plan: primero se registra, luego
+// se vincula la pulsera y finalmente se evalúa con todos los datos disponibles.
+export function recordWorkflowState(record) {
+  if (!record) return { status: "empty", label: "Sin registrar" };
+  if (record.category === "rest") return { status: "rest", label: "Descanso" };
+  if (isComplementaryActivity(record)) return { status: "complement", label: "Complemento" };
+  if (record.routineAiAnalysis) return { status: "evaluated", label: "Evaluado" };
+  if (record.metricsPending && !record.wearableSessionId) return { status: "wearable-pending", label: "Pulsera pendiente" };
+  if (record.wearableSessionId || record.wearableSnapshot) return { status: "wearable-linked", label: "Pulsera vinculada" };
+  return { status: "registered", label: "Registrado" };
+}
+
 export function recordMatchesPlanOption(record, option) {
   if (!record || !option || record.category !== option.category) return false;
   const prefill = option.prefill || {};

@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=95">
+  <link rel="stylesheet" href="assets/css/styles.css?v=96">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -84,6 +84,7 @@
         <div>
           <p class="eyebrow dark">Esta semana</p>
           <h2>Tu actividad, día por día</h2>
+          <p id="weekProgressSummary" class="week-progress-summary"></p>
         </div>
         <span id="weekProgress" class="progress-pill"></span>
       </div>
@@ -335,26 +336,29 @@
         </div>
       </details>
 
-      <section class="trekking-ranking-card physical-ranking-card" aria-labelledby="physicalRankingTitle">
-        <p class="eyebrow dark">Progreso de fuerza</p>
-        <h2 id="physicalRankingTitle">Tus marcas de fuerza</h2>
-        <p>Los abdominales tienen una única marca global para todas las rutinas; el volumen conserva tus tres mejores entrenamientos.</p>
-        <div id="physicalRankings" class="trekking-rankings"></div>
-      </section>
+      <details class="trekking-ranking-card physical-ranking-card history-ranking-disclosure" aria-labelledby="physicalRankingTitle">
+        <summary><span><span class="eyebrow">Progreso de fuerza</span><strong id="physicalRankingTitle">Tus marcas de fuerza</strong></span><span aria-hidden="true"></span></summary>
+        <div class="history-ranking-body">
+          <p>Los abdominales tienen una única marca global para todas las rutinas; el volumen conserva tus tres mejores entrenamientos.</p>
+          <div id="physicalRankings" class="trekking-rankings"></div>
+        </div>
+      </details>
 
-      <section class="trekking-ranking-card running-ranking-card" aria-labelledby="runningRankingTitle">
-        <p class="eyebrow dark">Progreso en trote</p>
-        <h2 id="runningRankingTitle">Mejores tiempos por distancia</h2>
-        <p>Tus marcas se ordenan automáticamente, separadas en 3K, 5K, 10K y cualquier otra distancia que registres.</p>
-        <div id="runningRankings" class="trekking-rankings"></div>
-      </section>
+      <details class="trekking-ranking-card running-ranking-card history-ranking-disclosure" aria-labelledby="runningRankingTitle">
+        <summary><span><span class="eyebrow">Progreso en trote</span><strong id="runningRankingTitle">Mejores tiempos por distancia</strong></span><span aria-hidden="true"></span></summary>
+        <div class="history-ranking-body">
+          <p>Tus marcas se ordenan automáticamente, separadas en 3K, 5K, 10K y cualquier otra distancia que registres.</p>
+          <div id="runningRankings" class="trekking-rankings"></div>
+        </div>
+      </details>
 
-      <section class="trekking-ranking-card" aria-labelledby="trekkingRankingTitle">
-        <p class="eyebrow dark">Progreso en cerros</p>
-        <h2 id="trekkingRankingTitle">Mejores tiempos de subida</h2>
-        <p>Los intentos se ordenan del más rápido al más lento para cada cerro y ruta.</p>
-        <div id="trekkingRankings" class="trekking-rankings"></div>
-      </section>
+      <details class="trekking-ranking-card history-ranking-disclosure" aria-labelledby="trekkingRankingTitle">
+        <summary><span><span class="eyebrow">Progreso en cerros</span><strong id="trekkingRankingTitle">Mejores tiempos de subida</strong></span><span aria-hidden="true"></span></summary>
+        <div class="history-ranking-body">
+          <p>Los intentos se ordenan del más rápido al más lento para cada cerro y ruta.</p>
+          <div id="trekkingRankings" class="trekking-rankings"></div>
+        </div>
+      </details>
 
       <div id="historyCoachInsights" class="history-coach-insights"></div>
       <div id="historyWeeks" class="history-weeks"></div>
@@ -388,14 +392,21 @@
       <div><strong id="cloudUserName"></strong><span id="cloudUserEmail"></span></div>
     </div>
     <p id="cloudMessage" class="cloud-message">Comprobando la conexión…</p>
-    <p id="cloudPlanStatus" class="cloud-plan-status"></p>
-    <div class="cloud-actions">
-      <button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button>
-      <button id="cloudSyncButton" class="hidden" type="button">Sincronizar ahora</button>
-      <button id="wearableSyncButton" type="button">↻ Sincronizar datos de la pulsera</button>
-      <p id="wearableSyncStatus" class="cloud-plan-status"></p>
-      <button id="syncMatchesButton" type="button">↻ Importar todos los partidos</button>
-      <p id="matchSyncStatus" class="cloud-plan-status"></p>
+    <div class="cloud-sync-list">
+      <section class="cloud-sync-row">
+        <div><strong>Cuenta y registros</strong><p id="cloudPlanStatus" class="cloud-plan-status"></p></div>
+        <div class="cloud-sync-action"><button id="cloudSignInButton" class="cloud-primary" type="button">Continuar con Google</button><button id="cloudSyncButton" class="hidden" type="button">Sincronizar</button></div>
+      </section>
+      <section class="cloud-sync-row">
+        <div><strong>Pulsera y Health Connect</strong><p id="wearableSyncStatus" class="cloud-plan-status">Abre el sincronizador para buscar datos nuevos.</p></div>
+        <div class="cloud-sync-action"><button id="wearableSyncButton" type="button">Sincronizar datos de la pulsera</button></div>
+      </section>
+      <section class="cloud-sync-row">
+        <div><strong>Calendario de partidos</strong><p id="matchSyncStatus" class="cloud-plan-status"></p></div>
+        <div class="cloud-sync-action"><button id="syncMatchesButton" type="button">Importar todos los partidos</button></div>
+      </section>
+    </div>
+    <div class="cloud-actions cloud-secondary-actions">
       <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
       <a class="wearable-download" href="downloads/tgtrain-sync-0.6.2.apk" download>Descargar TGTrain Sync para Android</a>
@@ -554,6 +565,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=98"></script>
+<script type="module" src="assets/js/app.js?v=99"></script>
 </body>
 </html>

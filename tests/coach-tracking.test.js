@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment } from "../assets/js/coach-tracking.js";
+import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment, recordWorkflowState } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
 import { normalizeRecord } from "../assets/js/utils.js";
 
@@ -11,6 +11,14 @@ test("un día pasado y vacío permite registrar descanso rápido", () => {
   assert.equal(canQuickRegisterRest("2026-10-21", "2026-10-21", []), false);
   assert.equal(canQuickRegisterRest("2026-10-22", "2026-10-21", []), false);
   assert.equal(canQuickRegisterRest("2026-10-20", "2026-10-21", [{ dateISO: "2026-10-20", category: "rest" }]), false);
+});
+
+test("el flujo del registro distingue pulsera y evaluación del cumplimiento del plan", () => {
+  assert.equal(recordWorkflowState({ category: "tennis", metricsPending: true }).label, "Pulsera pendiente");
+  assert.equal(recordWorkflowState({ category: "tennis", metricsPending: true, wearableSessionId: "hc-1" }).label, "Pulsera vinculada");
+  assert.equal(recordWorkflowState({ category: "tennis", metricsPending: true, wearableSessionId: "hc-1", routineAiAnalysis: { summary: "Bien" } }).label, "Evaluado");
+  assert.equal(recordWorkflowState({ category: "warmup" }).label, "Complemento");
+  assert.equal(recordWorkflowState({ category: "rest" }).label, "Descanso");
 });
 
 test("relaciona el trote manual de 5K con el plan del mismo día sin modificarlo", () => {
