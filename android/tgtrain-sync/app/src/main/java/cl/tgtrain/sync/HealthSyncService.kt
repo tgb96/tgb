@@ -101,7 +101,8 @@ class HealthSyncService(private val context: Context) {
         // Read the sessions independently and keep the real origin of each one.
         // If another app mirrored the same workout, prefer the selected source
         // (or Mi Fitness) so TGTrain does not offer a duplicate link.
-        val workouts = readAll(ExerciseSessionRecord::class, start, end)
+        val workoutRecords = readAll(ExerciseSessionRecord::class, start, end)
+        val workouts = workoutRecords
             .groupBy { "${it.startTime}|${it.endTime}|${it.exerciseType}" }
             .values
             .map { copies ->
@@ -274,8 +275,43 @@ class HealthSyncService(private val context: Context) {
                 SetOptions.merge()
             )
         }
+        val workoutsToday = workouts.count { it.startTime.atZone(zone).toLocalDate() == today }
+        val newestWorkout = workouts.maxByOrNull { it.startTime }
+        val workoutOrigins = workoutRecords.groupingBy { it.metadata.dataOrigin.packageName }.eachCount()
+        batch.set(
+            firestore.collection("users").document(uid).collection("wearableSyncStatus")
+                .document("latest"),
+            hashMapOf(
+                "id" to "latest",
+                "syncedAt" to syncedAt,
+                "sourcePackage" to sourcePackage,
+                "daysRequested" to days,
+                "exerciseRecordsRead" to workoutRecords.size,
+                "workoutsUploaded" to workouts.size,
+                "workoutsToday" to workoutsToday,
+                "newestWorkoutStartTime" to newestWorkout?.startTime?.toString(),
+                "newestWorkoutEndTime" to newestWorkout?.endTime?.toString(),
+                "newestWorkoutTitle" to newestWorkout?.let { exerciseTitle(it.exerciseType) },
+                "workoutOrigins" to workoutOrigins,
+                "backgroundReadGranted" to granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
+            ),
+            SetOptions.merge()
+        )
         batch.commit().await()
-        return SyncReport(days, sleep.size, sleepSessionsWithStages, workouts.size, sessionsWithHeartRate, heartRateSamples, heartRateGranted, syncedAt)
+        return SyncReport(
+            days,
+            sleep.size,
+            sleepSessionsWithStages,
+            workouts.size,
+            workoutsToday,
+            newestWorkout?.startTime?.toString(),
+            workoutRecords.size,
+            sessionsWithHeartRate,
+            heartRateSamples,
+            heartRateGranted,
+            granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND),
+            syncedAt
+        )
     }
 
     private suspend fun <T : Record> readAll(
@@ -343,8 +379,12 @@ data class SyncReport(
     val sleepSessions: Int,
     val sleepSessionsWithStages: Int,
     val workouts: Int,
+    val workoutsToday: Int,
+    val newestWorkoutStartTime: String?,
+    val exerciseRecordsRead: Int,
     val sessionsWithHeartRate: Int,
     val heartRateSamples: Int,
     val heartRateGranted: Boolean,
+    val backgroundReadGranted: Boolean,
     val syncedAt: String
 )

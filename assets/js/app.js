@@ -26,7 +26,7 @@ import {
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=98";
 import { createRepository } from "./storage.js?v=98";
-import { createCloudSync } from "./cloud.js?v=74";
+import { createCloudSync } from "./cloud.js?v=75";
 import { createNutritionUI } from "./nutrition-ui.js?v=98";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
@@ -69,7 +69,7 @@ import {
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
 const aiClient = createAiClient();
-let wearableData = { days: [], sessions: [] };
+let wearableData = { days: [], sessions: [], status: null };
 const cloudSync = createCloudSync({
   repository,
   storage: window.localStorage,
@@ -77,6 +77,7 @@ const cloudSync = createCloudSync({
   onWearableChanged: data => {
     wearableData = data;
     renderWearable();
+    renderWearableSyncStatus();
     renderHistory();
     nutritionUI.render();
     if (loadRoutineSession()?.status === "complete") renderRoutines();
@@ -139,6 +140,7 @@ let monthlySummaryInFlight = false;
 let monthlySummaryAttempted = false;
 let coachQuestionInFlight = false;
 let coachHistoryExpanded = false;
+let wearableBridgePollToken = 0;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -947,27 +949,88 @@ async function syncCloudNow() {
   }
 }
 
+function renderWearableSyncStatus(message = "") {
+  const output = $("wearableSyncStatus");
+  if (!output) return;
+  if (message) {
+    output.textContent = message;
+    return;
+  }
+  const status = wearableData.status;
+  if (!status?.syncedAt) {
+    output.textContent = "Abre el sincronizador para buscar datos nuevos.";
+    return;
+  }
+  const when = new Date(status.syncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" });
+  const todayCount = Number(status.workoutsToday) || 0;
+  const total = Number(status.workoutsUploaded) || 0;
+  output.textContent = todayCount > 0
+    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).`
+    : `Última lectura ${when}: TGTrain Sync funcionó, pero Health Connect entregó 0 entrenamientos de hoy. Abre Mi Fitness y comprueba que la sesión ya figure allí.${status.backgroundReadGranted ? " TGTrain Sync volverá a revisar automáticamente." : ""}`;
+}
+
+const wait = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+async function refreshWearableAfterBridge(startedAt, knownSessionIds) {
+  const token = ++wearableBridgePollToken;
+  const button = $("wearableSyncButton");
+  for (const delay of [0, 2000, 4000]) {
+    if (delay) await wait(delay);
+    if (token !== wearableBridgePollToken) return;
+    try {
+      renderWearableSyncStatus("Comprobando directamente en la nube si llegó el entrenamiento…");
+      const fresh = await cloudSync.refreshWearableNow();
+      const newSessions = (fresh.sessions || []).filter(session => session?.id && !knownSessionIds.has(session.id));
+      if (newSessions.length) {
+        renderWearableSyncStatus(`Llegaron ${newSessions.length} entrenamiento${newSessions.length === 1 ? "" : "s"} nuevo${newSessions.length === 1 ? "" : "s"}. Ya puedes vincular.`);
+        const inbox = $("wearableSessions")?.querySelector("details.wearable-inbox");
+        if (inbox) inbox.open = true;
+        showToast("La sesión de la pulsera ya llegó. Revisa la coincidencia y vincúlala.");
+        button.disabled = false;
+        return;
+      }
+      const statusTime = Date.parse(fresh.status?.syncedAt || "");
+      if (Number.isFinite(statusTime) && statusTime >= startedAt - 5000) {
+        renderWearableSyncStatus();
+        showToast(Number(fresh.status?.workoutsToday) > 0
+          ? "El puente encontró el entrenamiento. Revisa si ya está vinculado o abre la bandeja de la pulsera."
+          : fresh.status?.backgroundReadGranted
+            ? "El puente respondió, pero Health Connect todavía no entregó el entrenamiento. TGTrain Sync volverá a revisar automáticamente."
+            : "El puente respondió, pero Health Connect todavía no entregó el entrenamiento de hoy.");
+        button.disabled = false;
+        return;
+      }
+    } catch (error) {
+      if (delay === 4000) renderWearableSyncStatus(error.message || "No se pudo comprobar la nube de la pulsera.");
+    }
+  }
+  renderWearableSyncStatus("TGTrain Sync no confirmó una lectura nueva. Ábrelo, comprueba que use el mismo Gmail y revisa el resultado bajo Sincronizar ahora.");
+  button.disabled = false;
+}
+
 function requestWearableBridgeSync() {
   const button = $("wearableSyncButton");
-  const status = $("wearableSyncStatus");
   if (!button) return;
   if (!/Android/i.test(navigator.userAgent)) {
-    status.textContent = "Abre TGTrain desde tu Android para lanzar TGTrain Sync y leer Health Connect.";
+    renderWearableSyncStatus("Abre TGTrain desde tu Android para lanzar TGTrain Sync y leer Health Connect.");
     showToast("La sincronización de la pulsera se inicia desde TGTrain Sync en Android.");
     return;
   }
+  if (!cloudSync.currentUser) {
+    renderWearableSyncStatus("Inicia sesión con Google en TGTrain antes de abrir el sincronizador.");
+    showToast("Primero inicia sesión con Google en TGTrain.");
+    return;
+  }
+  const startedAt = Date.now();
+  const knownSessionIds = new Set((wearableData.sessions || []).map(session => session?.id).filter(Boolean));
   button.disabled = true;
-  status.textContent = "Abriendo TGTrain Sync… al volver, los datos aparecerán aquí automáticamente.";
+  renderWearableSyncStatus("Abriendo TGTrain Sync… al volver comprobaré la nube automáticamente.");
   let returned = false;
   const restore = () => {
-    if (returned) return;
+    if (returned || document.visibilityState !== "visible") return;
     returned = true;
-    button.disabled = false;
     document.removeEventListener("visibilitychange", restore);
-    if (document.visibilityState === "visible") {
-      status.textContent = "Esperando la actualización de Health Connect…";
-      showToast("Al terminar TGTrain Sync, vuelve aquí para ver los datos de la pulsera.");
-    }
+    refreshWearableAfterBridge(startedAt, knownSessionIds);
   };
   document.addEventListener("visibilitychange", restore);
   window.location.href = "tgtrain://sync";
@@ -3233,7 +3296,7 @@ function renderWearable() {
     sleepDetails.append(unavailable);
   }
   sleepDetails.classList.toggle("hidden", !lastSleep);
-  const newestSync = days.map(day => day.syncedAt).filter(Boolean).sort().at(-1);
+  const newestSync = [...days.map(day => day.syncedAt), wearableData.status?.syncedAt].filter(Boolean).sort().at(-1);
   const syncAgeMinutes = newestSync ? Math.max(0, Math.round((Date.now() - Date.parse(newestSync)) / 60000)) : null;
   const syncLabel = $("wearableSyncTime");
   syncLabel.textContent = newestSync
@@ -3256,7 +3319,11 @@ function renderWearable() {
   const heading = document.createElement("strong");
   heading.textContent = `${inbox.length} entrenamiento${inbox.length === 1 ? "" : "s"} por vincular`;
   const summaryHint = document.createElement("small");
-  summaryHint.textContent = inbox.length ? "Ordenados por fecha y hora" : "Aún no aparece una sesión compatible de Health Connect";
+  summaryHint.textContent = inbox.length
+    ? "Ordenados por fecha y hora"
+    : Number(wearableData.status?.workoutsToday) === 0
+      ? "La última lectura encontró 0 entrenamientos de hoy en Health Connect"
+      : "Aún no aparece una sesión compatible de Health Connect";
   summaryCopy.append(heading, summaryHint);
   disclosureSummary.append(summaryCopy, document.createElement("span"));
   disclosure.append(disclosureSummary);

@@ -59,6 +59,7 @@ export function createCloudSync({
   let unsubscribeNutrition = null;
   let unsubscribeWearableDays = null;
   let unsubscribeWearableSessions = null;
+  let unsubscribeWearableStatus = null;
   let unsubscribeRepository = null;
   let writeQueue = Promise.resolve();
   let mergePromise = null;
@@ -131,9 +132,30 @@ export function createCloudSync({
   const nutritionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "nutritionEntries", cloudDocumentId(id));
   const wearableDaysCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableDays");
   const wearableSessionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableSessions");
+  const wearableStatusDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "wearableSyncStatus", "latest");
   let wearableDays = [];
   let wearableSessions = [];
-  const emitWearable = () => onWearableChanged({ days: wearableDays, sessions: wearableSessions });
+  let wearableStatus = null;
+  const wearableSnapshot = () => ({ days: wearableDays, sessions: wearableSessions, status: wearableStatus });
+  const emitWearable = () => onWearableChanged(wearableSnapshot());
+
+  async function refreshWearableFromServer() {
+    if (!user) throw new Error("Primero inicia sesión con Google.");
+    const [daysSnapshot, sessionsSnapshot, statusSnapshot] = await Promise.all([
+      awaitServer(modules.firestoreModule.getDocsFromServer(wearableDaysCollectionReference())),
+      awaitServer(modules.firestoreModule.getDocsFromServer(wearableSessionsCollectionReference())),
+      awaitServer(modules.firestoreModule.getDocFromServer(wearableStatusDocumentReference()))
+    ]);
+    const days = [];
+    const sessions = [];
+    daysSnapshot.forEach(item => days.push(item.data()));
+    sessionsSnapshot.forEach(item => sessions.push(item.data()));
+    wearableDays = days;
+    wearableSessions = sessions;
+    wearableStatus = statusSnapshot.exists() ? statusSnapshot.data() : null;
+    emitWearable();
+    return wearableSnapshot();
+  }
 
   const setCloudDoc = (reference, value) => awaitServer(modules.firestoreModule.setDoc(reference, firestoreDocument(value)));
 
@@ -410,6 +432,7 @@ export function createCloudSync({
   function observeCloudWearable() {
     unsubscribeWearableDays?.();
     unsubscribeWearableSessions?.();
+    unsubscribeWearableStatus?.();
     unsubscribeWearableDays = modules.firestoreModule.onSnapshot(wearableDaysCollectionReference(), snapshot => {
       wearableDays = snapshot.docs.map(item => item.data());
       emitWearable();
@@ -418,6 +441,10 @@ export function createCloudSync({
       wearableSessions = snapshot.docs.map(item => item.data());
       emitWearable();
     }, () => emit("offline", "No se pudieron cargar las sesiones de la pulsera."));
+    unsubscribeWearableStatus = modules.firestoreModule.onSnapshot(wearableStatusDocumentReference(), snapshot => {
+      wearableStatus = snapshot.exists() ? snapshot.data() : null;
+      emitWearable();
+    }, () => emit("offline", "No se pudo comprobar la última lectura de Health Connect."));
   }
 
   async function connect(currentUser) {
@@ -442,8 +469,11 @@ export function createCloudSync({
     unsubscribeWearableDays = null;
     unsubscribeWearableSessions?.();
     unsubscribeWearableSessions = null;
+    unsubscribeWearableStatus?.();
+    unsubscribeWearableStatus = null;
     wearableDays = [];
     wearableSessions = [];
+    wearableStatus = null;
     emitWearable();
     if (!user) {
       emit("signed-out", "Inicia sesión para guardar tus entrenamientos en la nube.");
@@ -535,6 +565,9 @@ export function createCloudSync({
         throw error;
       }
     },
+    async refreshWearableNow() {
+      return refreshWearableFromServer();
+    },
     destroy() {
       if (retryTimer) clearTimeout(retryTimer);
       unsubscribeAuth?.();
@@ -546,6 +579,7 @@ export function createCloudSync({
       unsubscribeNutrition?.();
       unsubscribeWearableDays?.();
       unsubscribeWearableSessions?.();
+      unsubscribeWearableStatus?.();
       unsubscribeRepository?.();
     }
   };

@@ -122,8 +122,15 @@ test("lee las mediciones de la pulsera por cuenta y las limpia al cerrar sesión
   const firestoreModule = {
     collection: (_database, ...path) => ({ kind: path.at(-1) }),
     doc: (_database, ...path) => ({ kind: path.at(-2), id: path.at(-1) }),
-    getDocsFromServer: async () => ({ forEach: () => {} }),
-    getDocFromServer: async () => ({ exists: () => false }),
+    getDocsFromServer: async reference => ({
+      forEach: callback => {
+        if (reference.kind === "wearableDays") callback({ data: () => ({ dateISO: "2026-09-23", steps: 8000 }) });
+        if (reference.kind === "wearableSessions") callback({ data: () => ({ id: "session-1", title: "Trote" }) });
+      }
+    }),
+    getDocFromServer: async reference => reference.kind === "wearableSyncStatus"
+      ? { exists: () => true, data: () => ({ syncedAt: "2026-09-23T12:00:00Z", workoutsToday: 1 }) }
+      : { exists: () => false },
     waitForPendingWrites: async () => {},
     onSnapshot: (reference, callback) => {
       const docs = reference.kind === "wearableDays"
@@ -159,7 +166,9 @@ test("lee las mediciones de la pulsera por cuenta y las limpia al cerrar sesión
   await ready;
   assert.equal(updates.at(-1).days[0].steps, 8000);
   assert.equal(updates.at(-1).sessions[0].title, "Trote");
+  const refreshed = await cloud.refreshWearableNow();
+  assert.equal(refreshed.status.workoutsToday, 1);
   await authListener(null);
-  assert.deepEqual(updates.at(-1), { days: [], sessions: [] });
+  assert.deepEqual(updates.at(-1), { days: [], sessions: [], status: null });
   cloud.destroy();
 });

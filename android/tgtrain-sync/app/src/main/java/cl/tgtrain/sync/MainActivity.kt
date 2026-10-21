@@ -245,6 +245,9 @@ class MainActivity : ComponentActivity() {
                 val report = service.sync(source)
                 SyncPreferences.markSuccess(this@MainActivity, source)
                 AutomaticSync.refresh(this@MainActivity)
+                if (report.workoutsToday == 0 && report.backgroundReadGranted) {
+                    AutomaticSync.scheduleRecovery(this@MainActivity)
+                }
                 val heartRateStatus = when {
                     !report.heartRateGranted -> "Las LPM no están autorizadas; pulsa Permitir acceso para incluirlas."
                     report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
@@ -255,8 +258,13 @@ class MainActivity : ComponentActivity() {
                     report.sleepSessionsWithStages == 0 -> " Mi Fitness entregó duración, pero no fases de sueño."
                     else -> " ${report.sleepSessionsWithStages} sesiones incluyen fases de sueño."
                 }
-                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. " +
-                    (if (report.workouts == 0) "Health Connect no entregó ninguna sesión de ejercicio en este período; revisa que el entrenamiento aparezca allí antes de volver a sincronizar. " else "") +
+                val workoutStatus = when {
+                    report.workoutsToday > 0 -> "Health Connect entregó ${report.workoutsToday} entrenamiento(s) de hoy."
+                    report.backgroundReadGranted -> "Health Connect todavía entregó 0 entrenamientos de hoy; programé otra revisión automática en 2 minutos."
+                    else -> "Health Connect todavía entregó 0 entrenamientos de hoy. Abre Mi Fitness y vuelve a sincronizar; el acceso en segundo plano permitiría reintentarlo automáticamente."
+                }
+                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $workoutStatus " +
+                    (if (report.workouts == 0) "No hay ninguna sesión de ejercicio en los últimos ${report.days} días disponible para TGTrain. " else "") +
                     (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
                     "$sleepDetailStatus $heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {

@@ -6,7 +6,9 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -15,6 +17,7 @@ import java.util.concurrent.TimeUnit
 
 object AutomaticSync {
     private const val JOB_NAME = "tgtrain_health_connect_sync"
+    private const val RECOVERY_JOB_NAME = "tgtrain_health_connect_recovery"
     const val INTERVAL_MINUTES = 15L
 
     suspend fun refresh(context: Context) {
@@ -35,6 +38,18 @@ object AutomaticSync {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
         manager.enqueueUniquePeriodicWork(JOB_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+    }
+
+    fun scheduleRecovery(context: Context) {
+        val request = OneTimeWorkRequestBuilder<HealthSyncWorker>()
+            .setInitialDelay(2, TimeUnit.MINUTES)
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            RECOVERY_JOB_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 }
 
