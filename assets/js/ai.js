@@ -99,7 +99,7 @@ const progressionChangeSchema = {
   properties: {
     exerciseId: stringSchema,
     exerciseName: stringSchema,
-    action: { type: "string", enum: ["increase", "maintain", "reduce", "substitute"] },
+    action: { type: "string", enum: ["increase", "reduce"] },
     currentSets: { type: "integer" },
     proposedSets: { type: "integer" },
     currentTarget: stringSchema,
@@ -121,7 +121,7 @@ const analysisSchema = {
     progress: { type: "array", items: stringSchema, maxItems: 6 },
     nextSession: { type: "array", items: stringSchema, maxItems: 6 },
     cautions: { type: "array", items: stringSchema, maxItems: 6 },
-    changes: { type: "array", items: progressionChangeSchema, maxItems: 12 },
+    changes: { type: "array", items: progressionChangeSchema, maxItems: 2 },
     goal: stringSchema,
     planComparison: {
       type: "object",
@@ -435,6 +435,7 @@ export function createAiClient() {
         "En planComparison.reason compara explícitamente plan y realidad: lo que sí se cubrió, qué cambió y qué queda pendiente o no se puede determinar. Considera alternativas y sameDayActivities, sin atribuir sus resultados a la actividad actual ni duplicarlos. Para otra rutina evalúa grupos musculares, habilidades de tenis y recuperación; explica si cubre el objetivo de otra forma, parcialmente o no. Más completa, más carga o más kilómetros no significa automáticamente mejor ni autorizado por el plan.",
         "Respeta el estado del calendario competitivo: scheduled cuenta como partido confirmado; likely-suspended, suspended y pending no cuentan como carga competitiva hasta confirmación y no justifican por sí solos una descarga o una compensación intensa.",
         "Para rutina física compara las cargas, series, objetivos de repeticiones/segundos y series realmente completadas por ejercicio con target.settings y las omisiones previstas. Si el plan no especifica una carga, no inventes una carga planificada ni la sustituyas por la sesión actual. Para describir aumentos o reducciones usa también ejecuciones anteriores comparables. No modifiques automáticamente el calendario ni el objetivo original.",
+        "Para una rutina física, progressionEvidence es la evaluación numérica local y prevalece al decidir cambios. Usa su readiness, porcentaje completado, técnica, repeticiones en reserva, dolor, esfuerzo e historial por ejercicio. Solo puedes aumentar ejercicios con eligibleForIncrease=true. Explica la evidencia concreta y no conviertas una buena sesión aislada en una subida automática.",
         "En trote analiza distancia, duración y ritmo calculado, compara solo marcas de la misma distancia y considera cansancio, molestias, terreno y comentarios. Respetar un máximo de distancia o intensidad indicado por el plan; no perseguir un récord a costa de la recuperación para tenis.",
         "Los datos de tiempo y ritmo son cálculos de la aplicación: durationSeconds son segundos TOTALES, durationHms es HH:MM:SS y averagePaceFormatted es MINUTOS:SEGUNDOS por kilómetro. Copia exactamente averagePaceFormatted al citar un ritmo; no vuelvas a convertir averagePaceSecondsPerKm ni interpretes un decimal de minutos como segundos. Ejemplo: 5 km en 00:30:56 son 1856 segundos y 6:11 min/km redondeado, NO 3:12. No redondees 30:56 a 31 minutos al describir el registro exacto. No inventes ritmos numéricos previstos ni cites otros ritmos que no estén calculados en las actividades entregadas.",
         "Ritmo conversable es una indicación de intensidad percibida, no un ritmo numérico fijo. Sin una referencia explícita no afirmes que el ritmo por km fue superior al plan; puedes señalar que el usuario reportó esfuerzo alto o molestias, distinguiendo su percepción del ritmo calculado. Si hubo pausas, durationSeconds representa el tiempo que registró el usuario; no inventes tiempo en movimiento, duración de las pausas ni ritmo sin pausas.",
@@ -443,9 +444,9 @@ export function createAiClient() {
         "Analiza solo los datos entregados. No inventes cargas, repeticiones, dolor, calendario, equipamiento ni récords.",
         "Elige exactamente una decisión general: progress, maintain, reduce o recover.",
         "Propón cambios solo para exerciseId presentes en la sesión actual. Los valores deben ser concretos y aplicables en TGTrain.",
-        "En una sesión aumenta como máximo una variable principal. No subas simultáneamente carga, repeticiones y series. El volumen total no debe subir más de 5–10% respecto de una sesión comparable.",
+        "Propón como máximo dos cambios concretos por sesión y una sola variable por ejercicio. No subas simultáneamente carga, repeticiones y series. El volumen total no debe subir más de 5–10% respecto de una sesión comparable.",
         "Carga: aumenta como máximo 1–2 kg cuando esa configuración exista. Repeticiones: +1–2 por serie. Series: +1 serie en un solo ejercicio. Planchas/carries: +5–10 segundos. Desplazamientos: +5 segundos. Nunca agregues carga a pliometría.",
-        "Solo progresa si se completó al menos 90%, la técnica y energía fueron adecuadas, el esfuerzo fue controlado, el dolor fue 0–2/10 y no hay tenis o partido exigente en las próximas 48 horas.",
+        "Solo progresa si progressionEvidence.readiness=progress. Una sesión de tenis normal en las próximas 48 horas no prohíbe por sí sola una progresión pequeña para la próxima vez; un partido, una sesión exigente, fatiga, mala técnica o recuperación dudosa sí exigen cautela.",
         "Con esfuerzo alto, mala técnica, poca energía o rutina parcial, mantén o reduce. Con dolor 3–4/10 no progreses y reduce 20–30%. Con dolor 5/10 o más, o molestia repetida, prioriza recuperar y recomienda detener el ejercicio problemático y consultar si persiste.",
         "Para piernas prioriza técnica, estabilidad, rango, repeticiones, tempo y al final carga. Para tren superior protege el lado de raqueta y no aumentes más de un empuje y una tracción. Para potencia prioriza calidad, descansos y aterrizaje. Para core aumenta tiempo o control antes que carga.",
         "El perfil privado del usuario prevalece sobre las reglas generales. El inventario entregado es el único equipamiento permitido.",
@@ -468,6 +469,7 @@ export function createAiClient() {
           wearableContext: context.wearableContext || null,
           nutritionContext: context.nutritionContext || null,
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
+          progressionEvidence: context.progressionEvidence || null,
           planDetails: planDetails.slice(0, 20)
         })
       };

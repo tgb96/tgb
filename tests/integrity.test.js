@@ -252,7 +252,7 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/progression.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
@@ -385,6 +385,24 @@ test("la guía también analiza registros manuales y el plan reconoce actividade
   assert.match(app, /comparableActivity\(record, item\)/);
   assert.match(app, /currentPlan/);
   assert.match(app, /status: concreteChanges\.length \? "pending" : "reviewed"/);
+});
+
+test("la guía decide la progresión con técnica, reserva, historial y límites aplicables", async () => {
+  const [app, ai, progression, html] = await Promise.all([
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "assets/js/ai.js"), "utf8"),
+    readFile(resolve(root, "assets/js/progression.js"), "utf8"),
+    readFile(resolve(root, "index.html"), "utf8")
+  ]);
+  assert.match(app, /routineTechnique-/);
+  assert.match(app, /routineRepsInReserve-/);
+  assert.match(app, /sanitizeProgressionChanges/);
+  assert.match(app, /progressionBasis/);
+  assert.match(ai, /progressionEvidence/);
+  assert.match(ai, /como máximo dos cambios concretos/);
+  assert.match(progression, /eligibleForIncrease/);
+  assert.match(progression, /accepted\.length >= 2/);
+  assert.match(html, /assets\/js\/app\.js\?v=101/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

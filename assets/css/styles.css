@@ -471,6 +471,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-rating-control, .routine-pain-detail { display: block; color: var(--ink); font-size: 11px; font-weight: 850; }
 .routine-rating-control span, .routine-pain-detail span { display: block; margin-bottom: 7px; }
 .routine-rating-control select, .routine-pain-detail textarea { background: white; }
+.routine-progression-hint { display: block; margin-top: 9px; padding: 9px 10px; border-radius: 11px; background: #eef3ff; color: var(--blue-dark); font-size: 10px; font-weight: 750; line-height: 1.45; }
 .routine-pain-detail { margin-top: 11px; }
 .routine-sensation-box { margin-top: 15px; padding-top: 14px; border-top: 1px solid #d9dcd2; }
 .routine-sensation-box > label { display: block; margin-bottom: 7px; color: var(--ink); font-size: 11px; font-weight: 850; }
@@ -612,6 +613,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-ai-card h4 { margin: 8px 0 0; font-size: 19px; line-height: 1.22; letter-spacing: -.2px; }
 .routine-ai-card p { margin: 9px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .routine-ai-card .routine-ai-evidence { padding: 8px 10px; border-radius: 10px; background: rgba(49, 87, 255, .07); color: #4f5d78; font-size: 11px; font-weight: 750; line-height: 1.45; }
+.routine-ai-card .routine-ai-progression-basis { padding: 10px; border-left: 4px solid var(--lime); border-radius: 10px; background: #f1f8df; color: #3d4d17; font-size: 12px; font-weight: 750; line-height: 1.5; }
 .routine-ai-groups { display: grid; gap: 10px; margin-top: 13px; }
 .routine-ai-group { padding: 13px; border-radius: 14px; background: white; }
 .routine-ai-group strong { display: block; font-size: 13px; }

@@ -25,18 +25,19 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=97";
-import { createRepository } from "./storage.js?v=94";
+import { createRepository } from "./storage.js?v=95";
 import { createCloudSync } from "./cloud.js?v=74";
-import { createNutritionUI } from "./nutrition-ui.js?v=94";
+import { createNutritionUI } from "./nutrition-ui.js?v=95";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
-import { createGuidedUI } from "./guided-ui.js?v=95";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=95";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=94";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=96";
+import { createGuidedUI } from "./guided-ui.js?v=96";
+import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=96";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=95";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=97";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=94";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, recordWorkflowState } from "./coach-tracking.js?v=75";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
+import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=1";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableMatch, wearableSummaryText } from "./wearable-link.js?v=68";
 import {
   dayIndexFromISO,
@@ -62,7 +63,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=68";
+} from "./utils.js?v=69";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -3171,6 +3172,8 @@ function startRoutineSession(routine) {
     effort: "",
     pain: 0,
     painDetail: "",
+    technique: "",
+    repsInReserve: "",
     focusMode: true,
     activeExerciseId: routineExercisesForDate(routine, dateISO)[0]?.id || "",
     settingsAtStart,
@@ -3291,6 +3294,8 @@ function routineForAi(record) {
     effortRpe: record.routineEffort,
     painScore: record.routinePain,
     painDetail: record.routinePainDetail,
+    technique: record.routineTechnique,
+    repsInReserve: record.routineRepsInReserve,
     completedSets: record.routineCompletedSets,
     plannedSets: record.routinePlannedSets,
     completedExercises: record.routineCompletedExercises,
@@ -3331,6 +3336,8 @@ function routineAiContext(record) {
       effortRpe: item.routineEffort,
       painScore: item.routinePain,
       painDetail: item.routinePainDetail,
+      technique: item.routineTechnique,
+      repsInReserve: item.routineRepsInReserve,
       volumeKg: Number(item.routineVolumeKg) || 0,
       wearableHeartRateAvgBpm: item.wearableSnapshot?.heartRateAvgBpm ?? null,
       wearableActiveCaloriesKcal: item.wearableSnapshot?.activeCaloriesKcal ?? null
@@ -3354,6 +3361,10 @@ function routineAiContext(record) {
       };
     });
   const match = plannedContextForRecord(record, block);
+  const comparableProgressionRecords = records
+    .filter(item => item.id !== record.id && item.category === "physical" && item.routineId === record.routineId && item.dateISO <= record.dateISO)
+    .map(routineForAi);
+  const progressionEvidence = buildProgressionEvidence(routineForAi(record), comparableProgressionRecords);
   const currentPlan = match ? {
     blockId: block.id,
     blockUpdatedAt: block.updatedAt || "",
@@ -3378,7 +3389,7 @@ function routineAiContext(record) {
   } : null;
   const lastNight = wearableData.days.find(day => day.dateISO === record.dateISO && Number(day.sleepMinutes) > 0);
   return {
-    coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan,
+    coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan, progressionEvidence,
     nutritionContext: {
       activityDay: nutritionDayForCoach(record.dateISO, block),
       previousDay: nutritionDayForCoach(addDaysISO(record.dateISO, -1), block)
@@ -3418,14 +3429,35 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
       .map(routineForAi);
     const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails, context);
     const analysis = result?.analysis || result;
-    const concreteChanges = record.category === "physical" ? actionableRoutineAiChanges(analysis) : [];
+    const checkedChanges = record.category === "physical" ? sanitizeProgressionChanges(analysis?.changes, context.progressionEvidence) : [];
+    const suggestedChanges = checkedChanges.length || analysis?.decision !== "progress"
+      ? checkedChanges
+      : fallbackProgressionChanges(context.progressionEvidence);
+    const concreteChanges = suggestedChanges.filter(change => change.action === "increase"
+      ? analysis?.decision === "progress"
+      : ["reduce", "recover"].includes(analysis?.decision));
+    const evidenceDecision = context.progressionEvidence?.readiness;
+    const safeDecision = record.category === "physical" && ["maintain", "reduce", "recover"].includes(evidenceDecision)
+      ? evidenceDecision
+      : analysis?.decision;
     const latest = repository.get(record.id);
     if (!latest || latest.updatedAt !== record.updatedAt) throw new Error("El registro cambió durante el análisis. Vuelve a analizarlo para incluir sus últimos comentarios.");
     repository.upsert({
       ...attachMatchingPlan(latest),
       routineAiAnalysis: {
         ...analysis,
+        decision: safeDecision,
         changes: concreteChanges,
+        progressionBasis: context.progressionEvidence ? {
+          readiness: context.progressionEvidence.readiness,
+          reason: context.progressionEvidence.reason,
+          comparableSessions: context.progressionEvidence.comparableSessions,
+          completedPercent: context.progressionEvidence.completedPercent,
+          effortRpe: context.progressionEvidence.effortRpe,
+          painScore: context.progressionEvidence.painScore,
+          technique: context.progressionEvidence.technique,
+          repsInReserve: context.progressionEvidence.repsInReserve
+        } : null,
         status: concreteChanges.length ? "pending" : "reviewed",
         planContext: context.currentPlan ? {
           blockId: context.currentPlan.blockId,
@@ -3466,6 +3498,8 @@ function finishRoutineSession(routine) {
   const sensationsInput = $(`routineSensations-${routine.id}`);
   const effortInput = $(`routineEffort-${routine.id}`);
   const painInput = $(`routinePain-${routine.id}`);
+  const techniqueInput = $(`routineTechnique-${routine.id}`);
+  const repsInReserveInput = $(`routineRepsInReserve-${routine.id}`);
   const painDetailInput = $(`routinePainDetail-${routine.id}`);
   const message = $(`routineFinishMessage-${routine.id}`);
   // Las calorías, duración y distancia no se preguntan al cerrar la rutina:
@@ -3475,6 +3509,8 @@ function finishRoutineSession(routine) {
   const sensations = sensationsInput?.value.trim() || "";
   const effort = effortInput?.value === "" ? null : Number(effortInput?.value);
   const pain = painInput?.value === "" ? null : Number(painInput?.value);
+  const technique = techniqueInput?.value || "";
+  const repsInReserve = repsInReserveInput?.value === "" ? null : Number(repsInReserveInput?.value);
   const painDetail = painDetailInput?.value.trim() || "";
   const progress = loadRoutineProgress();
   const settings = loadRoutineSettings();
@@ -3509,6 +3545,18 @@ function finishRoutineSession(routine) {
     message.textContent = "Selecciona el nivel de dolor o molestia entre 0 y 10.";
     message.classList.remove("hidden");
     painInput?.focus();
+    return;
+  }
+  if (!["solid", "acceptable", "declined"].includes(technique)) {
+    message.textContent = "Indica cómo se mantuvo tu técnica al final de la rutina.";
+    message.classList.remove("hidden");
+    techniqueInput?.focus();
+    return;
+  }
+  if (!Number.isFinite(repsInReserve) || repsInReserve < 0 || repsInReserve > 5) {
+    message.textContent = "Indica cuántas repeticiones más crees que podrías haber realizado.";
+    message.classList.remove("hidden");
+    repsInReserveInput?.focus();
     return;
   }
   if (pain > 0 && !painDetail) {
@@ -3549,6 +3597,8 @@ function finishRoutineSession(routine) {
     routineEffort: effort,
     routinePain: pain,
     routinePainDetail: painDetail,
+    routineTechnique: technique,
+    routineRepsInReserve: repsInReserve,
     metricsPending: true,
     routineExercises: summary.exercises,
     routineSummary: "",
@@ -3595,6 +3645,8 @@ function finishRoutineSession(routine) {
     effort,
     pain,
     painDetail,
+    technique,
+    repsInReserve,
     recordId: record.id,
     summary,
     routineSummary: record.routineSummary,
@@ -3632,7 +3684,7 @@ function balanceMetric(label, value) {
   return metric;
 }
 
-function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", preview = false, effort = "", pain = "") {
+function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", preview = false, effort = "", pain = "", technique = "", repsInReserve = "") {
   const grid = document.createElement("div");
   grid.className = "routine-balance-grid";
   const metrics = [
@@ -3646,6 +3698,8 @@ function routineBalanceGrid(summary, elapsedSeconds, calories, absCount = "", pr
   ];
   if (effort !== "" && effort !== null && effort !== undefined) metrics.push(["Esfuerzo", `${effort}/10`, "effort"]);
   if (pain !== "" && pain !== null && pain !== undefined) metrics.push(["Dolor", `${pain}/10`, "pain"]);
+  if (technique) metrics.push(["Técnica final", { solid: "Sólida", acceptable: "Aceptable", declined: "Se deterioró" }[technique] || technique, "technique"]);
+  if (repsInReserve !== "" && repsInReserve !== null && repsInReserve !== undefined) metrics.push(["Reps. en reserva", Number(repsInReserve) >= 5 ? "5+" : String(repsInReserve), "reps-in-reserve"]);
   metrics.forEach(([label, value, key]) => {
     const metric = balanceMetric(label, value);
     if (preview) metric.id = `routinePreview-${key}`;
@@ -3814,9 +3868,24 @@ function createRoutineAiCard(record, { compact = false } = {}) {
     const evidenceParts = ["registro de la actividad"];
     if (record.wearableSessionId || record.wearableSnapshot) evidenceParts.push("métricas de la pulsera");
     if (record.sensations || record.routinePainDetail || record.guidedPainNotes) evidenceParts.push("tus comentarios y sensaciones");
-    if (plannedContextForRecord(record, activeTrainingBlock())) evidenceParts.push("plan vigente");
+    if (plannedContextForRecord(record, activeTrainingBlock(record.dateISO))) evidenceParts.push("plan vigente");
     evidence.textContent = `Datos considerados: ${evidenceParts.join(" · ")}.`;
     card.append(evidence);
+    if (analysis.progressionBasis && record.category === "physical") {
+      const basis = document.createElement("p");
+      basis.className = "routine-ai-progression-basis";
+      const techniqueLabel = { solid: "técnica sólida", acceptable: "técnica aceptable", declined: "técnica deteriorada" }[analysis.progressionBasis.technique];
+      const parts = [
+        `${analysis.progressionBasis.completedPercent}% de series`,
+        techniqueLabel,
+        analysis.progressionBasis.repsInReserve === "" || analysis.progressionBasis.repsInReserve == null
+          ? "sin repeticiones en reserva anotadas"
+          : `${Number(analysis.progressionBasis.repsInReserve) >= 5 ? "5+" : analysis.progressionBasis.repsInReserve} repeticiones en reserva`,
+        `${analysis.progressionBasis.comparableSessions || 0} sesiones comparables`
+      ].filter(Boolean);
+      basis.textContent = `Base de progresión: ${parts.join(" · ")}. ${analysis.progressionBasis.reason || ""}`;
+      card.append(basis);
+    }
     if (analysis.planComparison?.status) {
       const comparison = document.createElement("p");
       comparison.className = "routine-ai-plan-comparison";
@@ -4224,7 +4293,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
     eyebrow.textContent = "Balance final";
     heading.textContent = "Entrenamiento registrado";
     copy.textContent = "Este resultado ya cuenta dentro del entrenamiento diario y del informe semanal.";
-    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount, false, session.effort, session.pain));
+    panel.append(eyebrow, heading, copy, routineBalanceGrid(session.summary, session.elapsedSeconds, session.calories, session.absCount, false, session.effort, session.pain, session.technique, session.repsInReserve));
     const automaticSummary = document.createElement("p");
     automaticSummary.className = "routine-auto-summary";
     automaticSummary.textContent = session.routineSummary || "Tu balance completo quedó guardado para comparar la próxima sesión.";
@@ -4300,7 +4369,44 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   ratings.className = "routine-ratings";
   const effortControl = loadSelect({ id: `routineEffort-${routine.id}`, label: "Esfuerzo percibido (RPE)", min: 1, max: 10, blank: true, value: session.effort });
   const painControl = loadSelect({ id: `routinePain-${routine.id}`, label: "Dolor o molestia", min: 0, max: 10, value: session.pain ?? 0 });
-  ratings.append(effortControl.wrapper, painControl.wrapper);
+  const choiceControl = ({ id, label, value, choices }) => {
+    const wrapper = document.createElement("label");
+    wrapper.className = "routine-rating-control";
+    wrapper.htmlFor = id;
+    const caption = document.createElement("span");
+    caption.textContent = label;
+    const select = document.createElement("select");
+    select.id = id;
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "Seleccionar";
+    select.append(blank);
+    choices.forEach(([choiceValue, choiceLabel]) => {
+      const option = document.createElement("option");
+      option.value = String(choiceValue);
+      option.textContent = choiceLabel;
+      select.append(option);
+    });
+    select.value = value === undefined || value === null ? "" : String(value);
+    wrapper.append(caption, select);
+    return { wrapper, select };
+  };
+  const techniqueControl = choiceControl({
+    id: `routineTechnique-${routine.id}`,
+    label: "Técnica en las últimas series",
+    value: session.technique,
+    choices: [["solid", "Sólida"], ["acceptable", "Aceptable"], ["declined", "Se deterioró"]]
+  });
+  const reserveControl = choiceControl({
+    id: `routineRepsInReserve-${routine.id}`,
+    label: "Repeticiones correctas que aún podías hacer",
+    value: session.repsInReserve,
+    choices: [[0, "0 · ninguna"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5 o más"]]
+  });
+  ratings.append(effortControl.wrapper, painControl.wrapper, techniqueControl.wrapper, reserveControl.wrapper);
+  const progressionHint = document.createElement("small");
+  progressionHint.className = "routine-progression-hint";
+  progressionHint.textContent = "La guía usará la técnica y las repeticiones que te quedaban en la última serie principal para decidir si conviene subir, mantener o reducir.";
   const painDetailWrap = document.createElement("label");
   painDetailWrap.className = "routine-pain-detail";
   painDetailWrap.htmlFor = `routinePainDetail-${routine.id}`;
@@ -4321,14 +4427,27 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   const persistRatings = () => {
     const current = loadRoutineSession();
     if (current?.status !== "active" || current.routineId !== routine.id) return;
-    saveRoutineSession({ ...current, effort: effortControl.select.value, pain: Number(painControl.select.value), painDetail: painDetail.value });
+    saveRoutineSession({
+      ...current,
+      effort: effortControl.select.value,
+      pain: Number(painControl.select.value),
+      painDetail: painDetail.value,
+      technique: techniqueControl.select.value,
+      repsInReserve: reserveControl.select.value
+    });
     const effortPreview = $("routinePreview-effort")?.querySelector("strong");
     const painPreview = $("routinePreview-pain")?.querySelector("strong");
+    const techniquePreview = $("routinePreview-technique")?.querySelector("strong");
+    const reservePreview = $("routinePreview-reps-in-reserve")?.querySelector("strong");
     if (effortPreview) effortPreview.textContent = effortControl.select.value ? `${effortControl.select.value}/10` : "—";
     if (painPreview) painPreview.textContent = `${painControl.select.value}/10`;
+    if (techniquePreview) techniquePreview.textContent = { solid: "Sólida", acceptable: "Aceptable", declined: "Se deterioró" }[techniqueControl.select.value] || "—";
+    if (reservePreview) reservePreview.textContent = reserveControl.select.value === "" ? "—" : Number(reserveControl.select.value) >= 5 ? "5+" : reserveControl.select.value;
   };
   effortControl.select.addEventListener("change", persistRatings);
   painControl.select.addEventListener("change", () => { syncPainVisibility(); persistRatings(); });
+  techniqueControl.select.addEventListener("change", persistRatings);
+  reserveControl.select.addEventListener("change", persistRatings);
   painDetail.addEventListener("input", persistRatings);
   syncPainVisibility();
   const sensations = createRoutineSensationPicker(routine, session);
@@ -4356,7 +4475,7 @@ function createRoutineFinishPanel(routine, session, progress, settings, dateISO)
   finish.id = `routineFinishButton-${routine.id}`;
   finish.textContent = "Finalizar y registrar";
   finish.addEventListener("click", () => finishRoutineSession(routine));
-  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true, session.effort, session.pain), ratings, painDetailWrap, sensations, defaultsOption, message, finish);
+  panel.append(eyebrow, heading, copy, routineBalanceGrid(preview, routineSessionElapsedSeconds(session), "", session.absCount, true, session.effort, session.pain, session.technique, session.repsInReserve), ratings, progressionHint, painDetailWrap, sensations, defaultsOption, message, finish);
   const note = document.createElement("small");
   note.textContent = "El volumen es estimado. Duración y calorías quedan pendientes de la sesión de la pulsera para no pedirte datos duplicados.";
   panel.append(note);
@@ -5228,7 +5347,9 @@ function createHistoryEntry(sourceRecord) {
       ["Volumen", `${Number(record.routineVolumeKg || 0).toLocaleString("es-CL")} kg`],
       ["Abdominales", record.routineAbsCount === "" ? "—" : String(record.routineAbsCount)],
       ["Esfuerzo", record.routineEffort === "" ? "—" : `${record.routineEffort}/10`],
-      ["Dolor", record.routinePain === "" ? "—" : `${record.routinePain}/10`]
+      ["Dolor", record.routinePain === "" ? "—" : `${record.routinePain}/10`],
+      ["Técnica final", { solid: "Sólida", acceptable: "Aceptable", declined: "Se deterioró" }[record.routineTechnique] || "—"],
+      ["Reps. en reserva", record.routineRepsInReserve === "" ? "—" : Number(record.routineRepsInReserve) >= 5 ? "5+" : String(record.routineRepsInReserve)]
     ].forEach(([label, value]) => balance.append(balanceMetric(label, value)));
     copy.append(balance);
     if (record.routinePainDetail) {
