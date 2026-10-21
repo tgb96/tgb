@@ -26,12 +26,100 @@ const exerciseKind = exercise => {
   return "repetitions";
 };
 
+const exerciseFeedback = (exercise, record) => ({
+  technique: String(exercise?.technique || record?.technique || record?.routineTechnique || ""),
+  repsInReserve: asNumber(exercise?.repsInReserve ?? record?.repsInReserve ?? record?.routineRepsInReserve)
+});
+
+const targetNumber = target => {
+  const match = String(target || "").match(/\d+(?:[.,]\d+)?/);
+  return match ? Number(match[0].replace(",", ".")) : null;
+};
+
+const replaceFirstTargetNumber = (target, value) => String(target || "").replace(/\d+(?:[.,]\d+)?/, String(value).replace(".", ","));
+
+function increasedTarget(target) {
+  const source = String(target || "");
+  const increment = /\bseg/i.test(source) ? 5 : 1;
+  return source.replace(/\d+(?:[.,]\d+)?/g, match => {
+    const value = Number(match.replace(",", "."));
+    return Number.isInteger(value + increment) ? String(value + increment) : String(value + increment).replace(".", ",");
+  });
+}
+
 const qualityForProgression = record => completionRate(record) >= 0.9
   && asNumber(record?.painScore ?? record?.routinePain) !== null
   && asNumber(record?.painScore ?? record?.routinePain) <= 2
   && asNumber(record?.effortRpe ?? record?.routineEffort) !== null
   && asNumber(record?.effortRpe ?? record?.routineEffort) <= 7
   && !["declined", "poor"].includes(record?.technique ?? record?.routineTechnique);
+
+const exerciseQualityForProgression = (record, exercise) => {
+  const feedback = exerciseFeedback(exercise, record);
+  return qualityForProgression(record) && exerciseComplete(exercise)
+    && !["declined", "poor"].includes(feedback.technique)
+    && (feedback.repsInReserve === null || feedback.repsInReserve >= 2);
+};
+
+function recommendedIncrease(exercise, repeatedSuccesses) {
+  const progression = exercise?.progression;
+  const currentSets = Number(exercise?.plannedSets) || 0;
+  const currentTarget = String(exercise?.target || "");
+  const currentWeightKg = asNumber(exercise?.weightKg);
+  const base = {
+    exerciseId: exercise.id,
+    exerciseName: exercise.name,
+    action: "increase",
+    currentSets,
+    proposedSets: currentSets,
+    currentTarget,
+    proposedTarget: currentTarget,
+    currentWeightKg,
+    proposedWeightKg: currentWeightKg
+  };
+  if (progression?.type === "double") {
+    const current = targetNumber(currentTarget);
+    const minimum = asNumber(progression.minTarget);
+    const maximum = asNumber(progression.maxTarget);
+    if (current !== null && maximum !== null && current < maximum) return {
+      ...base,
+      proposedTarget: replaceFirstTargetNumber(currentTarget, Math.min(maximum, current + 1)),
+      progressionStep: "repetitions",
+      reason: `Primero sube una repetición dentro del rango ${minimum}–${maximum}; el peso se mantiene.`
+    };
+    if (current !== null && maximum !== null && current >= maximum && currentWeightKg !== null && repeatedSuccesses >= 1) {
+      const step = asNumber(progression.loadStepKg) || 1;
+      return {
+        ...base,
+        proposedTarget: replaceFirstTargetNumber(currentTarget, minimum ?? current),
+        proposedWeightKg: Math.round((currentWeightKg + step) * 100) / 100,
+        progressionStep: "load-reset",
+        reason: `Consolidaste el máximo del rango en dos sesiones: sube ${step.toLocaleString("es-CL")} kg y vuelve a ${minimum} repeticiones.`
+      };
+    }
+    return null;
+  }
+  const kind = exerciseKind(exercise);
+  if (kind === "load" && currentWeightKg !== null && currentWeightKg < 40) return {
+    ...base,
+    proposedWeightKg: currentWeightKg + 1,
+    progressionStep: "load",
+    reason: "Sube 1 kg y vuelve a evaluar técnica y repeticiones en reserva."
+  };
+  if (/\d/.test(currentTarget)) return {
+    ...base,
+    proposedTarget: increasedTarget(currentTarget),
+    progressionStep: kind === "time" ? "time" : "repetitions",
+    reason: kind === "time" ? "Añade un intervalo breve manteniendo la calidad." : "Añade una repetición manteniendo la carga y la técnica."
+  };
+  if (currentSets > 0 && currentSets < 10) return {
+    ...base,
+    proposedSets: currentSets + 1,
+    progressionStep: "sets",
+    reason: "Añade una serie y no cambies las demás variables."
+  };
+  return null;
+}
 
 export function buildProgressionEvidence(current, previousRecords = []) {
   if (!current || current.category !== "physical" || !current.routineId) return null;
@@ -72,9 +160,12 @@ export function buildProgressionEvidence(current, previousRecords = []) {
       return previous ? [{ record, exercise: previous }] : [];
     });
     const repeatedSuccesses = history.filter(item => sameConfiguration(exercise, item.exercise)
-      && exerciseComplete(item.exercise) && qualityForProgression(item.record)).length;
-    const eligible = readiness === "progress" && exerciseComplete(exercise) && !blocksAutomaticProgression(exercise)
-      && (repsInReserve !== null ? repsInReserve >= 3 : repeatedSuccesses >= 1);
+      && exerciseQualityForProgression(item.record, item.exercise)).length;
+    const feedback = exerciseFeedback(exercise, current);
+    const baseEligible = readiness === "progress" && exerciseComplete(exercise) && !blocksAutomaticProgression(exercise)
+      && !["declined", "poor"].includes(feedback.technique)
+      && (feedback.repsInReserve !== null ? feedback.repsInReserve >= 3 : repeatedSuccesses >= 1);
+    const recommendation = baseEligible ? recommendedIncrease(exercise, repeatedSuccesses) : null;
     return {
       exerciseId: exercise.id,
       exerciseName: exercise.name,
@@ -85,8 +176,11 @@ export function buildProgressionEvidence(current, previousRecords = []) {
       completedSets: Number(exercise.completedSets) || 0,
       progressionKind: exerciseKind(exercise),
       repeatedSuccessfulSessions: repeatedSuccesses,
-      eligibleForIncrease: eligible,
-      automaticProgressionBlocked: blocksAutomaticProgression(exercise)
+      technique: feedback.technique,
+      repsInReserve: feedback.repsInReserve,
+      eligibleForIncrease: Boolean(recommendation),
+      automaticProgressionBlocked: blocksAutomaticProgression(exercise),
+      recommendedChange: recommendation
     };
   });
 
@@ -134,7 +228,14 @@ export function sanitizeProgressionChanges(changes = [], evidence = null) {
     const weightChanged = currentWeight !== proposedWeight;
     const setsChanged = rule.currentSets !== proposedSets;
     const targetChanged = rule.currentTarget !== proposedTarget;
-    if ([weightChanged, setsChanged, targetChanged].filter(Boolean).length !== 1) continue;
+    const changedCount = [weightChanged, setsChanged, targetChanged].filter(Boolean).length;
+    const recommendation = rule.recommendedChange;
+    const followsRecommendation = change.action === "increase" && recommendation
+      && proposedSets === recommendation.proposedSets
+      && proposedTarget === recommendation.proposedTarget
+      && proposedWeight === recommendation.proposedWeightKg;
+    if (change.action === "increase" && recommendation && !followsRecommendation) continue;
+    if (changedCount !== 1 && !(followsRecommendation && recommendation.progressionStep === "load-reset" && changedCount === 2)) continue;
     if (weightChanged) {
       if (currentWeight === null || proposedWeight === null || rule.progressionKind !== "load" || rule.automaticProgressionBlocked || /core/i.test(rule.phase || "")) continue;
       const delta = proposedWeight - currentWeight;
@@ -144,7 +245,8 @@ export function sanitizeProgressionChanges(changes = [], evidence = null) {
       const delta = proposedSets - rule.currentSets;
       if (change.action === "increase" ? delta !== 1 : delta >= 0 || Math.abs(delta) > 2) continue;
     }
-    if (targetChanged && !changedTargetsAreSafe(rule.currentTarget, proposedTarget, change.action)) continue;
+    if (targetChanged && !(followsRecommendation && recommendation.progressionStep === "load-reset")
+      && !changedTargetsAreSafe(rule.currentTarget, proposedTarget, change.action)) continue;
     usedExercises.add(change.exerciseId);
     accepted.push({
       ...change,
@@ -155,42 +257,15 @@ export function sanitizeProgressionChanges(changes = [], evidence = null) {
       proposedTarget,
       currentWeightKg: currentWeight,
       proposedWeightKg: proposedWeight,
-      reason: String(change.reason || evidence.reason).slice(0, 1000)
+      progressionStep: recommendation?.progressionStep || String(change.progressionStep || "").slice(0, 40),
+      reason: String(recommendation?.reason || change.reason || evidence.reason).slice(0, 1000)
     });
   }
   return accepted;
 }
 
-function increasedTarget(target) {
-  const source = String(target || "");
-  const increment = /\bseg/i.test(source) ? 5 : 1;
-  return source.replace(/\d+(?:[.,]\d+)?/g, match => {
-    const value = Number(match.replace(",", "."));
-    return Number.isInteger(value + increment) ? String(value + increment) : String(value + increment).replace(".", ",");
-  });
-}
-
 export function fallbackProgressionChanges(evidence = null) {
   if (evidence?.readiness !== "progress") return [];
-  const eligible = (evidence.exercises || []).filter(exercise => exercise.eligibleForIncrease);
-  const exercise = eligible.find(item => item.progressionKind === "load" && item.currentWeightKg !== null && item.currentWeightKg < 40)
-    || eligible.find(item => /\d/.test(item.currentTarget || ""))
-    || eligible.find(item => item.currentSets > 0 && item.currentSets < 10);
-  if (!exercise) return [];
-  const proposed = {
-    exerciseId: exercise.exerciseId,
-    exerciseName: exercise.exerciseName,
-    action: "increase",
-    currentSets: exercise.currentSets,
-    proposedSets: exercise.currentSets,
-    currentTarget: exercise.currentTarget,
-    proposedTarget: exercise.currentTarget,
-    currentWeightKg: exercise.currentWeightKg,
-    proposedWeightKg: exercise.currentWeightKg,
-    reason: `${evidence.reason} Se propone cambiar una sola variable y volver a evaluar la técnica y la reserva.`
-  };
-  if (exercise.progressionKind === "load") proposed.proposedWeightKg = exercise.currentWeightKg + 1;
-  else if (/\d/.test(exercise.currentTarget || "")) proposed.proposedTarget = increasedTarget(exercise.currentTarget);
-  else proposed.proposedSets += 1;
-  return sanitizeProgressionChanges([proposed], evidence);
+  const proposed = (evidence.exercises || []).find(exercise => exercise.eligibleForIncrease && exercise.recommendedChange)?.recommendedChange;
+  return proposed ? sanitizeProgressionChanges([{ ...proposed, reason: proposed.reason || evidence.reason }], evidence) : [];
 }

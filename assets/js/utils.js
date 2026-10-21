@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=67";
+} from "./data.js?v=68";
 import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=68";
 
 export function getChileParts(now = new Date()) {
@@ -127,7 +127,9 @@ function normalizeRoutineExercises(value) {
       completedSets: completedSets === null || completedSets === "" ? completedSetNumbers.length : Math.min(10, Math.floor(completedSets)),
       completedSetNumbers,
       totalReps: optionalNumber(exercise?.totalReps, { min: 0 }) || 0,
-      volumeKg: optionalNumber(exercise?.volumeKg, { min: 0 }) || 0
+      volumeKg: optionalNumber(exercise?.volumeKg, { min: 0 }) || 0,
+      technique: ["solid", "acceptable", "declined"].includes(exercise?.technique) ? exercise.technique : "",
+      repsInReserve: optionalNumber(exercise?.repsInReserve, { min: 0 })
     };
   });
 }
@@ -340,6 +342,9 @@ export function routineExerciseLine(exercise) {
   if (completedSetNumbers.length) parts.push(`series marcadas: ${completedSetNumbers.join(", ")}`);
   if (Number(exercise?.totalReps) > 0) parts.push(`${exercise.totalReps} repeticiones contabilizadas`);
   if (Number(exercise?.volumeKg) > 0) parts.push(`${Number(exercise.volumeKg).toLocaleString("es-CL")} kg de volumen`);
+  if (exercise?.technique) parts.push(`técnica ${{ solid: "sólida", acceptable: "aceptable", declined: "deteriorada" }[exercise.technique]}`);
+  if (exercise?.repsInReserve !== "" && exercise?.repsInReserve !== null && exercise?.repsInReserve !== undefined)
+    parts.push(`${Number(exercise.repsInReserve) >= 5 ? "5+" : exercise.repsInReserve} repeticiones en reserva`);
   return parts.join(" · ");
 }
 
@@ -543,6 +548,7 @@ function normalizeRoutineAiAnalysis(value) {
       proposedTarget: String(change?.proposedTarget || "").slice(0, 100),
       currentWeightKg: currentWeightKg === null ? "" : currentWeightKg,
       proposedWeightKg: proposedWeightKg === null ? "" : proposedWeightKg,
+      progressionStep: String(change?.progressionStep || "").slice(0, 40),
       reason: String(change?.reason || "").slice(0, 1000)
     };
   }).filter(change => change.exerciseId) : [];
@@ -573,6 +579,23 @@ function normalizeRoutineAiAnalysis(value) {
       painScore: optionalNumber(value.progressionBasis.painScore, { min: 0 }),
       technique: ["solid", "acceptable", "declined"].includes(value.progressionBasis.technique) ? value.progressionBasis.technique : "",
       repsInReserve: optionalNumber(value.progressionBasis.repsInReserve, { min: 0 })
+    } : null,
+    progressionFollowUp: value.progressionFollowUp && typeof value.progressionFollowUp === "object" ? {
+      sourceRecordId: String(value.progressionFollowUp.sourceRecordId || "").slice(0, 120),
+      sourceDateISO: String(value.progressionFollowUp.sourceDateISO || "").slice(0, 10),
+      assessments: Array.isArray(value.progressionFollowUp.assessments) ? value.progressionFollowUp.assessments.slice(0, 12).map(item => ({
+        exerciseId: String(item?.exerciseId || "").slice(0, 100),
+        exerciseName: String(item?.exerciseName || "Ejercicio").slice(0, 300),
+        status: ["tolerated", "not-tolerated", "observe"].includes(item?.status) ? item.status : "observe",
+        reason: String(item?.reason || "").slice(0, 1000),
+        currentSets: Math.min(10, Math.max(1, Math.floor(Number(item?.currentSets) || 1))),
+        proposedSets: Math.min(10, Math.max(1, Math.floor(Number(item?.proposedSets) || 1))),
+        currentTarget: String(item?.currentTarget || "").slice(0, 100),
+        proposedTarget: String(item?.proposedTarget || "").slice(0, 100),
+        currentWeightKg: optionalNumber(item?.currentWeightKg, { min: 0 }),
+        proposedWeightKg: optionalNumber(item?.proposedWeightKg, { min: 0 })
+      })).filter(item => item.exerciseId) : [],
+      revertedAt: String(value.progressionFollowUp.revertedAt || "").slice(0, 40)
     } : null,
     encouragement: String(value.encouragement || "").trim().slice(0, 1000),
     status: statuses.has(value.status) ? value.status : (changes.length || value.decision ? "pending" : ""),

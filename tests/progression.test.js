@@ -33,7 +33,7 @@ const weightChange = overrides => ({
   currentTarget: "10 reps",
   proposedTarget: "10 reps",
   currentWeightKg: 8,
-  proposedWeightKg: 10,
+  proposedWeightKg: 9,
   reason: "La ejecución dejó margen.",
   ...overrides
 });
@@ -44,7 +44,7 @@ test("habilita una progresión pequeña cuando la sesión deja reserva y mantien
   assert.equal(evidence.exercises[0].eligibleForIncrease, true);
   const accepted = sanitizeProgressionChanges([weightChange()], evidence);
   assert.equal(accepted.length, 1);
-  assert.equal(accepted[0].proposedWeightKg, 10);
+  assert.equal(accepted[0].proposedWeightKg, 9);
 });
 
 test("genera una propuesta conservadora si la IA decide progresar sin entregar cifras", () => {
@@ -124,4 +124,61 @@ test("solo acepta un cambio por ejercicio y dos cambios por sesión", () => {
   const accepted = sanitizeProgressionChanges(changes, evidence);
   assert.equal(accepted.length, 2);
   assert.equal(new Set(accepted.map(change => change.exerciseId)).size, 2);
+});
+
+test("la doble progresión sube repeticiones antes de aumentar la carga", () => {
+  const current = session({
+    exercises: [{
+      ...session().exercises[0],
+      target: "10 reps",
+      progression: { type: "double", minTarget: 8, maxTarget: 12, loadStepKg: 1 }
+    }]
+  });
+  const evidence = buildProgressionEvidence(current);
+  const recommendation = evidence.exercises[0].recommendedChange;
+  assert.equal(recommendation.progressionStep, "repetitions");
+  assert.equal(recommendation.proposedTarget, "11 reps");
+  assert.equal(recommendation.proposedWeightKg, 8);
+  assert.equal(sanitizeProgressionChanges([recommendation], evidence).length, 1);
+});
+
+test("tras consolidar el máximo sube la carga y vuelve al inicio del rango", () => {
+  const exercise = {
+    ...session().exercises[0],
+    target: "12 reps",
+    progression: { type: "double", minTarget: 8, maxTarget: 12, loadStepKg: 1 }
+  };
+  const previous = session({ dateISO: "2026-10-14", exercises: [{ ...exercise }] });
+  const evidence = buildProgressionEvidence(session({ exercises: [exercise] }), [previous]);
+  const recommendation = evidence.exercises[0].recommendedChange;
+  assert.equal(recommendation.progressionStep, "load-reset");
+  assert.equal(recommendation.proposedWeightKg, 9);
+  assert.equal(recommendation.proposedTarget, "8 reps");
+  const accepted = sanitizeProgressionChanges([recommendation], evidence);
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].progressionStep, "load-reset");
+});
+
+test("en el máximo del rango espera una segunda sesión exitosa antes de subir peso", () => {
+  const evidence = buildProgressionEvidence(session({
+    exercises: [{
+      ...session().exercises[0],
+      target: "12 reps",
+      progression: { type: "double", minTarget: 8, maxTarget: 12, loadStepKg: 1 }
+    }]
+  }));
+  assert.equal(evidence.exercises[0].eligibleForIncrease, false);
+  assert.equal(evidence.exercises[0].recommendedChange, null);
+});
+
+test("la evaluación específica de un ejercicio prevalece sobre la sesión general", () => {
+  const evidence = buildProgressionEvidence(session({
+    exercises: [{
+      ...session().exercises[0],
+      technique: "solid",
+      repsInReserve: 1
+    }]
+  }));
+  assert.equal(evidence.readiness, "progress");
+  assert.equal(evidence.exercises[0].eligibleForIncrease, false);
 });

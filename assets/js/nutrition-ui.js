@@ -1,7 +1,7 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=94";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
-import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=69";
+import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=70";
 
 const byId = id => document.getElementById(id);
 const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;

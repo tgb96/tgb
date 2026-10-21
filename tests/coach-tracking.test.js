@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment, recordWorkflowState } from "../assets/js/coach-tracking.js";
+import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
 import { normalizeRecord } from "../assets/js/utils.js";
 
@@ -95,6 +95,15 @@ test("Inicio describe registros y cambios de plan sin afirmar cumplimiento ni pe
   assert.equal(dayPlanOverview(session, [{ category: "physical", routineId: "legs" }]).label, "Cambio de plan");
   const option = session.options[0];
   assert.equal(dayPlanOverview(session, [{ category: option.category, cardioTypeId: option.prefill.cardioTypeId }]).label, "Registrado");
+});
+
+test("Inicio no repite el plan cuando la actividad registrada es exactamente la prevista", () => {
+  const session = coachTrainingBlock.weeks.flatMap(week => week.sessions).find(item => item.dateISO === "2026-09-14");
+  const block = coachTrainingBlock;
+  const exact = { category: "physical", routineId: "legs", dateISO: session.dateISO };
+  assert.equal(planNeedsSeparateLine(session, [], block), true);
+  assert.equal(planNeedsSeparateLine(session, [exact], block), false);
+  assert.equal(planNeedsSeparateLine(session, [{ category: "rest", restTypeId: "planned", dateISO: session.dateISO }], block), true);
 });
 
 test("calentamiento y estiramiento quedan como complementos aunque precedan al tenis", () => {

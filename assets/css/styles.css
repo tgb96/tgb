@@ -472,6 +472,14 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-rating-control span, .routine-pain-detail span { display: block; margin-bottom: 7px; }
 .routine-rating-control select, .routine-pain-detail textarea { background: white; }
 .routine-progression-hint { display: block; margin-top: 9px; padding: 9px 10px; border-radius: 11px; background: #eef3ff; color: var(--blue-dark); font-size: 10px; font-weight: 750; line-height: 1.45; }
+.routine-exercise-feedback { margin-top: 10px; border: 1px solid #d8deef; border-radius: 13px; background: #f8faff; }
+.routine-exercise-feedback > summary { padding: 11px 12px; color: var(--blue-dark); font-size: 12px; font-weight: 900; cursor: pointer; }
+.routine-exercise-feedback > p { margin: 0; padding: 0 12px 10px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.routine-exercise-feedback-row { display: grid; gap: 7px; padding: 10px 12px; border-top: 1px solid #e1e5ef; }
+.routine-exercise-feedback-row > strong { font-size: 12px; }
+.routine-exercise-feedback-row > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.routine-exercise-feedback-row label span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.routine-exercise-feedback-row select { width: 100%; background: white; font-size: 11px; }
 .routine-pain-detail { margin-top: 11px; }
 .routine-sensation-box { margin-top: 15px; padding-top: 14px; border-top: 1px solid #d9dcd2; }
 .routine-sensation-box > label { display: block; margin-bottom: 7px; color: var(--ink); font-size: 11px; font-weight: 850; }
@@ -502,6 +510,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .tennis-benefit strong { color: var(--blue-dark); }
 .exercise-guidance:empty { display: none; }
 .exercise-guidance p { padding: 8px 9px; border-radius: 10px; background: white; color: #58606d; font-size: 10px; }
+.exercise-guidance .exercise-progression-rule { border-left: 3px solid var(--lime); background: #f4fbdc; color: #26320f; }
 .exercise-guidance .exercise-caution { background: #fff0dd; color: #7a4a10; }
 .abdominal-finisher { margin-top: 12px !important; border-color: #a8d62f; background: linear-gradient(145deg, #f5fbe7, #eef8d5); }
 .abdominal-finisher .exercise-phase { background: var(--lime); color: var(--night); }
@@ -614,6 +623,13 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-ai-card p { margin: 9px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .routine-ai-card .routine-ai-evidence { padding: 8px 10px; border-radius: 10px; background: rgba(49, 87, 255, .07); color: #4f5d78; font-size: 11px; font-weight: 750; line-height: 1.45; }
 .routine-ai-card .routine-ai-progression-basis { padding: 10px; border-left: 4px solid var(--lime); border-radius: 10px; background: #f1f8df; color: #3d4d17; font-size: 12px; font-weight: 750; line-height: 1.5; }
+.routine-ai-follow-up { display: grid; gap: 7px; margin-top: 10px; padding: 11px; border-radius: 12px; background: #f6f7fb; }
+.routine-ai-follow-up > strong { font-size: 13px; }
+.routine-ai-card .routine-ai-follow-up p { margin: 0; padding: 8px 9px; border-radius: 9px; background: white; color: var(--ink); font-size: 11px; }
+.routine-ai-follow-up p.tolerated { border-left: 4px solid #77ad17; }
+.routine-ai-follow-up p.not-tolerated { border-left: 4px solid #d45f4d; }
+.routine-ai-follow-up p.observe { border-left: 4px solid #e3a72f; }
+.routine-ai-follow-up button { justify-self: start; }
 .routine-ai-groups { display: grid; gap: 10px; margin-top: 13px; }
 .routine-ai-group { padding: 13px; border-radius: 14px; background: white; }
 .routine-ai-group strong { display: block; font-size: 13px; }

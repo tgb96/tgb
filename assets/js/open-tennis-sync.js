@@ -1,4 +1,4 @@
-import { isoWeekInfo } from "./utils.js?v=69";
+import { isoWeekInfo } from "./utils.js?v=70";
 
 export const OPEN_TENNIS_PAGE_URL = "https://opentennis.cl/partidos.html";
 export const OPEN_TENNIS_FIXTURE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4Uc2YiXkim8OTwSbwK4AYfC1oWWNTX1TCE4RXFyzaK5azjuaHx4nWT1v6Ubiq2Lm9kpYFTJmY6C1d/pub?gid=0&single=true&output=csv";

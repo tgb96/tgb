@@ -88,7 +88,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
 test("hay cuatro rutinas físicas completas y configurables", async () => {
   const data = await import("../assets/js/data.js");
   assert.equal(data.physicalRoutines.length, 4);
-  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 13, 11, 12]);
+  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12]);
   assert.ok(data.physicalRoutines.every(routine => {
     const warmup = routine.exercises[0];
     return warmup.name === "Bicicleta estática" && warmup.sets === 1 && warmup.target === "10 min";
@@ -256,7 +256,7 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
-  assert.match(worker, /coach-tracking\.js\?v=75/);
+  assert.match(worker, /coach-tracking\.js\?v=76/);
 });
 
 test("la vista de nutrición enlaza todos sus controles", async () => {
@@ -402,7 +402,10 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(ai, /como máximo dos cambios concretos/);
   assert.match(progression, /eligibleForIncrease/);
   assert.match(progression, /accepted\.length >= 2/);
-  assert.match(html, /assets\/js\/app\.js\?v=101/);
+  assert.match(progression, /recommendedChange/);
+  assert.match(app, /Afinar por ejercicio \(opcional\)/);
+  assert.match(app, /Resultado del ajuste anterior/);
+  assert.match(html, /assets\/js\/app\.js\?v=102/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

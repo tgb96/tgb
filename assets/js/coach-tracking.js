@@ -108,6 +108,15 @@ export function planAssessment(record, match, block = null) {
   return { status: "unknown", label: "Registrado", reason: "Actividad prevista registrada. La guía evaluará cargas, intensidad, sensaciones y objetivo antes de afirmar cumplimiento total." };
 }
 
+export function planNeedsSeparateLine(session, records = [], block = null) {
+  const mainRecords = records.filter(isMainDayRecord);
+  if (!session || !mainRecords.length) return Boolean(session);
+  return !mainRecords.some(record => {
+    const match = plannedContextForRecord(record, block);
+    return match?.exact && match.session?.id === session.id;
+  });
+}
+
 export function comparableActivity(record, other) {
   if (record.category !== other.category) return false;
   if (record.category === "physical") return record.routineId ? record.routineId === other.routineId : record.routineName === other.routineName;
