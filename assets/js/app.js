@@ -2959,7 +2959,7 @@ function renderWearable() {
   const records = repository.list();
   const linkedSessionIds = new Set(records.map(record => record.wearableSessionId).filter(Boolean));
   const recent = sessions.filter(session => session.startTime && session.endTime && !linkedSessionIds.has(session.id))
-    .sort((a, b) => String(b.startTime).localeCompare(String(a.startTime))).slice(0, 3);
+    .sort((a, b) => String(b.startTime).localeCompare(String(a.startTime))).slice(0, 8);
   if (!recent.length) return;
   const heading = document.createElement("strong");
   heading.textContent = "Entrenamientos por vincular";

@@ -256,6 +256,7 @@ class MainActivity : ComponentActivity() {
                     else -> " ${report.sleepSessionsWithStages} sesiones incluyen fases de sueño."
                 }
                 status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. " +
+                    (if (report.workouts == 0) "Health Connect no entregó ninguna sesión de ejercicio en este período; revisa que el entrenamiento aparezca allí antes de volver a sincronizar. " else "") +
                     (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
                     "$sleepDetailStatus $heartRateStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
@@ -287,7 +288,7 @@ class MainActivity : ComponentActivity() {
             if (busy || elapsed in 0 until 15 * 60 * 1000L) return@launch
             setBusy(true, "Actualizando automáticamente los datos recientes…")
             try {
-                val report = service.sync(source, days = 2)
+                val report = service.sync(source, days = 7)
                 SyncPreferences.markSuccess(this@MainActivity, source)
                 status.text = "Actualización automática completa: ${report.workouts} entrenamientos recientes. Abre TGTrain para verlos."
             } catch (error: Exception) {

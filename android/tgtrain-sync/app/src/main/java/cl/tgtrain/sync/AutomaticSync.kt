@@ -47,7 +47,10 @@ class HealthSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             if (!service.backgroundReadAvailable || !service.grantedPermissions().containsAll(
                     HealthSyncService.essentialPermissions + HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
                 )) return Result.success()
-            service.sync(source, days = 2)
+            // Mi Fitness puede publicar una sesión con retraso. Releer una
+            // semana permite recuperar entrenamientos que no estaban aún en
+            // Health Connect cuando se ejecutó la sincronización anterior.
+            service.sync(source, days = 7)
             SyncPreferences.markSuccess(applicationContext, source)
             Result.success()
         } catch (_: SecurityException) {

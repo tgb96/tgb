@@ -17,7 +17,19 @@ test("el enlace de Android entrega un APK y no lo guarda en la caché PWA", asyn
   assert.ok((await stat(resolve(root, apk[1]))).size > 1_000_000);
   const automaticSync = await readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/AutomaticSync.kt"), "utf8");
   assert.match(automaticSync, /INTERVAL_MINUTES = 15L/);
+  assert.match(automaticSync, /service\.sync\(source, days = 7\)/);
   assert.match(automaticSync, /ExistingPeriodicWorkPolicy\.UPDATE/);
+});
+
+test("la pulsera recupera sesiones aunque Health Connect use otra fuente para los pasos", async () => {
+  const [bridge, app] = await Promise.all([
+    readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/HealthSyncService.kt"), "utf8"),
+    readFile(resolve(root, "assets/js/app.js"), "utf8")
+  ]);
+  assert.match(bridge, /readAll\(ExerciseSessionRecord::class, start, end\)/);
+  assert.match(bridge, /workout\.metadata\.dataOrigin\.packageName/);
+  assert.match(bridge, /dataOriginFilter = workoutOrigin/);
+  assert.match(app, /slice\(0, 8\)/);
 });
 
 test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async () => {

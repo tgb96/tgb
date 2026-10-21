@@ -96,7 +96,19 @@ class HealthSyncService(private val context: Context) {
             val packageName = record.metadata.dataOrigin.packageName
             packageName == sourcePackage || (isMiFitnessSource(sourcePackage) && isMiFitnessSource(packageName))
         }
-        val workouts = readAll(ExerciseSessionRecord::class, start, end, origin)
+        // ExerciseSessionRecord can arrive under a different Health Connect
+        // origin than steps or sleep, even when all data came from Mi Fitness.
+        // Read the sessions independently and keep the real origin of each one.
+        // If another app mirrored the same workout, prefer the selected source
+        // (or Mi Fitness) so TGTrain does not offer a duplicate link.
+        val workouts = readAll(ExerciseSessionRecord::class, start, end)
+            .groupBy { "${it.startTime}|${it.endTime}|${it.exerciseType}" }
+            .values
+            .map { copies ->
+                copies.firstOrNull { it.metadata.dataOrigin.packageName == sourcePackage }
+                    ?: copies.firstOrNull { isMiFitnessSource(it.metadata.dataOrigin.packageName) }
+                    ?: copies.first()
+            }
         val sleepByDay = sleepCandidates.groupBy { it.endTime.atZone(zone).toLocalDate() }
             .mapValues { (_, records) ->
                 records.groupBy { it.metadata.dataOrigin.packageName }.values.maxBy { sourceRecords ->
@@ -201,7 +213,9 @@ class HealthSyncService(private val context: Context) {
 
         for (workout in workouts) {
             if (!workout.endTime.isAfter(workout.startTime)) continue
-            val externalId = stableId(sourcePackage, workout.metadata.id)
+            val workoutPackage = workout.metadata.dataOrigin.packageName
+            val workoutOrigin = setOf(DataOrigin(workoutPackage))
+            val externalId = stableId(workoutPackage, workout.metadata.id)
             val details = hashMapOf<String, Any?>(
                 "id" to externalId,
                 "dateISO" to workout.startTime.atZone(zone).toLocalDate().toString(),
@@ -217,7 +231,7 @@ class HealthSyncService(private val context: Context) {
                 "heartRateMaxBpm" to null,
                 "heartRateMinBpm" to null,
                 "source" to "health_connect",
-                "originPackage" to sourcePackage,
+                "originPackage" to workoutPackage,
                 "syncedAt" to syncedAt
             )
             if (granted.contains(androidx.health.connect.client.permission.HealthPermission.getReadPermission(DistanceRecord::class))) {
@@ -225,7 +239,7 @@ class HealthSyncService(private val context: Context) {
                     AggregateRequest(
                         metrics = setOf(DistanceRecord.DISTANCE_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(workout.startTime, workout.endTime),
-                        dataOriginFilter = origin
+                        dataOriginFilter = workoutOrigin
                     )
                 )
                 distance[DistanceRecord.DISTANCE_TOTAL]?.let { details["distanceMeters"] = it.inMeters }
@@ -235,13 +249,13 @@ class HealthSyncService(private val context: Context) {
                     AggregateRequest(
                         metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(workout.startTime, workout.endTime),
-                        dataOriginFilter = origin
+                        dataOriginFilter = workoutOrigin
                     )
                 )
                 calories[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { details["caloriesKcal"] = it.inKilocalories }
             }
             if (heartRateGranted) {
-                val samples = readAll(HeartRateRecord::class, workout.startTime, workout.endTime, origin)
+                val samples = readAll(HeartRateRecord::class, workout.startTime, workout.endTime, workoutOrigin)
                     .flatMap { it.samples }
                     .filter { !it.time.isBefore(workout.startTime) && it.time.isBefore(workout.endTime) }
                 details["heartRateSampleCount"] = samples.size
