@@ -59,6 +59,24 @@ test("la hora manual de inicio prioriza la sesión correcta de la pulsera", () =
   assert.match(candidates[0].match.reason, /inicio muy cercana/);
 });
 
+test("tolera y explica el desfase de una hora de Mi Fitness tras el cambio horario", () => {
+  const timed = { ...manual, routineStartedAt: "2026-09-22T22:12:00Z", routineEndedAt: "2026-09-22T22:44:00Z" };
+  const staleClock = { ...band, startTime: "2026-09-22T23:12:00Z", endTime: "2026-09-22T23:44:00Z", durationSeconds: 1920 };
+  const candidate = wearableCandidates(timed, [staleClock])[0];
+  assert.equal(candidate.session.id, band.id);
+  assert.equal(candidate.match.timeAdjustmentMinutes, -60);
+  assert.match(candidate.match.reason, /desfase de 1 h/);
+  const snapshot = normalizeWearableSnapshot({ ...staleClock, clockAdjustmentMinutes: -60, clockAdjustmentReason: "mi_fitness_future_end_after_dst" });
+  assert.equal(snapshot.clockAdjustmentMinutes, -60);
+  assert.equal(snapshot.clockAdjustmentReason, "mi_fitness_future_end_after_dst");
+});
+
+test("no aplica corrección cuando los horarios ya coinciden", () => {
+  const candidate = wearableCandidates(manual, [band])[0];
+  assert.equal(candidate.match.timeAdjustmentMinutes, 0);
+  assert.equal(candidate.match.reason, "Horario coincidente");
+});
+
 test("una sesión completa de tenis no se ofrece para un calentamiento breve", () => {
   const warmup = { ...manual, category: "warmup", routineStartedAt: "", routineEndedAt: "",
     guidedStartedAt: "2026-09-22T14:00:00Z", guidedEndedAt: "2026-09-22T14:10:00Z",

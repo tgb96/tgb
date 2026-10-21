@@ -38,7 +38,7 @@ import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=95";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=69";
+import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -64,7 +64,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=72";
+} from "./utils.js?v=73";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -964,8 +964,9 @@ function renderWearableSyncStatus(message = "") {
   const when = new Date(status.syncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" });
   const todayCount = Number(status.workoutsToday) || 0;
   const total = Number(status.workoutsUploaded) || 0;
+  const adjusted = Number(status.workoutsClockAdjusted) || 0;
   output.textContent = todayCount > 0
-    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).`
+    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).${adjusted ? ` TGTrain corrigió el desfase horario de ${adjusted} sesión${adjusted === 1 ? "" : "es"} de Mi Fitness.` : ""}`
     : `Última lectura ${when}: TGTrain Sync funcionó, pero Health Connect entregó 0 entrenamientos de hoy. Abre Mi Fitness y comprueba que la sesión ya figure allí.${status.backgroundReadGranted ? " TGTrain Sync volverá a revisar automáticamente." : ""}`;
 }
 
@@ -995,7 +996,7 @@ async function refreshWearableAfterBridge(startedAt, knownSessionIds) {
         showToast(Number(fresh.status?.workoutsToday) > 0
           ? "El puente encontró el entrenamiento. Revisa si ya está vinculado o abre la bandeja de la pulsera."
           : fresh.status?.backgroundReadGranted
-            ? "El puente respondió, pero Health Connect todavía no entregó el entrenamiento. TGTrain Sync volverá a revisar automáticamente."
+            ? "El puente respondió, pero Health Connect todavía no entregó el entrenamiento. TGTrain Sync volverá a revisar a los 2, 8 y 20 minutos."
             : "El puente respondió, pero Health Connect todavía no entregó el entrenamiento de hoy.");
         button.disabled = false;
         return;
@@ -3338,11 +3339,16 @@ function renderWearable() {
     const details = document.createElement("span");
     const minutes = Math.round((Number(session.durationSeconds) || 0) / 60);
     const start = new Date(session.startTime);
-    const hour = Number.isFinite(start.getTime()) ? start.toLocaleTimeString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit" }) : "hora no disponible";
+    // New bridge versions already publish startTime corrected and preserve the
+    // original in rawStartTime. Only shift legacy cloud sessions here.
+    const legacyAdjustmentMinutes = session.rawStartTime ? 0 : Number(recommended?.match?.timeAdjustmentMinutes) || 0;
+    const displayStart = Number.isFinite(start.getTime()) ? new Date(start.getTime() + legacyAdjustmentMinutes * 60_000) : start;
+    const hour = Number.isFinite(displayStart.getTime()) ? displayStart.toLocaleTimeString("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit" }) : "hora no disponible";
     const distance = Number(session.distanceMeters) > 0 ? ` · ${(Number(session.distanceMeters) / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} km` : "";
     const calories = Number(session.caloriesKcal) > 0 ? ` · ${Math.round(Number(session.caloriesKcal))} kcal` : "";
     const bpm = Number(session.heartRateAvgBpm) > 0 ? ` · ${Math.round(Number(session.heartRateAvgBpm))} lpm media` : "";
-    details.textContent = `${formatShortDate(session.dateISO)} · ${hour} · ${minutes} min${distance}${calories}${bpm}`;
+    const correctedClock = Number(session.clockAdjustmentMinutes) || legacyAdjustmentMinutes ? " · hora corregida" : "";
+    details.textContent = `${formatShortDate(session.dateISO)} · ${hour}${correctedClock} · ${minutes} min${distance}${calories}${bpm}`;
     row.append(stateBadge, title, details);
     if (recommended) {
       const button = document.createElement("button");
@@ -5800,7 +5806,12 @@ function linkWearableSession(recordId, sessionId) {
   if (!record || !session || record.category === "rest") return showToast("No se encontró esta sesión de la pulsera.");
   if (repository.list().some(item => item.id !== recordId && item.wearableSessionId === sessionId))
     return showToast("Esta sesión de la pulsera ya está vinculada a otro entrenamiento.");
-  const snapshot = normalizeWearableSnapshot(session);
+  const match = wearableCandidates(record, [session], repository.list())[0]?.match;
+  const snapshot = normalizeWearableSnapshot({
+    ...session,
+    clockAdjustmentMinutes: Number(session.clockAdjustmentMinutes) || Number(match?.timeAdjustmentMinutes) || 0,
+    clockAdjustmentReason: session.clockAdjustmentReason || (match?.timeAdjustmentMinutes ? "matched_one_hour_dst_skew" : "")
+  });
   if (!snapshot) return showToast("Los datos de la pulsera están incompletos.");
   const updated = {
     ...record,

@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -44,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var permissionButton: Button
     private lateinit var scanButton: Button
     private lateinit var syncButton: Button
+    private lateinit var timeSettingsButton: Button
     private lateinit var signOutButton: Button
     private var sources: List<String> = emptyList()
     private var busy = false
@@ -152,6 +154,11 @@ class MainActivity : ComponentActivity() {
         status = text("Preparando conexión…", 13f, Color.DKGRAY)
         status.setPadding(0, dp(18), 0, 0)
         card.addView(status)
+        timeSettingsButton = action("Corregir hora del teléfono") {
+            startActivity(Intent(Settings.ACTION_DATE_SETTINGS))
+        }
+        timeSettingsButton.visibility = View.GONE
+        card.addView(timeSettingsButton)
 
         signOutButton = action("Cerrar sesión") {
             auth.signOut()
@@ -248,6 +255,8 @@ class MainActivity : ComponentActivity() {
                 if (report.workoutsToday == 0 && report.backgroundReadGranted) {
                     AutomaticSync.scheduleRecovery(this@MainActivity)
                 }
+                timeSettingsButton.visibility = if (report.deviceOffsetMinutes == report.chileOffsetMinutes)
+                    View.GONE else View.VISIBLE
                 val heartRateStatus = when {
                     !report.heartRateGranted -> "Las LPM no están autorizadas; pulsa Permitir acceso para incluirlas."
                     report.sessionsWithHeartRate == 0 -> "Mi Fitness no compartió LPM para estas sesiones."
@@ -260,13 +269,17 @@ class MainActivity : ComponentActivity() {
                 }
                 val workoutStatus = when {
                     report.workoutsToday > 0 -> "Health Connect entregó ${report.workoutsToday} entrenamiento(s) de hoy."
-                    report.backgroundReadGranted -> "Health Connect todavía entregó 0 entrenamientos de hoy; programé otra revisión automática en 2 minutos."
+                    report.backgroundReadGranted -> "Health Connect todavía entregó 0 entrenamientos de hoy; programé revisiones automáticas en 2, 8 y 20 minutos."
                     else -> "Health Connect todavía entregó 0 entrenamientos de hoy. Abre Mi Fitness y vuelve a sincronizar; el acceso en segundo plano permitiría reintentarlo automáticamente."
+                }
+                val clockStatus = buildString {
+                    if (report.workoutsClockAdjusted > 0) append(" Corregí el desfase horario de una hora detectado en ${report.workoutsClockAdjusted} sesión(es) de Mi Fitness.")
+                    if (report.deviceOffsetMinutes != report.chileOffsetMinutes) append(" La zona del teléfono (${report.deviceZoneId}, UTC${offsetLabel(report.deviceOffsetMinutes)}) no coincide con Chile (UTC${offsetLabel(report.chileOffsetMinutes)}); pulsa Corregir hora del teléfono.")
                 }
                 status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $workoutStatus " +
                     (if (report.workouts == 0) "No hay ninguna sesión de ejercicio en los últimos ${report.days} días disponible para TGTrain. " else "") +
                     (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
-                    "$sleepDetailStatus $heartRateStatus Abre TGTrain para verlos."
+                    "$sleepDetailStatus $heartRateStatus$clockStatus Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo sincronizar: ${error.localizedMessage}"
             } finally { setBusy(false) }
@@ -284,6 +297,12 @@ class MainActivity : ComponentActivity() {
             return
         }
         syncNow()
+    }
+
+    private fun offsetLabel(minutes: Int): String {
+        val sign = if (minutes >= 0) "+" else "-"
+        val absolute = kotlin.math.abs(minutes)
+        return "$sign${absolute / 60}:${(absolute % 60).toString().padStart(2, '0')}"
     }
 
     private fun maybeSyncOnOpen() {

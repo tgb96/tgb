@@ -19,6 +19,7 @@ object AutomaticSync {
     private const val JOB_NAME = "tgtrain_health_connect_sync"
     private const val RECOVERY_JOB_NAME = "tgtrain_health_connect_recovery"
     const val INTERVAL_MINUTES = 15L
+    private val RECOVERY_DELAYS_MINUTES = listOf(2L, 8L, 20L)
 
     suspend fun refresh(context: Context) {
         val service = HealthSyncService(context)
@@ -41,15 +42,18 @@ object AutomaticSync {
     }
 
     fun scheduleRecovery(context: Context) {
-        val request = OneTimeWorkRequestBuilder<HealthSyncWorker>()
-            .setInitialDelay(2, TimeUnit.MINUTES)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            RECOVERY_JOB_NAME,
-            ExistingWorkPolicy.REPLACE,
-            request
-        )
+        val manager = WorkManager.getInstance(context)
+        RECOVERY_DELAYS_MINUTES.forEach { delay ->
+            val request = OneTimeWorkRequestBuilder<HealthSyncWorker>()
+                .setInitialDelay(delay, TimeUnit.MINUTES)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            manager.enqueueUniqueWork(
+                "${RECOVERY_JOB_NAME}_$delay",
+                ExistingWorkPolicy.REPLACE,
+                request
+            )
+        }
     }
 }
 

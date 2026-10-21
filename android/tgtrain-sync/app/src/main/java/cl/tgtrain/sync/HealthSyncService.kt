@@ -25,6 +25,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.abs
 import java.util.Locale
 import kotlin.reflect.KClass
 import kotlinx.coroutines.tasks.await
@@ -32,7 +33,10 @@ import kotlinx.coroutines.tasks.await
 /** Health Connect is read-only here. Nothing is inserted into the training log. */
 class HealthSyncService(private val context: Context) {
     private val client get() = HealthConnectClient.getOrCreate(context)
-    private val zone get() = ZoneId.systemDefault()
+    // TGTrain belongs to a user in Chile. A fixed regional zone keeps the
+    // calendar aligned with Chilean DST even if Android was left on a fixed
+    // GMT offset after a clock change.
+    private val zone = ZoneId.of("America/Santiago")
 
     val backgroundReadAvailable: Boolean
         get() = client.features.getFeatureStatus(
@@ -110,6 +114,7 @@ class HealthSyncService(private val context: Context) {
                     ?: copies.firstOrNull { isMiFitnessSource(it.metadata.dataOrigin.packageName) }
                     ?: copies.first()
             }
+        val normalizedWorkouts = workouts.map { workout -> workout to normalizedWorkoutTime(workout) }
         val sleepByDay = sleepCandidates.groupBy { it.endTime.atZone(zone).toLocalDate() }
             .mapValues { (_, records) ->
                 records.groupBy { it.metadata.dataOrigin.packageName }.values.maxBy { sourceRecords ->
@@ -212,16 +217,16 @@ class HealthSyncService(private val context: Context) {
             )
         }
 
-        for (workout in workouts) {
+        for ((workout, normalizedTime) in normalizedWorkouts) {
             if (!workout.endTime.isAfter(workout.startTime)) continue
             val workoutPackage = workout.metadata.dataOrigin.packageName
             val workoutOrigin = setOf(DataOrigin(workoutPackage))
             val externalId = stableId(workoutPackage, workout.metadata.id)
             val details = hashMapOf<String, Any?>(
                 "id" to externalId,
-                "dateISO" to workout.startTime.atZone(zone).toLocalDate().toString(),
-                "startTime" to workout.startTime.toString(),
-                "endTime" to workout.endTime.toString(),
+                "dateISO" to normalizedTime.start.atZone(zone).toLocalDate().toString(),
+                "startTime" to normalizedTime.start.toString(),
+                "endTime" to normalizedTime.end.toString(),
                 "durationSeconds" to Duration.between(workout.startTime, workout.endTime).seconds,
                 "exerciseType" to workout.exerciseType,
                 "title" to exerciseTitle(workout.exerciseType),
@@ -233,6 +238,12 @@ class HealthSyncService(private val context: Context) {
                 "heartRateMinBpm" to null,
                 "source" to "health_connect",
                 "originPackage" to workoutPackage,
+                "rawStartTime" to workout.startTime.toString(),
+                "rawEndTime" to workout.endTime.toString(),
+                "recordedStartZoneOffset" to workout.startZoneOffset?.toString(),
+                "recordedEndZoneOffset" to workout.endZoneOffset?.toString(),
+                "clockAdjustmentMinutes" to normalizedTime.adjustmentMinutes,
+                "clockAdjustmentReason" to normalizedTime.reason,
                 "syncedAt" to syncedAt
             )
             if (granted.contains(androidx.health.connect.client.permission.HealthPermission.getReadPermission(DistanceRecord::class))) {
@@ -275,9 +286,14 @@ class HealthSyncService(private val context: Context) {
                 SetOptions.merge()
             )
         }
-        val workoutsToday = workouts.count { it.startTime.atZone(zone).toLocalDate() == today }
-        val newestWorkout = workouts.maxByOrNull { it.startTime }
+        val workoutsToday = normalizedWorkouts.count { (_, time) -> time.start.atZone(zone).toLocalDate() == today }
+        val newestWorkout = normalizedWorkouts.maxByOrNull { (_, time) -> time.start }
+        val adjustedWorkouts = normalizedWorkouts.count { (_, time) -> time.adjustmentMinutes != 0 }
         val workoutOrigins = workoutRecords.groupingBy { it.metadata.dataOrigin.packageName }.eachCount()
+        val deviceZone = ZoneId.systemDefault()
+        val now = Instant.now()
+        val deviceOffsetMinutes = deviceZone.rules.getOffset(now).totalSeconds / 60
+        val chileOffsetMinutes = zone.rules.getOffset(now).totalSeconds / 60
         batch.set(
             firestore.collection("users").document(uid).collection("wearableSyncStatus")
                 .document("latest"),
@@ -289,10 +305,16 @@ class HealthSyncService(private val context: Context) {
                 "exerciseRecordsRead" to workoutRecords.size,
                 "workoutsUploaded" to workouts.size,
                 "workoutsToday" to workoutsToday,
-                "newestWorkoutStartTime" to newestWorkout?.startTime?.toString(),
-                "newestWorkoutEndTime" to newestWorkout?.endTime?.toString(),
-                "newestWorkoutTitle" to newestWorkout?.let { exerciseTitle(it.exerciseType) },
+                "workoutsClockAdjusted" to adjustedWorkouts,
+                "newestWorkoutStartTime" to newestWorkout?.second?.start?.toString(),
+                "newestWorkoutEndTime" to newestWorkout?.second?.end?.toString(),
+                "newestWorkoutTitle" to newestWorkout?.first?.let { exerciseTitle(it.exerciseType) },
                 "workoutOrigins" to workoutOrigins,
+                "syncZoneId" to zone.id,
+                "deviceZoneId" to deviceZone.id,
+                "deviceOffsetMinutes" to deviceOffsetMinutes,
+                "chileOffsetMinutes" to chileOffsetMinutes,
+                "deviceTimeZoneMatchesChile" to (deviceOffsetMinutes == chileOffsetMinutes),
                 "backgroundReadGranted" to granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
             ),
             SetOptions.merge()
@@ -304,13 +326,55 @@ class HealthSyncService(private val context: Context) {
             sleepSessionsWithStages,
             workouts.size,
             workoutsToday,
-            newestWorkout?.startTime?.toString(),
+            newestWorkout?.second?.start?.toString(),
             workoutRecords.size,
+            adjustedWorkouts,
             sessionsWithHeartRate,
             heartRateSamples,
             heartRateGranted,
             granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND),
+            deviceZone.id,
+            deviceOffsetMinutes,
+            chileOffsetMinutes,
             syncedAt
+        )
+    }
+
+    /**
+     * Mi Fitness has been observed publishing a completed session one hour in
+     * the future after the Chilean DST change. Health Connect stores instants,
+     * so blindly subtracting an hour forever would break the next clock change.
+     * Correct only when the record itself contains evidence of the stale offset:
+     * a one-hour zone-offset mismatch, or an end time that was already in the
+     * future when Health Connect last modified the completed record.
+     */
+    private fun normalizedWorkoutTime(workout: ExerciseSessionRecord): WorkoutTime {
+        val origin = workout.metadata.dataOrigin.packageName
+        if (!isMiFitnessSource(origin)) return WorkoutTime(workout.startTime, workout.endTime)
+
+        val expectedStartOffset = zone.rules.getOffset(workout.startTime).totalSeconds
+        val expectedEndOffset = zone.rules.getOffset(workout.endTime).totalSeconds
+        val startOffsetDelta = workout.startZoneOffset?.totalSeconds?.minus(expectedStartOffset)
+        val endOffsetDelta = workout.endZoneOffset?.totalSeconds?.minus(expectedEndOffset)
+        val futureAtWriteSeconds = Duration.between(workout.metadata.lastModifiedTime, workout.endTime).seconds
+
+        val adjustmentSeconds = when {
+            startOffsetDelta != null && startOffsetDelta == endOffsetDelta && abs(startOffsetDelta) == 3600 ->
+                startOffsetDelta.toLong()
+            futureAtWriteSeconds in 120..4500 -> -3600L
+            else -> 0L
+        }
+        val reason = when {
+            adjustmentSeconds == 0L -> ""
+            startOffsetDelta != null && startOffsetDelta == endOffsetDelta && abs(startOffsetDelta) == 3600 ->
+                "mi_fitness_stale_zone_offset"
+            else -> "mi_fitness_future_end_after_dst"
+        }
+        return WorkoutTime(
+            workout.startTime.plusSeconds(adjustmentSeconds),
+            workout.endTime.plusSeconds(adjustmentSeconds),
+            (adjustmentSeconds / 60).toInt(),
+            reason
         )
     }
 
@@ -374,6 +438,13 @@ class HealthSyncService(private val context: Context) {
     }
 }
 
+private data class WorkoutTime(
+    val start: Instant,
+    val end: Instant,
+    val adjustmentMinutes: Int = 0,
+    val reason: String = ""
+)
+
 data class SyncReport(
     val days: Int,
     val sleepSessions: Int,
@@ -382,9 +453,13 @@ data class SyncReport(
     val workoutsToday: Int,
     val newestWorkoutStartTime: String?,
     val exerciseRecordsRead: Int,
+    val workoutsClockAdjusted: Int,
     val sessionsWithHeartRate: Int,
     val heartRateSamples: Int,
     val heartRateGranted: Boolean,
     val backgroundReadGranted: Boolean,
+    val deviceZoneId: String,
+    val deviceOffsetMinutes: Int,
+    val chileOffsetMinutes: Int,
     val syncedAt: String
 )

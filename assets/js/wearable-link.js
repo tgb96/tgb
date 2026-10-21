@@ -15,6 +15,11 @@ export function normalizeWearableSnapshot(value) {
     dateISO: String(value.dateISO || "").slice(0, 10),
     startTime: String(value.startTime || ""),
     endTime: String(value.endTime || ""),
+    rawStartTime: String(value.rawStartTime || ""),
+    rawEndTime: String(value.rawEndTime || ""),
+    clockAdjustmentMinutes: numberOrNull(value.clockAdjustmentMinutes) === null
+      ? 0 : Math.max(-120, Math.min(120, Number(value.clockAdjustmentMinutes))),
+    clockAdjustmentReason: String(value.clockAdjustmentReason || "").slice(0, 100),
     durationSeconds: numeric("durationSeconds"),
     activeCaloriesKcal: numeric("caloriesKcal") ?? numeric("activeCaloriesKcal"),
     distanceMeters: numeric("distanceMeters"),
@@ -42,7 +47,10 @@ export function wearableMatch(record, session) {
   if (!record || record.category === "rest" || !session?.id) return null;
   const own = recordWindow(record);
   const band = sessionWindow(session);
-  const overlaps = own && band && Math.min(own.end, band.end) > Math.max(own.start, band.start);
+  const overlaps = own && band && [0, -60, 60].some(minutes => {
+    const shift = minutes * 60_000;
+    return Math.min(own.end, band.end + shift) > Math.max(own.start, band.start + shift);
+  });
   if (session.dateISO !== record.dateISO && !overlaps) return null;
   const recordedSeconds = numberOrNull(record.durationSeconds) ?? (numberOrNull(record.durationMinutes) || 0) * 60;
   const bandSeconds = numberOrNull(session.durationSeconds) || 0;
@@ -60,15 +68,27 @@ export function wearableMatch(record, session) {
           : record.cardioTypeId?.startsWith("bik") ? /bicicleta/.test(title) : false;
   let score = (sameType ? 20 : 0) + Math.round((1 - durationDifference) * 20);
   let reason = "Mismo día; confirma que sea la misma actividad";
+  let timeAdjustmentMinutes = numberOrNull(session.clockAdjustmentMinutes) || 0;
   if (own && band) {
-    const overlap = Math.max(0, Math.min(own.end, band.end) - Math.max(own.start, band.start));
     const shorter = Math.min(own.end - own.start, band.end - band.start);
-    if (overlap / shorter >= 0.5) {
-      score += 100 + Math.round(40 * overlap / shorter);
-      reason = "Horario coincidente";
-    } else if (Math.abs(own.start - band.start) <= 10 * 60_000) {
+    const alignments = [0, -60, 60].map(minutes => {
+      const shift = minutes * 60_000;
+      const overlap = Math.max(0, Math.min(own.end, band.end + shift) - Math.max(own.start, band.start + shift));
+      return { minutes, overlap, startDifference: Math.abs(own.start - (band.start + shift)) };
+    }).sort((a, b) => b.overlap - a.overlap || a.startDifference - b.startDifference);
+    const best = alignments[0];
+    if (best.overlap / shorter >= 0.5) {
+      score += 100 + Math.round(40 * best.overlap / shorter);
+      timeAdjustmentMinutes = best.minutes || timeAdjustmentMinutes;
+      reason = best.minutes
+        ? "Horario coincidente corrigiendo desfase de 1 h de Mi Fitness"
+        : "Horario coincidente";
+    } else if (best.startDifference <= 10 * 60_000) {
       score += 65;
-      reason = "Inicio cercano; revisa el término";
+      timeAdjustmentMinutes = best.minutes || timeAdjustmentMinutes;
+      reason = best.minutes
+        ? "Inicio cercano corrigiendo desfase de 1 h de Mi Fitness"
+        : "Inicio cercano; revisa el término";
     } else {
       score -= 30;
       reason = "Horarios distintos; revisa antes de vincular";
@@ -77,13 +97,28 @@ export function wearableMatch(record, session) {
     const bandLocal = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(band.start));
     const [recordHour, recordMinute] = record.activityStartTime.split(":").map(Number);
     const [bandHour, bandMinute] = bandLocal.split(":").map(Number);
-    const rawDifference = Math.abs((recordHour * 60 + recordMinute) - (bandHour * 60 + bandMinute));
-    const difference = Math.min(rawDifference, 1440 - rawDifference);
-    if (difference <= 10) { score += 85; reason = "Hora de inicio muy cercana"; }
-    else if (difference <= 30) { score += 45; reason = "Hora de inicio cercana"; }
+    const minuteDistance = (left, right) => {
+      const raw = Math.abs(left - right);
+      return Math.min(raw, 1440 - raw);
+    };
+    const manualMinutes = recordHour * 60 + recordMinute;
+    const bandMinutes = bandHour * 60 + bandMinute;
+    const best = [0, -60, 60].map(minutes => ({ minutes, difference: minuteDistance(manualMinutes, (bandMinutes + minutes + 1440) % 1440) }))
+      .sort((a, b) => a.difference - b.difference)[0];
+    const difference = best.difference;
+    if (difference <= 10) {
+      score += 85;
+      timeAdjustmentMinutes = best.minutes || timeAdjustmentMinutes;
+      reason = best.minutes ? "Hora coincidente corrigiendo desfase de 1 h de Mi Fitness" : "Hora de inicio muy cercana";
+    }
+    else if (difference <= 30) {
+      score += 45;
+      timeAdjustmentMinutes = best.minutes || timeAdjustmentMinutes;
+      reason = best.minutes ? "Hora cercana corrigiendo desfase de 1 h de Mi Fitness" : "Hora de inicio cercana";
+    }
     else if (difference > 120) { score -= 25; reason = "Hora de inicio distinta; revisa antes de vincular"; }
   }
-  return { score, reason };
+  return { score, reason, timeAdjustmentMinutes };
 }
 
 export function wearableCandidates(record, sessions, records = []) {
