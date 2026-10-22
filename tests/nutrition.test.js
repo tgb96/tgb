@@ -74,7 +74,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   );
   assert.ok(Object.values(foodCatalog).every(food => food.portion));
   assert.ok(Object.values(foodCatalog).every(food => Number.isFinite(food.kcal)));
-  assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 2);
+  assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 3);
   assert.equal(foodCatalog.avocado.portion, "1 porción normal · aprox. 50 g");
   assert.equal(foodCatalog.avocadoHalf.portion, "½ porción · 25 g");
   assert.equal(isSelectableFood("avocadoHalf"), false);
@@ -86,6 +86,13 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
     { name: foodCatalog.cerealBar.name, portion: foodCatalog.cerealBar.portion, kcal: foodCatalog.cerealBar.kcal, proteinG: foodCatalog.cerealBar.proteinG, carbsG: foodCatalog.cerealBar.carbsG, fatG: foodCatalog.cerealBar.fatG, source: foodCatalog.cerealBar.source },
     { name: "Costa Cereal Bar Nuts", portion: "1 barrita · 30 g", kcal: 151, proteinG: 3.6, carbsG: 16, fatG: 8.9, source: "label" }
   );
+  assert.deepEqual(
+    { name: foodCatalog.premiumSausage.name, portion: foodCatalog.premiumSausage.portion, kcal: foodCatalog.premiumSausage.kcal, proteinG: foodCatalog.premiumSausage.proteinG, carbsG: foodCatalog.premiumSausage.carbsG, fatG: foodCatalog.premiumSausage.fatG, source: foodCatalog.premiumSausage.source },
+    { name: "Salchicha premium Receta del Abuelo", portion: "1 unidad · 50 g", kcal: 135, proteinG: 7.4, carbsG: 0.4, fatG: 11.6, source: "label" }
+  );
+  assert.deepEqual(estimateParts({ premiumSausage: 2 }),
+    { caloriesKcal: 270, proteinG: 14.8, carbsG: 0.8, fatG: 23.2 });
+  assert.equal(summarizeParts({ premiumSausage: 2 }), "2 salchichas premium");
   assert.deepEqual(estimateParts({ mandarin: 1 }),
     { caloriesKcal: 47, proteinG: 0.7, carbsG: 12, fatG: 0.3 });
   assert.equal(summarizeParts({ mandarin: 1 }), "mandarina");
@@ -113,6 +120,9 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(foodsForSlot("snack").some(food => food.id === "mandarin"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "mandarin"));
   assert.ok(foodsForSlot("dinner").some(food => food.id === "mandarin"));
+  assert.ok(foodsForSlot("breakfast").some(food => food.id === "premiumSausage"));
+  assert.ok(foodsForSlot("lunch").some(food => food.id === "premiumSausage"));
+  assert.ok(foodsForSlot("dinner").some(food => food.id === "premiumSausage"));
   assert.ok(foodsForSlot("snack").some(food => food.id === "cerealBar"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
