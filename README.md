@@ -2,6 +2,8 @@
 
 La integración personal con Xiaomi Smart Band mediante Health Connect está en [TGTrain Sync para Android](android/tgtrain-sync/README.md). [Descarga el APK instalable](downloads/tgtrain-sync-0.6.5.apk), inicia sesión con la misma cuenta de TGTrain y sincroniza desde la app puente. Los datos aparecen en Inicio y puedes vincular cada sesión de la pulsera con el entrenamiento manual correspondiente desde Historial, sin duplicarlo. La versión 0.6.5 intenta actualizar los datos cada 15 minutos con el permiso de segundo plano de Health Connect, también al abrir la app puente, y trae duración, fases, LPM y oxígeno nocturno cuando Mi Fitness los publica. Además usa las reglas horarias de Santiago y corrige el desfase de una hora que Mi Fitness puede conservar después del cambio horario tanto en entrenamientos como en sueño, sin alterar duraciones ni métricas. También vuelve a buscar sesiones demoradas a los 2, 8 y 20 minutos. Para registros manuales de cardio o tenis, una hora aproximada de inicio opcional ayuda a encontrar la sesión correcta. La vinculación siempre requiere confirmación.
 
+La conversación con el entrenador puede conservar durante 24–48 horas un contexto de recuperación cuando el usuario informa una salida con alcohol. La duración depende de la cantidad y el horario declarados; modifica la recomendación diaria, bloquea progresiones durante la ventana activa y se incorpora a los comentarios de entrenamiento y nutrición. Nunca cambia el calendario sin confirmación y el contexto vence automáticamente.
+
 PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, organizada por semanas ISO de lunes a domingo y preparada para sincronizar el historial mediante una cuenta de Google.
 
 ## Experiencia principal

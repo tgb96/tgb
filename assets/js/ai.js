@@ -143,6 +143,20 @@ const coachQuestionSchema = {
     answer: stringSchema,
     hasPlanAdjustment: { type: "boolean" },
     hasRecordAdjustment: { type: "boolean" },
+    hasRecoveryContext: { type: "boolean" },
+    recoveryContext: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["alcohol"] },
+        eventDateISO: stringSchema,
+        endDateISO: stringSchema,
+        endTime: stringSchema,
+        alcoholAmount: { type: "string", enum: ["low", "moderate", "high", "unknown"] },
+        symptoms: { type: "string", enum: ["none", "mild", "strong", "unknown"] },
+        summary: stringSchema
+      },
+      required: ["kind", "eventDateISO", "endDateISO", "endTime", "alcoholAmount", "symptoms", "summary"]
+    },
     planAdjustment: {
       type: "object",
       properties: {
@@ -181,7 +195,7 @@ const coachQuestionSchema = {
       required: ["targetRecordId", "targetDateISO", "expectedUpdatedAt", "title", "reason", "restTypeId", "restDetail", "sensationsAppend", "routineEffort", "routinePain", "routinePainDetail", "activityStartTime"]
     }
   },
-  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment"]
+  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment", "hasRecoveryContext"]
 };
 
 const coachInsightSchema = {
@@ -347,10 +361,13 @@ export function createAiClient() {
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
         "Integra entrenamiento, comidas registradas, hidratación, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
+        "Si el usuario informa que bebió alcohol o salió de noche, devuelve hasRecoveryContext=true y recoveryContext. Resuelve expresiones relativas usando todayISO: eventDateISO es el día en que comenzó la salida y endDateISO/endTime indican cuándo terminó; por ejemplo, sábado hasta las 05:00 termina el domingo. alcoholAmount solo puede reflejar lo que el usuario dijo: poco=low, moderado=moderate, harto/mucho=high y sin cantidad=unknown. symptoms también debe basarse en lo informado, sin inventarlos. La app calculará una influencia de 24 a 48 horas según cantidad y horario.",
+        "Durante una ventana de recuperación por alcohol evita progresiones y relaciona prudentemente hidratación, sueño, coordinación y recuperación. No sugieras sudar, café ni más alcohol como forma de acelerar la recuperación. Si hay mareos, vómitos, palpitaciones, confusión, dolor importante o incapacidad para hidratarse, recomienda no entrenar y buscar orientación médica según la gravedad. Mantén un tono neutral, sin moralizar.",
         "No inventes una calidad de sueño ni un diagnóstico nutricional. Indica cuando las comidas o los macros estén incompletos y usa los rangos del plan como orientación, no como prescripción clínica.",
         "No modifiques registros ni planificación por tu cuenta. La aplicación siempre pedirá confirmación.",
         "Si el usuario corrige o completa un hecho de una actividad ya registrada, devuelve hasRecordAdjustment=true y una sola recordAdjustment. Usa exclusivamente el recordId, dateISO y recordUpdatedAt exactos de recentActivities. Solo completa los campos que realmente cambian y deja los demás como cadena vacía. No cambies el tipo de actividad ni inventes otro registro. Para lluvia u otra imposibilidad climática en un descanso usa restTypeId weather y explica el motivo en restDetail. sensationsAppend agrega contexto sin borrar las sensaciones existentes. routineEffort admite 1–10, routinePain 0–10 y activityStartTime HH:MM.",
         "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
+        "Un recoveryContext no modifica por sí solo el calendario. Si afecta una sesión prevista dentro de las siguientes 48 horas, puedes proponer un planAdjustment más suave para una sola fecha, siempre sujeto a confirmación. Si no hay fecha planificada relevante, explica cómo regular la sesión y no inventes un cambio.",
         "El calendario competitivo incluido en el contexto es la fuente común para entrenamiento y nutrición. Un evento calendarStatus=scheduled es un partido confirmado para planificar; likely-suspended, suspended y pending no deben contarse como carga competitiva hasta que Open Tennis o el usuario confirme que se jugará. Mantén una alternativa suave o descanso y no compenses una suspensión con carga excesiva.",
         "Si la lluvia impide el tenis, no propongas descanso automáticamente. Revisa primero equipment, lo realizado en las últimas 24–48 horas, sueño, molestias y el próximo partido. Si la recuperación lo permite, prioriza una alternativa suave bajo techo usando solo implementos disponibles: físico reducido, bicicleta estática, core, movilidad o técnica sin cancha. Evita repetir el grupo muscular trabajado el día anterior y evita piernas pesadas o pliometría cerca de un partido. Propón descanso solo si los datos de recuperación, dolor o carga realmente lo justifican, y explica por qué.",
         "Cuando propongas una rutina física adaptada, usa exerciseSettings para bajar series, carga o repeticiones y para omitir ejercicios incompatibles con el objetivo del día. No incluyas ejercicios ajenos a la rutina elegida ni implementos que no figuren en equipment. Si la disponibilidad no está clara, dilo en la respuesta y pide actualizar los implementos antes de confirmar.",
@@ -369,6 +386,7 @@ export function createAiClient() {
         answer,
         planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null,
         recordAdjustment: response.hasRecordAdjustment ? response.recordAdjustment : null,
+        recoveryContext: response.hasRecoveryContext ? response.recoveryContext : null,
         model: MODEL_NAME
       };
     },
@@ -378,6 +396,7 @@ export function createAiClient() {
         "Evalúa exclusivamente el día entregado y relaciona comidas, kcal, proteína, carbohidratos, grasas, agua, entrenamiento, plan, sueño y pulsera cuando existan.",
         "Distingue datos completos, parciales y ausentes. Las porciones y calorías son estimaciones: no inventes alimentos, cantidades, macros ni gasto energético.",
         "No restes calorías activas de la pulsera a la ingesta. No diagnostiques ni prescribas una dieta clínica. Si los registros son parciales, comenta solo lo observado.",
+        "Si recoveryContext está activo, considéralo para recuperación, hidratación y regularidad de comidas sin moralizar, sin inventar síntomas y sin afirmar que una comida, café o suplemento acelera la eliminación del alcohol.",
         "Usa 2 o 3 secciones breves: Lo positivo, Ajustes prácticos y Próximo paso. Da sugerencias realistas para energía, recuperación y tenis.",
         "Termina con una frase positiva sobria, sin exagerar ni culpabilizar. Responde en español claro."
       ].join("\n");
@@ -464,6 +483,7 @@ export function createAiClient() {
         "Si hay wearable vinculado, integra solo sus LPM y kcal activas disponibles con el volumen, series, duración y sensaciones del registro manual. Cita la fuente y distingue kcal activas estimadas de kcal anotadas; jamás las sumes. Si faltan muestras de LPM, dilo sin inventar media ni máxima. No inventes zonas cardíacas ni FC máxima personal.",
         "Compara tendencias de LPM solo entre actividades realmente comparables y con datos suficientes; la FC en fuerza depende también de descansos y condiciones del día. Usa sueño, sus fases, oxígeno y pasos como contexto de recuperación, no como prueba causal ni diagnóstico. Las fases y el oxígeno de la pulsera son estimaciones y pueden faltar aunque exista duración. El dolor y las molestias reportadas prevalecen sobre una métrica favorable de la pulsera.",
         "Integra nutritionContext cuando exista: comidas, kcal y macros registrados, hidratación y rangos del plan. No inventes alimentos ni completes totales faltantes; no restes kcal de la pulsera a la ingesta. Solo comenta la relación práctica con energía y recuperación, sin diagnóstico ni prescripción clínica.",
+        "Si recoveryContext está activo, proviene de una salida y consumo de alcohol informados por el usuario. Relaciónalo con sus sensaciones, sueño y horario sin atribuirle síntomas no reportados. Durante esa ventana no propongas progresar cargas aunque progressionEvidence indique progress: elige maintain, reduce o recover según la intensidad del contexto y cómo se sintió realmente. No presentes café, sudar ni entrenar fuerte como una forma de acelerar la recuperación.",
         "Compara el resultado real con currentPlan cuando exista, incluso si se registró desde Registrar. Distingue entre objetivo planificado y actividad realizada; no afirmes cumplimiento total solo porque coincida el tipo de actividad.",
         "Si current.metricsPending=true, la persona registró la actividad sin repetir las métricas que medirá su reloj: no la trates como una sesión incompleta ni inventes duración, distancia o calorías; indica que la evaluación cuantitativa queda pendiente hasta vincular la pulsera.",
         "Devuelve planComparison: completed solo si la actividad actual cubre el objetivo previsto con evidencia suficiente; partial si falta parte; adapted si se cambió la rutina, distancia, intensidad o carga y se explica su relación con el objetivo; recovery para descanso sustitutivo; different si no cubre el objetivo; unknown si no hay plan o faltan datos. No confundir descansar con incumplir: puede ser una adaptación responsable, sin afirmar que era el descanso planificado.",
@@ -506,6 +526,7 @@ export function createAiClient() {
           recentTrainingLoad: Array.isArray(context.recentTrainingLoad) ? context.recentTrainingLoad.slice(-20) : [],
           wearableContext: context.wearableContext || null,
           nutritionContext: context.nutritionContext || null,
+          recoveryContext: context.recoveryContext || null,
           next48Hours: Array.isArray(context.next48Hours) ? context.next48Hours.slice(0, 6) : [],
           progressionEvidence: context.progressionEvidence || null,
           progressionFollowUp: context.progressionFollowUp || null,

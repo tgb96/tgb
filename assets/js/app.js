@@ -26,16 +26,17 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=99";
+import { createRepository } from "./storage.js?v=100";
 import { createCloudSync } from "./cloud.js?v=75";
 import { createNutritionUI } from "./nutrition-ui.js?v=98";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=100";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=101";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
-import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=95";
+import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
+import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
@@ -1093,6 +1094,12 @@ function coachEquipmentSummary() {
   return selected.length ? selected.join(" · ") : "Revisa tus implementos disponibles antes de pedir otra alternativa.";
 }
 
+function recoveryContextDescription(context) {
+  const amount = { low: "poco alcohol", moderate: "consumo moderado", high: "consumo alto", unknown: "cantidad no precisada" }[context?.alcoholAmount] || "cantidad no precisada";
+  const timing = context?.endTime ? `Terminó ${formatShortDate(context.endDateISO)} a las ${context.endTime}.` : `Terminó ${formatShortDate(context?.endDateISO)}.`;
+  return `${amount[0].toUpperCase()}${amount.slice(1)} · ${timing} Se considerará durante ${context?.recoveryHours || 24} horas.`;
+}
+
 function requestCoveredPlanAlternative(item) {
   if (coachQuestionInFlight) return;
   const adjustment = item.planAdjustment;
@@ -1151,6 +1158,18 @@ function renderCoachQuestions() {
     answer.className = "coach-exchange-answer";
     answer.textContent = item.answer || "Sin respuesta todavía. Pulsa Reintentar cuando tengas conexión.";
     exchange.append(question, answer);
+    if (item.recoveryContext) {
+      const recovery = document.createElement("div");
+      recovery.className = "coach-plan-proposal recovery-context";
+      const heading = document.createElement("strong");
+      heading.textContent = "Contexto de recuperación guardado";
+      const detail = document.createElement("span");
+      detail.textContent = recoveryContextDescription(item.recoveryContext);
+      const note = document.createElement("small");
+      note.textContent = "Influirá en la recomendación diaria y en las evaluaciones, pero no cambiará el calendario sin tu confirmación.";
+      recovery.append(heading, detail, note);
+      exchange.append(recovery);
+    }
     if (item.recordAdjustment) {
       const proposal = document.createElement("div");
       proposal.className = `coach-plan-proposal coach-record-proposal ${item.recordAdjustmentStatus || "pending"}`;
@@ -1354,6 +1373,7 @@ async function requestNutritionAnalysis(dateISO) {
       nutrition: nutritionDayForCoach(dateISO),
       activities: activities.map(record => routineForAi(record)).slice(0, 8),
       wearable: dayData ? wearableDayForCoach(dayData) : null,
+      recoveryContext: strongestRecoveryImpact(recoveryContextsFromQuestions(repository.listCoachQuestions()), dateISO),
       previousDays: [2, 1].map(offset => nutritionDayForCoach(addDaysISO(dateISO, -offset)))
     });
     const previous = repository.getNutritionEntry(`nutrition-analysis-${dateISO}`);
@@ -1688,6 +1708,7 @@ function coachQuestionContext() {
   const latest = records.filter(record => record.routineAiAnalysis)
     .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
       .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
+  const recoveryContexts = recoveryContextsFromQuestions(repository.listCoachQuestions());
   return {
     todayISO,
     coachProfile: String(repository.getCoachProfile()?.profileText || "").slice(0, 14000),
@@ -1703,6 +1724,8 @@ function coachQuestionContext() {
       today: nutritionDayForCoach(todayISO, block),
       tomorrow: nutritionDayForCoach(addDaysISO(todayISO, 1), block)
     },
+    recoveryContexts: recoveryContexts.slice(0, 8),
+    activeRecovery: strongestRecoveryImpact(recoveryContexts, todayISO),
     latestAnalysis: latest ? {
       activity: recordTitle(latest),
       dateISO: latest.dateISO,
@@ -1756,8 +1779,10 @@ async function submitCoachQuestion(existing = null) {
       adjustmentStatus: result.planAdjustment ? "pending" : "",
       recordAdjustment: result.recordAdjustment,
       recordAdjustmentStatus: result.recordAdjustment ? "pending" : "",
+      recoveryContext: result.recoveryContext,
       updatedAt: new Date().toISOString()
     });
+    if (result.recoveryContext) renderHome();
     if (!existing) input.value = "";
     $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
   } catch (error) {
@@ -1784,7 +1809,8 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     matchWithinDays: upcomingMatchOffset ?? null,
     records,
     wearableDays: wearableData.days,
-    nutritionEntries: repository.listNutritionEntries()
+    nutritionEntries: repository.listNutritionEntries(),
+    recoveryContexts: recoveryContextsFromQuestions(repository.listCoachQuestions())
   });
   $("dailyBriefTitle").textContent = brief.title;
   $("dailyBriefSummary").textContent = brief.summary;
@@ -3906,8 +3932,10 @@ function routineAiContext(record) {
     rules: block.rules || []
   } : null;
   const lastNight = wearableData.days.find(day => day.dateISO === record.dateISO && Number(day.sleepMinutes) > 0);
+  const recoveryContext = strongestRecoveryImpact(recoveryContextsFromQuestions(repository.listCoachQuestions()), record.dateISO);
   return {
     coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan, progressionEvidence, progressionFollowUp: appliedProgressionFollowUp,
+    recoveryContext,
     nutritionContext: {
       activityDay: nutritionDayForCoach(record.dateISO, block),
       previousDay: nutritionDayForCoach(addDaysISO(record.dateISO, -1), block)
@@ -3948,16 +3976,19 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
     const result = await aiClient.analyzeRoutine(routineForAi(record), recentRecords, planDetails, context);
     const analysis = result?.analysis || result;
     const checkedChanges = record.category === "physical" ? sanitizeProgressionChanges(analysis?.changes, context.progressionEvidence) : [];
-    const suggestedChanges = checkedChanges.length || analysis?.decision !== "progress"
+    const recoveryDecision = context.recoveryContext?.adaptation === "recover" ? "recover"
+      : context.recoveryContext ? "reduce" : "";
+    const effectiveDecision = recoveryDecision || analysis?.decision;
+    const suggestedChanges = checkedChanges.length || effectiveDecision !== "progress"
       ? checkedChanges
       : fallbackProgressionChanges(context.progressionEvidence);
     const concreteChanges = suggestedChanges.filter(change => change.action === "increase"
-      ? analysis?.decision === "progress"
-      : ["reduce", "recover"].includes(analysis?.decision));
+      ? effectiveDecision === "progress"
+      : ["reduce", "recover"].includes(effectiveDecision));
     const evidenceDecision = context.progressionEvidence?.readiness;
-    const safeDecision = record.category === "physical" && ["maintain", "reduce", "recover"].includes(evidenceDecision)
+    const safeDecision = recoveryDecision || (record.category === "physical" && ["maintain", "reduce", "recover"].includes(evidenceDecision)
       ? evidenceDecision
-      : analysis?.decision;
+      : analysis?.decision);
     const latest = repository.get(record.id);
     if (!latest || latest.updatedAt !== record.updatedAt) throw new Error("El registro cambió durante el análisis. Vuelve a analizarlo para incluir sus últimos comentarios.");
     repository.upsert({
@@ -3980,6 +4011,7 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
           stalledExercises: context.progressionEvidence.exercises.filter(exercise => exercise.stalled).map(exercise => exercise.exerciseName)
         } : null,
         progressionFollowUp: context.progressionFollowUp,
+        recoveryContext: context.recoveryContext,
         status: concreteChanges.length ? "pending" : "reviewed",
         planContext: context.currentPlan ? {
           blockId: context.currentPlan.blockId,

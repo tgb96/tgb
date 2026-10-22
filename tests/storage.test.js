@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 15/);
+  assert.match(repository.backup(), /"schemaVersion": 16/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -188,6 +188,26 @@ test("guarda preguntas de la guía, permite reintentar y las incluye en el respa
   const restored = createRepository(new FakeStorage());
   restored.importMerge(repository.backup());
   assert.equal(restored.listCoachQuestions()[0].planAdjustment.nutritionMode, "tennisLight");
+});
+
+test("conserva el contexto de recuperación informado al entrenador", () => {
+  const storage = new FakeStorage();
+  const repository = createRepository(storage);
+  repository.saveCoachQuestion({
+    id: "q-recovery",
+    question: "El sábado tomé harto hasta las cinco de la mañana",
+    answer: "Bajaremos la exigencia durante la recuperación.",
+    recoveryContext: {
+      kind: "alcohol", eventDateISO: "2026-10-24", endDateISO: "2026-10-25", endTime: "05:00",
+      alcoholAmount: "high", symptoms: "unknown", summary: "Salida larga informada."
+    },
+    createdAt: "2026-10-25T12:00:00Z",
+    updatedAt: "2026-10-25T12:00:00Z"
+  });
+  const saved = createRepository(storage).listCoachQuestions()[0].recoveryContext;
+  assert.equal(saved.recoveryHours, 48);
+  assert.equal(saved.endDateISO, "2026-10-25");
+  assert.match(repository.backup(), /recoveryContext/);
 });
 
 test("limpiar preguntas deja marcas de borrado para que no reaparezcan desde la nube", () => {

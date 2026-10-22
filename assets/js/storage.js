@@ -2,11 +2,12 @@ import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=73
 import { normalizeTrainingBlocks } from "./training-plan.js?v=99";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
 import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
+import { normalizeRecoveryContext } from "./recovery-context.js?v=100";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 function parseJSON(value, fallback) {
   try {
@@ -145,6 +146,7 @@ export function normalizeCoachQuestions(value) {
       answer: String(item?.answer || "").trim().slice(0, 6000),
       deleted: Boolean(item?.deleted),
       source: item?.source === "voice" ? "voice" : "text",
+      recoveryContext: normalizeRecoveryContext(item?.recoveryContext),
       planAdjustment,
       recordAdjustment,
       adjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.adjustmentStatus)

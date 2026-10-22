@@ -64,6 +64,25 @@ test("el centro diario distingue datos parciales y resume alimentación", () => 
   assert.match(brief.signals.join(" "), /no compartió sueño/i);
 });
 
+test("el centro diario baja la exigencia después de una salida informada", () => {
+  const brief = dailyBrief({
+    dateISO: "2026-10-25",
+    planTitle: "Día 1 · Piernas",
+    planCategory: "physical",
+    records: [],
+    wearableDays: [{ dateISO: "2026-10-25", sleepMinutes: 450 }],
+    recoveryContexts: [{
+      kind: "alcohol", eventDateISO: "2026-10-24", endDateISO: "2026-10-25", endTime: "05:00",
+      alcoholAmount: "high", symptoms: "unknown"
+    }]
+  });
+  assert.equal(brief.adaptation, "recover");
+  assert.equal(brief.recoveryContext.recoveryHours, 48);
+  assert.match(brief.label, /salida/i);
+  assert.match(brief.summary, /No progreses cargas/i);
+  assert.match(brief.signals.join(" "), /05:00/);
+});
+
 test("el resumen móvil usa una ventana exacta de cuatro semanas", () => {
   const summary = rollingFourWeekSummary([
     { dateISO: "2026-09-28", category: "tennis", durationMinutes: 60 },

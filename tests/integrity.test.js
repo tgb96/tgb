@@ -314,6 +314,8 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   ]);
   assert.match(ai, /hasPlanAdjustment/);
   assert.match(ai, /hasRecordAdjustment/);
+  assert.match(ai, /hasRecoveryContext/);
+  assert.match(ai, /alcoholAmount/);
   assert.match(ai, /restTypeId weather/);
   assert.match(ai, /no propongas descanso automáticamente/);
   assert.match(ai, /exerciseSettings para bajar series/);
@@ -328,6 +330,8 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /Proponer opción cubierta/);
   assert.match(app, /COACH_EQUIPMENT_OPTIONS/);
   assert.match(app, /sleepStagesMinutes/);
+  assert.match(app, /strongestRecoveryImpact/);
+  assert.match(app, /Contexto de recuperación guardado/);
   assert.match(html, /wearableSleepDetails/);
   assert.match(html, /coachEquipmentChoices/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
@@ -442,7 +446,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=109/);
+  assert.match(html, /assets\/js\/app\.js\?v=110/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

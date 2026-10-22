@@ -1,9 +1,11 @@
+import { strongestRecoveryImpact } from "./recovery-context.js?v=100";
+
 const dateValue = value => Date.parse(`${value}T12:00:00Z`);
 const daysBetween = (from, to) => Math.round((dateValue(to) - dateValue(from)) / 86400000);
 const durationMinutes = record => Math.round((Number(record?.durationSeconds) || Number(record?.durationMinutes) * 60 || 0) / 60);
 const painScore = record => Math.max(Number(record?.routinePain) || 0, Number(record?.guidedPainScore) || 0);
 
-export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWithinDays = null, records = [], wearableDays = [], nutritionEntries = [] } = {}) {
+export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWithinDays = null, records = [], wearableDays = [], nutritionEntries = [], recoveryContexts = [] } = {}) {
   const recent = records.filter(record => {
     const age = daysBetween(record.dateISO, dateISO);
     return age >= 0 && age <= 3 && !["warmup", "stretching"].includes(record.category);
@@ -21,6 +23,7 @@ export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWi
   const meals = todayNutrition.filter(entry => entry.kind === "meal").length;
   const waterMl = todayNutrition.filter(entry => entry.kind === "water")
     .reduce((total, entry) => total + (Number(entry.amountMl) || 0), 0);
+  const recovery = strongestRecoveryImpact(recoveryContexts, dateISO);
 
   let tone = "neutral";
   let label = "Contexto parcial";
@@ -64,6 +67,18 @@ export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWi
     label = "Carga reciente alta";
     title = "Conserva el objetivo y baja volumen";
   }
+  if (recovery && highestPain < 5) {
+    if (recovery.adaptation === "recover") {
+      tone = "recover";
+      label = recovery.label;
+      title = recovery.title;
+    } else if (tone !== "recover") {
+      tone = "caution";
+      label = recovery.label;
+      title = recovery.title;
+    }
+    signals.unshift(recovery.signal);
+  }
   if (matchWithinDays !== null && matchWithinDays >= 0 && matchWithinDays <= 2 && ["neutral", "ready"].includes(tone)) {
     tone = "neutral";
     label = "Proteger el próximo partido";
@@ -74,7 +89,9 @@ export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWi
   if (todayRecords.length) signals.push(`${todayRecords.length} actividad${todayRecords.length === 1 ? "" : "es"} principal${todayRecords.length === 1 ? "" : "es"} registrada${todayRecords.length === 1 ? "" : "s"} hoy.`);
   if (meals || waterMl) signals.push(`Nutrición de hoy: ${meals} comida${meals === 1 ? "" : "s"} y ${(waterMl / 1000).toLocaleString("es-CL")} L de agua anotados.`);
 
-  const summary = tone === "recover"
+  const summary = recovery && highestPain < 5
+    ? recovery.summary
+    : tone === "recover"
     ? "No progreses cargas hoy. Prefiere descanso, movilidad suave o una alternativa sin dolor y vuelve a evaluar tus sensaciones."
     : tone === "caution"
       ? planCategory === "physical"
@@ -91,7 +108,8 @@ export function dailyBrief({ dateISO, planTitle = "", planCategory = "", matchWi
     hasTodayActivity: todayRecords.length > 0,
     adaptation: tone === "recover" ? "recover" : tone === "caution" ? "reduce" : "maintain",
     recentLoadMinutes,
-    demandingSessions: demandingSessions.length
+    demandingSessions: demandingSessions.length,
+    recoveryContext: recovery
   };
 }
 
