@@ -42,7 +42,7 @@ export const defaultFoodCatalog = {
   tomato: food("Tomate", "1 porción · aprox. ½ unidad (60 g)", 11, 0.5, 2.4, 0.1),
   crackers: food("Galletas de agua", "1 porción · aprox. 30 g", 120, 2, 23, 2),
   honey: food("Miel", "1 cucharadita · aprox. 7 g", 21, 0, 5.7, 0),
-  cerealBar: food("Barra de cereal", "1 unidad · aprox. 35 g", 140, 2, 25, 4)
+  cerealBar: food("Costa Cereal Bar Nuts", "1 barrita · 30 g", 151, 3.6, 16, 8.9, "label")
 };
 
 export const foodCatalog = {};
@@ -95,7 +95,7 @@ export const isSelectableFood = id => Boolean(foodCatalog[id]) && !foodCatalog[i
 configureFoodCatalog();
 
 const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
-const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
+const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "cerealBar", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {

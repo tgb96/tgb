@@ -70,13 +70,17 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(foodCatalog.semiIntegralArtisanBread.portion, "1 rebanada · aprox. 45 g");
   assert.ok(Object.values(foodCatalog).every(food => food.portion));
   assert.ok(Object.values(foodCatalog).every(food => Number.isFinite(food.kcal)));
-  assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 1);
+  assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 2);
   assert.equal(foodCatalog.avocado.portion, "1 porción normal · aprox. 50 g");
   assert.equal(foodCatalog.avocadoHalf.portion, "½ porción · 25 g");
   assert.equal(isSelectableFood("avocadoHalf"), false);
   assert.deepEqual(
     { name: foodCatalog.rice.name, portion: foodCatalog.rice.portion, kcal: foodCatalog.rice.kcal, proteinG: foodCatalog.rice.proteinG, carbsG: foodCatalog.rice.carbsG, fatG: foodCatalog.rice.fatG, source: foodCatalog.rice.source },
     { name: "Arroz blanco", portion: "1 porción habitual · 151 g", kcal: 196, proteinG: 4.1, carbsG: 42.5, fatG: 0.4, source: "measured" }
+  );
+  assert.deepEqual(
+    { name: foodCatalog.cerealBar.name, portion: foodCatalog.cerealBar.portion, kcal: foodCatalog.cerealBar.kcal, proteinG: foodCatalog.cerealBar.proteinG, carbsG: foodCatalog.cerealBar.carbsG, fatG: foodCatalog.cerealBar.fatG, source: foodCatalog.cerealBar.source },
+    { name: "Costa Cereal Bar Nuts", portion: "1 barrita · 30 g", kcal: 151, proteinG: 3.6, carbsG: 16, fatG: 8.9, source: "label" }
   );
   assert.equal(foodCatalog.arepa, undefined);
   assert.equal(foodCatalog.tuna, undefined);
@@ -98,6 +102,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
   assert.ok(!foodsForSlot("breakfast").some(food => food.id === "avocadoHalf"));
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "semiIntegralArtisanBread"));
+  assert.ok(foodsForSlot("snack").some(food => food.id === "cerealBar"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
   assert.ok(!foodsForSlot("lunch").some(food => food.name.includes("Atún")));
