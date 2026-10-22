@@ -76,7 +76,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(isSelectableFood("avocadoHalf"), false);
   assert.deepEqual(
     { name: foodCatalog.rice.name, portion: foodCatalog.rice.portion, kcal: foodCatalog.rice.kcal, proteinG: foodCatalog.rice.proteinG, carbsG: foodCatalog.rice.carbsG, fatG: foodCatalog.rice.fatG, source: foodCatalog.rice.source },
-    { name: "Arroz blanco", portion: "1 porción habitual · 151 g", kcal: 196, proteinG: 4.1, carbsG: 42.5, fatG: 0.4, source: "measured" }
+    { name: "Arroz blanco", portion: "1 porción habitual · 200 g cocidos", kcal: 260, proteinG: 5.4, carbsG: 56.3, fatG: 0.5, source: "measured" }
   );
   assert.deepEqual(
     { name: foodCatalog.cerealBar.name, portion: foodCatalog.cerealBar.portion, kcal: foodCatalog.cerealBar.kcal, proteinG: foodCatalog.cerealBar.proteinG, carbsG: foodCatalog.cerealBar.carbsG, fatG: foodCatalog.cerealBar.fatG, source: foodCatalog.cerealBar.source },
@@ -95,7 +95,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(summarizeParts({ integralBread: 1, avocadoHalf: 1 }),
     "1 rebanada de pan integral con ½ porción de palta");
   assert.deepEqual(estimateParts({ rice: 0.5, beef: 1.5 }),
-    { caloriesKcal: 398, proteinG: 42.6, carbsG: 21.3, fatG: 15.2 });
+    { caloriesKcal: 430, proteinG: 43.2, carbsG: 28.2, fatG: 15.3 });
   assert.equal(summarizeParts({ rice: 0.5, beef: 1.5 }),
     "½ porción de arroz blanco · 1½ porciones de carne de vacuno");
   assert.match(describeParts({ rice: 0.5 }), /^½ × arroz blanco/);
