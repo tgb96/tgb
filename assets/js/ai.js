@@ -246,6 +246,20 @@ const mealPhotoSchema = {
   required: ["summary", "portionNotes", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence", "catalogParts"]
 };
 
+const foodNutritionSchema = {
+  type: "object",
+  properties: {
+    portion: stringSchema,
+    caloriesKcal: { type: "number" },
+    proteinG: { type: "number" },
+    carbsG: { type: "number" },
+    fatG: { type: "number" },
+    confidence: { type: "string", enum: ["low", "medium", "high"] },
+    notes: stringSchema
+  },
+  required: ["portion", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence", "notes"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -312,6 +326,45 @@ export function createAiClient() {
   }
 
   return {
+    async estimateFoodNutrition(name, context = {}) {
+      const foodName = String(name || "").trim().slice(0, 100);
+      if (foodName.length < 2) throw new Error("Escribe el nombre del alimento antes de consultar a Gemini.");
+      const portionHint = String(context.portionHint || "").trim().slice(0, 160);
+      const instructions = [
+        "Eres el asistente del catálogo nutricional personal de TGTrain. Estima una porción común y sus macronutrientes de forma orientativa.",
+        "Responde para exactamente un alimento y una porción completa. Las cifras corresponden a esa porción, nunca automáticamente a 100 g.",
+        "Si portionHint está presente, respétala y calcula para esa cantidad. Si falta, elige una porción doméstica común en Chile e incluye su peso o volumen comestible aproximado en portion.",
+        "Usa valores medios genéricos de referencias nutricionales habituales. No inventes una marca, una etiqueta, una receta ni ingredientes que el nombre no especifique.",
+        "Si la preparación cambia mucho el resultado o el nombre es ambiguo, elige la interpretación más común y explica brevemente el supuesto en notes.",
+        "caloriesKcal, proteinG, carbsG y fatG deben ser números no negativos y coherentes entre sí. Redondea las kcal a una cifra práctica y los macros a una decimal.",
+        "Este resultado es un borrador editable, no una medición ni una indicación clínica. Responde en español claro y conciso."
+      ].join("\n");
+      const estimate = await generateJson({
+        instructions,
+        input: JSON.stringify({ foodName, portionHint }),
+        schema: foodNutritionSchema,
+        maxOutputTokens: 650
+      });
+      const portion = String(estimate?.portion || "").trim().slice(0, 160);
+      if (!portion) throw new Error("Gemini no pudo proponer una porción utilizable. Agrega una cantidad y vuelve a intentarlo.");
+      const cleanMetric = (key, maximum) => {
+        const value = Number(estimate?.[key]);
+        if (!Number.isFinite(value) || value < 0 || value > maximum) throw new Error("Gemini devolvió cifras incompletas. Vuelve a intentarlo o ingrésalas manualmente.");
+        return Math.round(value * 10) / 10;
+      };
+      return {
+        estimate: {
+          portion,
+          caloriesKcal: cleanMetric("caloriesKcal", 5000),
+          proteinG: cleanMetric("proteinG", 1000),
+          carbsG: cleanMetric("carbsG", 1000),
+          fatG: cleanMetric("fatG", 1000),
+          confidence: ["low", "medium", "high"].includes(estimate?.confidence) ? estimate.confidence : "low",
+          notes: String(estimate?.notes || "").trim().slice(0, 400)
+        },
+        model: MODEL_NAME
+      };
+    },
     async analyzeMealPhoto(file, context = {}) {
       if (!(file instanceof File)) throw new Error("Selecciona una foto de la comida.");
       if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) throw new Error("Usa una foto JPG, PNG o WebP.");

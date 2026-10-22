@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=103";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=104";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
 
@@ -16,7 +16,8 @@ export function createNutritionUI(repository, {
   getNutritionInsight = () => null,
   analyzeNutritionDay = () => {},
   isNutritionAnalysisLoading = () => false,
-  analyzeMealPhoto = null
+  analyzeMealPhoto = null,
+  estimateFoodNutrition = null
 } = {}) {
   let selectedDate = getChileDateISO();
   let editingId = "";
@@ -26,6 +27,8 @@ export function createNutritionUI(repository, {
   let selectedPhotoFile = null;
   let photoAnalysisLoading = false;
   let editingFoodId = "";
+  let foodEstimateLoading = false;
+  let foodDraftSource = "";
   const dialog = byId("nutritionEntryDialog");
   const foodManagerDialog = byId("nutritionFoodManagerDialog");
 
@@ -35,16 +38,28 @@ export function createNutritionUI(repository, {
 
   function hideFoodForm() {
     editingFoodId = "";
+    foodDraftSource = "";
     const form = byId("nutritionFoodForm");
     form.reset();
     form.hidden = true;
     form.classList.add("hidden");
     byId("nutritionFoodFormMessage").classList.add("hidden");
+    const aiButton = byId("nutritionFoodAiEstimate");
+    aiButton.disabled = false;
+    aiButton.textContent = "Completar porción y macros con IA";
+  }
+
+  function setFoodFormMessage(message = "", state = "") {
+    const element = byId("nutritionFoodFormMessage");
+    element.textContent = message;
+    element.dataset.state = state;
+    element.classList.toggle("hidden", !message);
   }
 
   function editFood(id = "") {
     editingFoodId = id;
     const item = id ? foodCatalog[id] : null;
+    foodDraftSource = item?.source === "ai-average" ? "ai-average" : "";
     const form = byId("nutritionFoodForm");
     form.hidden = false;
     form.classList.remove("hidden");
@@ -60,7 +75,7 @@ export function createNutritionUI(repository, {
     const hasOverride = Boolean(id && defaultFoodCatalog[id] && repository.getNutritionFood(id) && !repository.getNutritionFood(id).deleted);
     reset.hidden = !hasOverride;
     reset.classList.toggle("hidden", !hasOverride);
-    byId("nutritionFoodFormMessage").classList.add("hidden");
+    setFoodFormMessage();
     byId("nutritionFoodName").focus();
     form.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
@@ -82,7 +97,7 @@ export function createNutritionUI(repository, {
       const copy = document.createElement("div"); copy.className = "nutrition-food-manager-copy";
       const name = document.createElement("strong"); name.textContent = `${item.name}${item.hidden ? " · oculto" : ""}`;
       const detail = document.createElement("small");
-      detail.textContent = `${item.portion} · ${item.source === "label" || item.source === "measured" ? "" : "≈ "}${item.kcal} kcal · ${item.proteinG} g proteína`;
+      detail.textContent = `${item.portion} · ${item.source === "label" || item.source === "measured" ? "" : "≈ "}${item.kcal} kcal · ${item.proteinG} g proteína${item.source === "ai-average" ? " · estimación IA" : ""}`;
       copy.append(name, detail);
       const actions = document.createElement("div"); actions.className = "nutrition-food-manager-actions";
       const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Editar";
@@ -112,6 +127,50 @@ export function createNutritionUI(repository, {
     showToast(item.hidden ? `${item.name} volvió a aparecer en los registros.` : `${item.name} quedó oculto para registros nuevos.`);
   }
 
+  async function completeFoodWithAi() {
+    if (foodEstimateLoading) return;
+    const name = byId("nutritionFoodName").value.trim();
+    if (name.length < 2) {
+      setFoodFormMessage("Escribe primero el nombre del alimento.", "error");
+      byId("nutritionFoodName").focus();
+      return;
+    }
+    if (typeof estimateFoodNutrition !== "function") {
+      setFoodFormMessage("El cálculo con IA requiere iniciar sesión y tener Gemini configurado.", "error");
+      return;
+    }
+    const button = byId("nutritionFoodAiEstimate");
+    foodEstimateLoading = true;
+    button.disabled = true;
+    button.textContent = "Consultando a Gemini…";
+    setFoodFormMessage("Buscando una porción promedio y preparando un borrador editable…", "loading");
+    try {
+      const result = await estimateFoodNutrition(name, { portionHint: byId("nutritionFoodPortion").value.trim() });
+      const estimate = result?.estimate || result;
+      const fields = [
+        ["nutritionFoodCalories", "caloriesKcal"],
+        ["nutritionFoodProtein", "proteinG"],
+        ["nutritionFoodCarbs", "carbsG"],
+        ["nutritionFoodFat", "fatG"]
+      ];
+      if (!String(estimate?.portion || "").trim() || fields.some(([, key]) => !Number.isFinite(Number(estimate?.[key])))) {
+        throw new Error("La IA no devolvió una estimación completa. Vuelve a intentarlo o completa los campos manualmente.");
+      }
+      byId("nutritionFoodPortion").value = String(estimate.portion).trim();
+      fields.forEach(([field, key]) => { byId(field).value = Number(estimate[key]); });
+      byId("nutritionFoodVerified").checked = false;
+      foodDraftSource = "ai-average";
+      const confidence = ({ high: "alta", medium: "media", low: "baja" })[estimate.confidence] || "no indicada";
+      setFoodFormMessage(`Borrador de Gemini listo · confianza ${confidence}.${estimate.notes ? ` ${estimate.notes}` : ""} Revisa la porción y las cifras antes de guardar.`, "ready");
+    } catch (error) {
+      setFoodFormMessage(error?.message || "No fue posible estimar este alimento.", "error");
+    } finally {
+      foodEstimateLoading = false;
+      button.disabled = false;
+      button.textContent = "Volver a calcular con IA";
+    }
+  }
+
   function saveFood(event) {
     event.preventDefault();
     const form = byId("nutritionFoodForm");
@@ -132,7 +191,7 @@ export function createNutritionUI(repository, {
         id, name, portion: byId("nutritionFoodPortion").value.trim(),
         kcal: Number(byId("nutritionFoodCalories").value), proteinG: Number(byId("nutritionFoodProtein").value),
         carbsG: Number(byId("nutritionFoodCarbs").value), fatG: Number(byId("nutritionFoodFat").value),
-        source: byId("nutritionFoodVerified").checked ? (current?.source === "measured" ? "measured" : "label") : "custom",
+        source: byId("nutritionFoodVerified").checked ? (current?.source === "measured" ? "measured" : "label") : (foodDraftSource === "ai-average" ? "ai-average" : "custom"),
         hidden: Boolean(current?.hidden), builtIn: Boolean(defaultFoodCatalog[id]), deleted: false,
         createdAt: previous?.createdAt || now, updatedAt: now
       });
@@ -666,6 +725,7 @@ export function createNutritionUI(repository, {
     byId("nutritionFoodManagerSearch").addEventListener("input", renderFoodManagerList);
     byId("nutritionFoodNewButton").addEventListener("click", () => editFood());
     byId("nutritionFoodFormCancel").addEventListener("click", hideFoodForm);
+    byId("nutritionFoodAiEstimate").addEventListener("click", completeFoodWithAi);
     byId("nutritionFoodReset").addEventListener("click", resetFood);
     byId("nutritionFoodForm").addEventListener("submit", saveFood);
     byId("nutritionCoachButton").addEventListener("click", () => analyzeNutritionDay(selectedDate));

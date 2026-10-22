@@ -155,8 +155,11 @@ test("el administrador permite crear, editar, ocultar y respaldar alimentos", ()
   const createdAt = "2026-10-22T12:00:00.000Z";
   repository.saveNutritionFood({ id: "customLentils", name: "Lentejas caseras", portion: "1 taza · 180 g", kcal: 230,
     proteinG: 18, carbsG: 40, fatG: 1, source: "custom", createdAt, updatedAt: createdAt });
+  repository.saveNutritionFood({ id: "customOrange", name: "Naranja", portion: "1 unidad mediana · 130 g comestibles", kcal: 62,
+    proteinG: 1.2, carbsG: 15.4, fatG: 0.2, source: "ai-average", createdAt, updatedAt: createdAt });
   configureFoodCatalog(repository.listNutritionFoods({ includeDeleted: true }));
   assert.equal(foodCatalog.customLentils.name, "Lentejas caseras");
+  assert.equal(foodCatalog.customOrange.source, "ai-average");
   assert.ok(foodsForSlot("lunch").some(item => item.id === "customLentils"));
   assert.deepEqual(estimateParts({ customLentils: 2 }), { caloriesKcal: 460, proteinG: 36, carbsG: 80, fatG: 2 });
   repository.saveNutritionFood({ ...repository.getNutritionFood("customLentils"), hidden: true, updatedAt: "2026-10-22T12:05:00.000Z" });
@@ -165,6 +168,7 @@ test("el administrador permite crear, editar, ocultar y respaldar alimentos", ()
   const restored = createRepository(memoryStorage());
   restored.importMerge(repository.backup());
   assert.equal(restored.getNutritionFood("customLentils").hidden, true);
+  assert.equal(restored.getNutritionFood("customOrange").source, "ai-average");
   configureFoodCatalog();
 });
 

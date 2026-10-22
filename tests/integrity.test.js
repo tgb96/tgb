@@ -290,7 +290,9 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
     assert.match(html, new RegExp(`id="${id}"`), `Falta el control ${id}`);
   }
   assert.match(html, /id="nutritionFoodManagerButton"/);
+  assert.match(html, /id="nutritionFoodAiEstimate"/);
   assert.match(ui, /saveNutritionFood/);
+  assert.match(ui, /estimateFoodNutrition/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
@@ -304,6 +306,8 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   const firebase = JSON.parse(await readFile(resolve(root, "firebase.json"), "utf8"));
   assert.match(ai, /firebase-ai\.js/);
   assert.match(ai, /firebase-app-check\.js/);
+  assert.match(ai, /async estimateFoodNutrition\(name, context/);
+  assert.match(ai, /foodNutritionSchema/);
   assert.match(ai, /ReCaptchaEnterpriseProvider/);
   assert.match(ai, /6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9/);
   assert.match(ai, /useResponseSchema: false/);
@@ -460,7 +464,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=122/);
+  assert.match(html, /assets\/js\/app\.js\?v=123/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

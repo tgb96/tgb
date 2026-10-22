@@ -72,7 +72,7 @@ export function normalizeNutritionFoods(value) {
     }
     return [[id, {
       id, name, portion, ...metrics,
-      source: ["label", "measured", "generic", "custom"].includes(item?.source) ? item.source : "custom",
+      source: ["label", "measured", "generic", "custom", "ai-average"].includes(item?.source) ? item.source : "custom",
       hidden: Boolean(item?.hidden), builtIn, deleted: false, createdAt, updatedAt
     }]];
   }));
