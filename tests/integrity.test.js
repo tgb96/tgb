@@ -293,6 +293,7 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.match(ui, /saveNutritionFood/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
+  assert.match(ui, /name\.textContent = item\.name/);
   assert.match(ui, /configureFoodCatalog/);
   assert.match(cloud, /nutritionFoodsCollectionReference/);
   assert.match(cloud, /observeCloudNutritionFoods/);
@@ -459,7 +460,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=118/);
+  assert.match(html, /assets\/js\/app\.js\?v=119/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

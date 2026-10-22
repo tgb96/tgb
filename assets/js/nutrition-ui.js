@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=99";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=100";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
 
@@ -305,7 +305,7 @@ export function createNutritionUI(repository, {
     if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
-      const name = document.createElement("strong"); name.textContent = `${item.name}  +1`;
+      const name = document.createElement("strong"); name.textContent = item.name;
       const detail = document.createElement("small"); detail.textContent = `${item.portion} · ${item.source === "label" ? "" : "≈ "}${item.kcal} kcal`;
       button.append(name, detail);
       button.addEventListener("click", () => changePart(item.id, 1));
