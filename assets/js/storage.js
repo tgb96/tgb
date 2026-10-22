@@ -1,13 +1,13 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=73";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=99";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
-import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
+import { describeParts, normalizeNutritionFoods, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=95";
 import { normalizeRecoveryContext } from "./recovery-context.js?v=100";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 function parseJSON(value, fallback) {
   try {
@@ -178,15 +178,16 @@ export function loadData(storage) {
     coachProfile: normalizeCoachProfile(current.coachProfile),
     coachQuestions: normalizeCoachQuestions(current.coachQuestions),
     nutritionEntries: normalizeNutritionEntries(current.nutritionEntries),
+    nutritionFoods: normalizeNutritionFoods(current.nutritionFoods),
     migrated: false,
     sourceKey: DATA_KEY
   };
 
   const previous = parseJSON(storage.getItem(PREVIOUS_DATA_KEY), null);
-  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
+  if (previous && Array.isArray(previous.records)) return { schemaVersion: SCHEMA_VERSION, records: ensureIds(previous.records), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, nutritionFoods: {}, migrated: true, sourceKey: PREVIOUS_DATA_KEY };
 
   const legacy = parseJSON(storage.getItem(LEGACY_HISTORY_KEY), []);
-  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
+  return { schemaVersion: SCHEMA_VERSION, records: ensureIds(Array.isArray(legacy) ? legacy : []), plans: {}, trainingBlocks: {}, coachProfile: null, coachQuestions: {}, nutritionEntries: {}, nutritionFoods: {}, migrated: true, sourceKey: LEGACY_HISTORY_KEY };
 }
 
 export function saveData(storage, data) {
@@ -197,7 +198,8 @@ export function saveData(storage, data) {
     trainingBlocks: normalizeTrainingBlocks(data.trainingBlocks),
     coachProfile: normalizeCoachProfile(data.coachProfile),
     coachQuestions: normalizeCoachQuestions(data.coachQuestions),
-    nutritionEntries: normalizeNutritionEntries(data.nutritionEntries)
+    nutritionEntries: normalizeNutritionEntries(data.nutritionEntries),
+    nutritionFoods: normalizeNutritionFoods(data.nutritionFoods)
   };
   try {
     storage.setItem(DATA_KEY, JSON.stringify(payload));
@@ -232,8 +234,8 @@ export function createRepository(storage) {
     }
   }
 
-  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks, coachProfile = state.coachProfile, coachQuestions = state.coachQuestions, nutritionEntries = state.nutritionEntries } = {}) => {
-    state = { ...saveData(storage, { records, plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries }), migrated: false, sourceKey: DATA_KEY };
+  const persist = ({ records = state.records, plans = state.plans, trainingBlocks = state.trainingBlocks, coachProfile = state.coachProfile, coachQuestions = state.coachQuestions, nutritionEntries = state.nutritionEntries, nutritionFoods = state.nutritionFoods } = {}) => {
+    state = { ...saveData(storage, { records, plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries, nutritionFoods }), migrated: false, sourceKey: DATA_KEY };
     return state;
   };
 
@@ -280,6 +282,7 @@ export function createRepository(storage) {
       const incomingProfile = normalizeCoachProfile(backup?.coachProfile);
       const incomingQuestions = normalizeCoachQuestions(backup?.coachQuestions);
       const incomingNutrition = normalizeNutritionEntries(backup?.nutritionEntries);
+      const incomingFoods = normalizeNutritionFoods(backup?.nutritionFoods);
       const merged = new Map(state.records.map(record => [record.id, record]));
       incoming.forEach(record => merged.set(record.id, record));
       const plans = { ...state.plans };
@@ -320,13 +323,23 @@ export function createRepository(storage) {
           appliedNutrition.push(entry);
         }
       });
-      persist({ records: [...merged.values()], plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries });
+      const nutritionFoods = { ...state.nutritionFoods };
+      const appliedFoods = [];
+      Object.values(incomingFoods).forEach(food => {
+        const current = nutritionFoods[food.id];
+        if (!current || recordTimestamp(food) >= recordTimestamp(current)) {
+          nutritionFoods[food.id] = food;
+          appliedFoods.push(food);
+        }
+      });
+      persist({ records: [...merged.values()], plans, trainingBlocks, coachProfile, coachQuestions, nutritionEntries, nutritionFoods });
       incoming.forEach(record => notify({ type: "upsert", record }));
       appliedPlans.forEach(plan => notify({ type: "plan-upsert", plan }));
       appliedBlocks.forEach(block => notify({ type: "training-block-upsert", block }));
       if (incomingProfile && coachProfile === incomingProfile) notify({ type: "coach-profile-upsert", profile: incomingProfile });
       appliedQuestions.forEach(question => notify({ type: "coach-question-upsert", question }));
       appliedNutrition.forEach(entry => notify({ type: "nutrition-upsert", entry }));
+      appliedFoods.forEach(food => notify({ type: "nutrition-food-upsert", food }));
       return incoming.length;
     },
     applyCloudRecord(record) {
@@ -437,6 +450,28 @@ export function createRepository(storage) {
       persist({ coachQuestions: { ...state.coachQuestions, [next.id]: next } });
       return true;
     },
+    listNutritionFoods({ includeDeleted = false } = {}) {
+      return Object.values(state.nutritionFoods).filter(item => includeDeleted || !item.deleted)
+        .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), "es"));
+    },
+    getNutritionFood(id) {
+      return state.nutritionFoods[String(id)] || null;
+    },
+    saveNutritionFood(food, { silent = false } = {}) {
+      const next = normalizeNutritionFoods([food])[String(food?.id || "")];
+      if (!next) throw new Error("Completa el nombre, la porción, las kcal y los macronutrientes del alimento.");
+      persist({ nutritionFoods: { ...state.nutritionFoods, [next.id]: next } });
+      if (!silent) notify({ type: "nutrition-food-upsert", food: next });
+      return next;
+    },
+    applyCloudNutritionFood(food) {
+      const next = normalizeNutritionFoods([food])[String(food?.id || "")];
+      if (!next) return false;
+      const current = state.nutritionFoods[next.id];
+      if (current && recordTimestamp(current) >= recordTimestamp(next)) return false;
+      persist({ nutritionFoods: { ...state.nutritionFoods, [next.id]: next } });
+      return true;
+    },
     listNutritionEntries(dateISO = "") {
       return Object.values(state.nutritionEntries).filter(item => !dateISO || item.dateISO === dateISO)
         .sort((a, b) => String(a.time || a.createdAt).localeCompare(String(b.time || b.createdAt)));
@@ -483,7 +518,7 @@ export function createRepository(storage) {
       return () => listeners.delete(listener);
     },
     backup() {
-      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks, coachProfile: state.coachProfile, coachQuestions: state.coachQuestions, nutritionEntries: state.nutritionEntries }, null, 2);
+      return JSON.stringify({ app: "TGTrain", schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), records: this.list(), plans: state.plans, trainingBlocks: state.trainingBlocks, coachProfile: state.coachProfile, coachQuestions: state.coachQuestions, nutritionEntries: state.nutritionEntries, nutritionFoods: state.nutritionFoods }, null, 2);
     }
   };
 }

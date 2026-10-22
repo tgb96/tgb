@@ -285,9 +285,15 @@ test("el shell offline incluye todos los recursos de la aplicación", async () =
 test("la vista de nutrición enlaza todos sus controles", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   const ui = await readFile(resolve(root, "assets/js/nutrition-ui.js"), "utf8");
+  const cloud = await readFile(resolve(root, "assets/js/cloud.js"), "utf8");
   for (const [, id] of ui.matchAll(/byId\("([^"]+)"\)/g)) {
     assert.match(html, new RegExp(`id="${id}"`), `Falta el control ${id}`);
   }
+  assert.match(html, /id="nutritionFoodManagerButton"/);
+  assert.match(ui, /saveNutritionFood/);
+  assert.match(ui, /configureFoodCatalog/);
+  assert.match(cloud, /nutritionFoodsCollectionReference/);
+  assert.match(cloud, /observeCloudNutritionFoods/);
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
@@ -451,7 +457,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=111/);
+  assert.match(html, /assets\/js\/app\.js\?v=112/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

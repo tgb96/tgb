@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=94";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=95";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
 
@@ -25,7 +25,141 @@ export function createNutritionUI(repository, {
   let estimateSource = "";
   let selectedPhotoFile = null;
   let photoAnalysisLoading = false;
+  let editingFoodId = "";
   const dialog = byId("nutritionEntryDialog");
+  const foodManagerDialog = byId("nutritionFoodManagerDialog");
+
+  function refreshFoodCatalog() {
+    configureFoodCatalog(repository.listNutritionFoods({ includeDeleted: true }));
+  }
+
+  function hideFoodForm() {
+    editingFoodId = "";
+    const form = byId("nutritionFoodForm");
+    form.reset();
+    form.hidden = true;
+    form.classList.add("hidden");
+    byId("nutritionFoodFormMessage").classList.add("hidden");
+  }
+
+  function editFood(id = "") {
+    editingFoodId = id;
+    const item = id ? foodCatalog[id] : null;
+    const form = byId("nutritionFoodForm");
+    form.hidden = false;
+    form.classList.remove("hidden");
+    byId("nutritionFoodFormTitle").textContent = item ? `Editar ${item.name}` : "Nuevo alimento";
+    byId("nutritionFoodName").value = item?.name || "";
+    byId("nutritionFoodPortion").value = item?.portion || "";
+    byId("nutritionFoodCalories").value = item?.kcal ?? "";
+    byId("nutritionFoodProtein").value = item?.proteinG ?? "";
+    byId("nutritionFoodCarbs").value = item?.carbsG ?? "";
+    byId("nutritionFoodFat").value = item?.fatG ?? "";
+    byId("nutritionFoodVerified").checked = ["label", "measured"].includes(item?.source);
+    const reset = byId("nutritionFoodReset");
+    const hasOverride = Boolean(id && defaultFoodCatalog[id] && repository.getNutritionFood(id) && !repository.getNutritionFood(id).deleted);
+    reset.hidden = !hasOverride;
+    reset.classList.toggle("hidden", !hasOverride);
+    byId("nutritionFoodFormMessage").classList.add("hidden");
+    byId("nutritionFoodName").focus();
+    form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function renderFoodManagerList() {
+    refreshFoodCatalog();
+    const list = byId("nutritionFoodManagerList");
+    list.replaceChildren();
+    const query = byId("nutritionFoodManagerSearch").value.trim().toLocaleLowerCase("es-CL");
+    const items = Object.values(foodCatalog)
+      .filter(item => !isRetiredFood(item.id))
+      .filter(item => !query || `${item.name} ${item.portion}`.toLocaleLowerCase("es-CL").includes(query))
+      .sort((a, b) => Number(a.hidden) - Number(b.hidden) || a.name.localeCompare(b.name, "es"));
+    if (!items.length) list.append(label("No encontré alimentos con ese nombre."));
+    items.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "nutrition-food-manager-row";
+      row.classList.toggle("is-hidden", item.hidden);
+      const copy = document.createElement("div"); copy.className = "nutrition-food-manager-copy";
+      const name = document.createElement("strong"); name.textContent = `${item.name}${item.hidden ? " · oculto" : ""}`;
+      const detail = document.createElement("small");
+      detail.textContent = `${item.portion} · ${item.source === "label" || item.source === "measured" ? "" : "≈ "}${item.kcal} kcal · ${item.proteinG} g proteína`;
+      copy.append(name, detail);
+      const actions = document.createElement("div"); actions.className = "nutrition-food-manager-actions";
+      const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Editar";
+      edit.addEventListener("click", () => editFood(item.id));
+      const toggle = document.createElement("button"); toggle.type = "button"; toggle.textContent = item.hidden ? "Mostrar" : "Ocultar";
+      toggle.addEventListener("click", () => toggleFood(item.id));
+      actions.append(edit, toggle); row.append(copy, actions); list.append(row);
+    });
+  }
+
+  function openFoodManager() {
+    hideFoodForm();
+    byId("nutritionFoodManagerSearch").value = "";
+    renderFoodManagerList();
+    foodManagerDialog.showModal();
+  }
+
+  function toggleFood(id) {
+    const item = foodCatalog[id];
+    if (!item) return;
+    const previous = repository.getNutritionFood(id);
+    const now = new Date().toISOString();
+    repository.saveNutritionFood({ ...item, hidden: !item.hidden, builtIn: Boolean(defaultFoodCatalog[id]),
+      createdAt: previous?.createdAt || now, updatedAt: now });
+    renderFoodManagerList();
+    render();
+    showToast(item.hidden ? `${item.name} volvió a aparecer en los registros.` : `${item.name} quedó oculto para registros nuevos.`);
+  }
+
+  function saveFood(event) {
+    event.preventDefault();
+    const form = byId("nutritionFoodForm");
+    if (!form.reportValidity()) return;
+    const id = editingFoodId || `custom${(crypto.randomUUID?.() || `${Date.now()}${Math.random()}`).replace(/[^a-zA-Z0-9]/g, "").slice(0, 34)}`;
+    const name = byId("nutritionFoodName").value.trim();
+    const duplicate = Object.values(foodCatalog).find(item => item.id !== id && !isRetiredFood(item.id) && item.name.toLocaleLowerCase("es-CL") === name.toLocaleLowerCase("es-CL"));
+    if (duplicate) {
+      byId("nutritionFoodFormMessage").textContent = `Ya existe “${duplicate.name}”. Puedes editar ese alimento.`;
+      byId("nutritionFoodFormMessage").classList.remove("hidden");
+      return;
+    }
+    const previous = repository.getNutritionFood(id);
+    const current = foodCatalog[id];
+    const now = new Date().toISOString();
+    try {
+      repository.saveNutritionFood({
+        id, name, portion: byId("nutritionFoodPortion").value.trim(),
+        kcal: Number(byId("nutritionFoodCalories").value), proteinG: Number(byId("nutritionFoodProtein").value),
+        carbsG: Number(byId("nutritionFoodCarbs").value), fatG: Number(byId("nutritionFoodFat").value),
+        source: byId("nutritionFoodVerified").checked ? (current?.source === "measured" ? "measured" : "label") : "custom",
+        hidden: Boolean(current?.hidden), builtIn: Boolean(defaultFoodCatalog[id]), deleted: false,
+        createdAt: previous?.createdAt || now, updatedAt: now
+      });
+      refreshFoodCatalog();
+      hideFoodForm();
+      renderFoodManagerList();
+      render();
+      showToast("Alimento guardado y disponible para tus comidas.");
+    } catch (error) {
+      byId("nutritionFoodFormMessage").textContent = error.message;
+      byId("nutritionFoodFormMessage").classList.remove("hidden");
+    }
+  }
+
+  function resetFood() {
+    if (!editingFoodId || !defaultFoodCatalog[editingFoodId]) return;
+    const previous = repository.getNutritionFood(editingFoodId);
+    const name = foodCatalog[editingFoodId]?.name || "El alimento";
+    const now = new Date().toISOString();
+    repository.saveNutritionFood({ id: editingFoodId, builtIn: true, deleted: true,
+      createdAt: previous?.createdAt || now, updatedAt: now });
+    refreshFoodCatalog();
+    hideFoodForm();
+    renderFoodManagerList();
+    render();
+    showToast(`${name} volvió a sus valores originales.`);
+  }
 
   function setPhotoStatus(message = "", state = "") {
     const status = byId("nutritionPhotoStatus");
@@ -86,7 +220,8 @@ export function createNutritionUI(repository, {
     button.disabled = true;
     setPhotoStatus("Analizando la foto y preparando un borrador…", "loading");
     try {
-      const catalog = Object.values(foodCatalog).map(item => ({ id: item.id, name: item.name, portion: item.portion }));
+      const catalog = Object.values(foodCatalog).filter(item => isSelectableFood(item.id))
+        .map(item => ({ id: item.id, name: item.name, portion: item.portion }));
       const result = await analyzeMealPhoto(selectedPhotoFile, { dateISO: selectedDate, slotId: selectedSlot, catalog });
       const analysis = result?.analysis || result;
       const parts = {};
@@ -316,6 +451,7 @@ export function createNutritionUI(repository, {
   }
 
   function render() {
+    refreshFoodCatalog();
     byId("nutritionDate").value = selectedDate;
     const strip = byId("nutritionWeekStrip"); strip.replaceChildren();
     weekDays(selectedDate).forEach((dateISO, index) => {
@@ -491,6 +627,7 @@ export function createNutritionUI(repository, {
   }
 
   function initialize() {
+    refreshFoodCatalog();
     repository.fillMissingNutritionEstimates();
     byId("nutritionPreviousDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, -1); render(); });
     byId("nutritionNextDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, 1); render(); });
@@ -507,6 +644,13 @@ export function createNutritionUI(repository, {
       const value = window.prompt("¿Cuántos ml de agua bebiste?", "300"); if (value !== null) addWater(value);
     });
     byId("nutritionExtraMeal").addEventListener("click", () => openMeal());
+    byId("nutritionFoodManagerButton").addEventListener("click", openFoodManager);
+    byId("nutritionFoodManagerClose").addEventListener("click", () => foodManagerDialog.close());
+    byId("nutritionFoodManagerSearch").addEventListener("input", renderFoodManagerList);
+    byId("nutritionFoodNewButton").addEventListener("click", () => editFood());
+    byId("nutritionFoodFormCancel").addEventListener("click", hideFoodForm);
+    byId("nutritionFoodReset").addEventListener("click", resetFood);
+    byId("nutritionFoodForm").addEventListener("submit", saveFood);
     byId("nutritionCoachButton").addEventListener("click", () => analyzeNutritionDay(selectedDate));
     byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
     byId("nutritionMealPhoto").addEventListener("change", event => {

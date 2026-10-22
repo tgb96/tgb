@@ -8,9 +8,8 @@ const food = (name, portion, kcal, proteinG, carbsG, fatG, source = "generic") =
   ({ name, portion, kcal, proteinG, carbsG, fatG, source });
 // Se conservan solo para leer comidas antiguas; no se pueden agregar a registros nuevos.
 const retiredFoodIds = new Set(["kiwi", "oats", "honey"]);
-export const isSelectableFood = id => Boolean(foodCatalog[id]) && !retiredFoodIds.has(id);
 
-export const foodCatalog = {
+export const defaultFoodCatalog = {
   integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
   semiIntegralArtisanBread: food("Pan semi integral artesanal", "1 rebanada · aprox. 45 g", 112, 4, 21, 1.5),
   whiteBread: food("Pan de molde normal", "1 rebanada · aprox. 30 g", 80, 2.5, 15, 1),
@@ -45,6 +44,55 @@ export const foodCatalog = {
   cerealBar: food("Barra de cereal", "1 unidad · aprox. 35 g", 140, 2, 25, 4)
 };
 
+export const foodCatalog = {};
+const customFoodIds = new Set();
+
+export function normalizeNutritionFoods(value) {
+  const entries = Array.isArray(value) ? value : Object.values(value || {});
+  return Object.fromEntries(entries.flatMap(item => {
+    const id = String(item?.id || "").trim();
+    if (!/^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(id)) return [];
+    const builtIn = Boolean(defaultFoodCatalog[id]);
+    const deleted = Boolean(item?.deleted);
+    const createdAt = String(item?.createdAt || "");
+    const updatedAt = String(item?.updatedAt || createdAt);
+    if (deleted) return builtIn ? [[id, { id, builtIn: true, deleted: true, createdAt, updatedAt }]] : [];
+    const name = String(item?.name || "").trim().slice(0, 100);
+    const portion = String(item?.portion || "").trim().slice(0, 160);
+    if (!name || !portion) return [];
+    const metrics = {};
+    for (const key of ["kcal", "proteinG", "carbsG", "fatG"]) {
+      if (item?.[key] === "" || item?.[key] == null) return [];
+      const number = Number(item?.[key]);
+      if (!Number.isFinite(number) || number < 0 || number > 10000) return [];
+      metrics[key] = Math.round(number * 100) / 100;
+    }
+    return [[id, {
+      id, name, portion, ...metrics,
+      source: ["label", "measured", "generic", "custom"].includes(item?.source) ? item.source : "custom",
+      hidden: Boolean(item?.hidden), builtIn, deleted: false, createdAt, updatedAt
+    }]];
+  }));
+}
+
+export function configureFoodCatalog(value = {}) {
+  Object.keys(foodCatalog).forEach(id => delete foodCatalog[id]);
+  customFoodIds.clear();
+  Object.entries(defaultFoodCatalog).forEach(([id, item]) => {
+    foodCatalog[id] = { id, ...item, builtIn: true, hidden: retiredFoodIds.has(id) };
+  });
+  Object.values(normalizeNutritionFoods(value)).forEach(item => {
+    if (item.deleted) return;
+    foodCatalog[item.id] = { ...item };
+    if (!item.builtIn) customFoodIds.add(item.id);
+  });
+  return foodCatalog;
+}
+
+export const isRetiredFood = id => retiredFoodIds.has(String(id));
+export const isSelectableFood = id => Boolean(foodCatalog[id]) && !foodCatalog[id].hidden && !retiredFoodIds.has(id);
+configureFoodCatalog();
+
 const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
 const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
@@ -52,7 +100,7 @@ const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tom
 export function foodsForSlot(slotId, query = "") {
   const preferred = slotId === "breakfast" ? breakfast : ["morning", "pre", "snack", "during"].includes(slotId) ? snack : main;
   const search = String(query).trim().toLocaleLowerCase("es-CL");
-  const ids = search ? Object.keys(foodCatalog) : preferred;
+  const ids = search ? Object.keys(foodCatalog) : [...preferred, ...customFoodIds];
   return ids.filter(id => isSelectableFood(id) && (!search || `${foodCatalog[id].name} ${foodCatalog[id].portion}`.toLocaleLowerCase("es-CL").includes(search)))
     .map(id => ({ id, ...foodCatalog[id] }));
 }

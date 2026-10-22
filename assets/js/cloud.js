@@ -57,6 +57,7 @@ export function createCloudSync({
   let unsubscribeCoachProfile = null;
   let unsubscribeCoachQuestions = null;
   let unsubscribeNutrition = null;
+  let unsubscribeNutritionFoods = null;
   let unsubscribeWearableDays = null;
   let unsubscribeWearableSessions = null;
   let unsubscribeWearableStatus = null;
@@ -97,6 +98,7 @@ export function createCloudSync({
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
         observeCloudNutrition();
+        observeCloudNutritionFoods();
         observeCloudWearable();
         emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
       } catch {
@@ -130,6 +132,8 @@ export function createCloudSync({
   const coachQuestionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "coachQuestions", cloudDocumentId(id));
   const nutritionCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "nutritionEntries");
   const nutritionDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "nutritionEntries", cloudDocumentId(id));
+  const nutritionFoodsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "nutritionFoods");
+  const nutritionFoodDocumentReference = id => modules.firestoreModule.doc(database, "users", user.uid, "nutritionFoods", cloudDocumentId(id));
   const wearableDaysCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableDays");
   const wearableSessionsCollectionReference = () => modules.firestoreModule.collection(database, "users", user.uid, "wearableSessions");
   const wearableStatusDocumentReference = () => modules.firestoreModule.doc(database, "users", user.uid, "wearableSyncStatus", "latest");
@@ -179,6 +183,10 @@ export function createCloudSync({
     }
     if (change.type === "nutrition-upsert") {
       await setCloudDoc(nutritionDocumentReference(change.entry.id), change.entry);
+      return;
+    }
+    if (change.type === "nutrition-food-upsert") {
+      await setCloudDoc(nutritionFoodDocumentReference(change.food.id), change.food);
       return;
     }
     if (change.type === "remove") {
@@ -328,6 +336,24 @@ export function createCloudSync({
       localChanged = true;
     });
     for (const change of nutritionUploads) await writeChange(change);
+    const foodsSnapshot = await awaitServer(modules.firestoreModule.getDocsFromServer(nutritionFoodsCollectionReference()));
+    const remoteFoods = new Map();
+    foodsSnapshot.forEach(item => {
+      const value = item.data();
+      if (value?.id) remoteFoods.set(String(value.id), value);
+    });
+    const localFoods = new Map(repository.listNutritionFoods({ includeDeleted: true }).map(food => [food.id, food]));
+    const foodUploads = [];
+    remoteFoods.forEach((cloudFood, id) => {
+      const localFood = localFoods.get(id);
+      if (!localFood || recordTimestamp(cloudFood) >= recordTimestamp(localFood)) {
+        if (repository.applyCloudNutritionFood(cloudFood)) localChanged = true;
+      } else foodUploads.push({ type: "nutrition-food-upsert", food: localFood });
+    });
+    localFoods.forEach((localFood, id) => {
+      if (!remoteFoods.has(id)) foodUploads.push({ type: "nutrition-food-upsert", food: localFood });
+    });
+    for (const change of foodUploads) await writeChange(change);
     await awaitServer(modules.firestoreModule.waitForPendingWrites(database));
     if (localChanged) onDataChanged();
   }
@@ -429,6 +455,22 @@ export function createCloudSync({
     });
   }
 
+  function observeCloudNutritionFoods() {
+    unsubscribeNutritionFoods?.();
+    unsubscribeNutritionFoods = modules.firestoreModule.onSnapshot(nutritionFoodsCollectionReference(), snapshot => {
+      let changed = false;
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") return;
+        changed = repository.applyCloudNutritionFood(change.doc.data()) || changed;
+      });
+      if (changed) onDataChanged();
+    }, () => {
+      syncError = true;
+      emit("offline", "No se pudo actualizar tu catálogo de alimentos. Se intentará otra vez.");
+      scheduleRetry();
+    });
+  }
+
   function observeCloudWearable() {
     unsubscribeWearableDays?.();
     unsubscribeWearableSessions?.();
@@ -465,6 +507,8 @@ export function createCloudSync({
     unsubscribeCoachQuestions = null;
     unsubscribeNutrition?.();
     unsubscribeNutrition = null;
+    unsubscribeNutritionFoods?.();
+    unsubscribeNutritionFoods = null;
     unsubscribeWearableDays?.();
     unsubscribeWearableDays = null;
     unsubscribeWearableSessions?.();
@@ -498,6 +542,7 @@ export function createCloudSync({
       observeCloudCoachProfile();
       observeCloudCoachQuestions();
       observeCloudNutrition();
+      observeCloudNutritionFoods();
       observeCloudWearable();
       emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
     } catch {
@@ -556,6 +601,7 @@ export function createCloudSync({
         observeCloudCoachProfile();
         observeCloudCoachQuestions();
         observeCloudNutrition();
+        observeCloudNutritionFoods();
         observeCloudWearable();
         emit("synced", "Entrenamientos, nutrición y planificación sincronizados con Google.");
       } catch (error) {
@@ -577,6 +623,7 @@ export function createCloudSync({
       unsubscribeCoachProfile?.();
       unsubscribeCoachQuestions?.();
       unsubscribeNutrition?.();
+      unsubscribeNutritionFoods?.();
       unsubscribeWearableDays?.();
       unsubscribeWearableSessions?.();
       unsubscribeWearableStatus?.();

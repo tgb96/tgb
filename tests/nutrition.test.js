@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nutritionDayTotals, nutritionModeForPlannedSession, nutritionPlanForDate, normalizeNutritionEntries, plannedActivityTime, plannedNutritionContext } from "../assets/js/nutrition.js";
-import { describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "../assets/js/nutrition-presets.js";
+import { configureFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "../assets/js/nutrition-presets.js";
 import { createRepository } from "../assets/js/storage.js";
 import { coachSessionForDate, withWeeklyCadenceForDate } from "../assets/js/coach-plan.js";
 
@@ -113,6 +113,25 @@ test("una comida ya guardada recibe la estimación visible sin modificar el regi
   assert.equal(shown.estimateSource, "generic");
   assert.equal(nutritionDayTotals([shown]).caloriesKcal, 559);
   assert.equal(nutritionEntryWithEstimate({ ...entry, caloriesKcal: 510, estimateSource: "manual" }).caloriesKcal, 510);
+});
+
+test("el administrador permite crear, editar, ocultar y respaldar alimentos", () => {
+  const storage = memoryStorage();
+  const repository = createRepository(storage);
+  const createdAt = "2026-10-22T12:00:00.000Z";
+  repository.saveNutritionFood({ id: "customLentils", name: "Lentejas caseras", portion: "1 taza · 180 g", kcal: 230,
+    proteinG: 18, carbsG: 40, fatG: 1, source: "custom", createdAt, updatedAt: createdAt });
+  configureFoodCatalog(repository.listNutritionFoods({ includeDeleted: true }));
+  assert.equal(foodCatalog.customLentils.name, "Lentejas caseras");
+  assert.ok(foodsForSlot("lunch").some(item => item.id === "customLentils"));
+  assert.deepEqual(estimateParts({ customLentils: 2 }), { caloriesKcal: 460, proteinG: 36, carbsG: 80, fatG: 2 });
+  repository.saveNutritionFood({ ...repository.getNutritionFood("customLentils"), hidden: true, updatedAt: "2026-10-22T12:05:00.000Z" });
+  configureFoodCatalog(repository.listNutritionFoods({ includeDeleted: true }));
+  assert.equal(isSelectableFood("customLentils"), false);
+  const restored = createRepository(memoryStorage());
+  restored.importMerge(repository.backup());
+  assert.equal(restored.getNutritionFood("customLentils").hidden, true);
+  configureFoodCatalog();
 });
 
 test("conserva el origen editable de una estimación preparada desde foto", () => {

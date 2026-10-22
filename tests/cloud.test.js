@@ -38,7 +38,7 @@ test("el envío a Firebase omite campos undefined sin alterar el plan local", ()
 });
 
 test("un plan importado se sube al servidor y aparece en otro dispositivo", async () => {
-  const remote = { records: new Map(), plans: new Map(), trainingBlocks: new Map(), settings: new Map(), coachQuestions: new Map(), nutritionEntries: new Map() };
+  const remote = { records: new Map(), plans: new Map(), trainingBlocks: new Map(), settings: new Map(), coachQuestions: new Map(), nutritionEntries: new Map(), nutritionFoods: new Map() };
   const user = { uid: "test-user", email: "test@example.com" };
   const containsUndefined = value => value === undefined || (value && typeof value === "object"
     && Object.values(value).some(containsUndefined));
@@ -88,6 +88,7 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   }));
   phone.saveCoachQuestion({ id: "question-1", question: "¿Cómo estuvo mi trote?", answer: "Cuida la rodilla.", createdAt: "2026-09-23T12:00:00.000Z", updatedAt: "2026-09-23T12:01:00.000Z" });
   phone.saveNutritionEntry({ id: "food-1", dateISO: "2026-09-23", kind: "meal", slotId: "lunch", text: "Pollo y arroz", proteinG: 35, createdAt: "2026-09-23T13:00:00.000Z", updatedAt: "2026-09-23T13:00:00.000Z" });
+  phone.saveNutritionFood({ id: "customLentils", name: "Lentejas", portion: "1 taza · 180 g", kcal: 230, proteinG: 18, carbsG: 40, fatG: 1, source: "custom", createdAt: "2026-09-23T13:00:00.000Z", updatedAt: "2026-09-23T13:00:00.000Z" });
   remote.nutritionEntries.set(Buffer.from("old-breakfast").toString("base64url"), { id: "old-breakfast", dateISO: "2026-09-24", kind: "meal", slotId: "breakfast", text: "Pan con palta", parts: {
     integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1
   }, createdAt: "2026-09-24T09:00:00.000Z", updatedAt: "2026-09-24T09:00:00.000Z" });
@@ -97,12 +98,14 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "food-1")?.text, "Pollo y arroz");
   assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.caloriesKcal, 559);
   assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.estimateSource, "generic");
+  assert.equal([...remote.nutritionFoods.values()][0].name, "Lentejas");
   const computerStorage = makeStorage();
   const computer = createRepository(computerStorage);
   const computerCloud = await connect(computer, computerStorage);
   assert.equal(computer.listTrainingBlocks()[0].title, "Plan del teléfono");
   assert.equal(computer.listCoachQuestions()[0].answer, "Cuida la rodilla.");
   assert.equal(computer.listNutritionEntries()[0].proteinG, 35);
+  assert.equal(computer.listNutritionFoods()[0].portion, "1 taza · 180 g");
   assert.equal(phone.clearCoachQuestions(), 1);
   await phoneCloud.syncNow();
   await computerCloud.syncNow();
