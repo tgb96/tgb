@@ -252,7 +252,7 @@ class MainActivity : ComponentActivity() {
                 val report = service.sync(source)
                 SyncPreferences.markSuccess(this@MainActivity, source)
                 AutomaticSync.refresh(this@MainActivity)
-                if (report.workoutsToday == 0 && report.backgroundReadGranted) {
+                if ((report.workoutsToday == 0 || report.sleepSessionsToday == 0) && report.backgroundReadGranted) {
                     AutomaticSync.scheduleRecovery(this@MainActivity)
                 }
                 timeSettingsButton.visibility = if (report.deviceOffsetMinutes == report.chileOffsetMinutes)
@@ -267,6 +267,11 @@ class MainActivity : ComponentActivity() {
                     report.sleepSessionsWithStages == 0 -> " Mi Fitness entregó duración, pero no fases de sueño."
                     else -> " ${report.sleepSessionsWithStages} sesiones incluyen fases de sueño."
                 }
+                val sleepStatus = when {
+                    report.sleepSessionsToday > 0 -> "Health Connect entregó ${report.sleepSessionsToday} sesión(es) de sueño que terminan hoy."
+                    report.backgroundReadGranted -> "Health Connect todavía entregó 0 sesiones de sueño terminadas hoy; programé revisiones automáticas en 2, 8 y 20 minutos."
+                    else -> "Health Connect todavía entregó 0 sesiones de sueño terminadas hoy. Abre Mi Fitness, verifica su conexión con Health Connect y vuelve a sincronizar."
+                }
                 val workoutStatus = when {
                     report.workoutsToday > 0 -> "Health Connect entregó ${report.workoutsToday} entrenamiento(s) de hoy."
                     report.backgroundReadGranted -> "Health Connect todavía entregó 0 entrenamientos de hoy; programé revisiones automáticas en 2, 8 y 20 minutos."
@@ -277,7 +282,7 @@ class MainActivity : ComponentActivity() {
                     if (report.sleepSessionsClockAdjusted > 0) append(" Corregí también la hora de ${report.sleepSessionsClockAdjusted} sesión(es) de sueño sin cambiar su duración.")
                     if (report.deviceOffsetMinutes != report.chileOffsetMinutes) append(" La zona del teléfono (${report.deviceZoneId}, UTC${offsetLabel(report.deviceOffsetMinutes)}) no coincide con Chile (UTC${offsetLabel(report.chileOffsetMinutes)}); pulsa Corregir hora del teléfono.")
                 }
-                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $workoutStatus " +
+                status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $sleepStatus $workoutStatus " +
                     (if (report.workouts == 0) "No hay ninguna sesión de ejercicio en los últimos ${report.days} días disponible para TGTrain. " else "") +
                     (if (report.sleepSessions == 0) "Mi Fitness no compartió sueño reciente en Health Connect; abre Mi Fitness y comprueba sus datos de sueño. " else "") +
                     "$sleepDetailStatus $heartRateStatus$clockStatus Abre TGTrain para verlos."
@@ -318,7 +323,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val report = service.sync(source, days = 7)
                 SyncPreferences.markSuccess(this@MainActivity, source)
-                status.text = "Actualización automática completa: ${report.workouts} entrenamientos recientes. Abre TGTrain para verlos."
+                status.text = "Actualización automática completa: ${report.sleepSessionsToday} sueño(s) terminado(s) hoy y ${report.workouts} entrenamientos recientes. Abre TGTrain para verlos."
             } catch (error: Exception) {
                 status.text = "No se pudo actualizar automáticamente: ${error.localizedMessage}. Puedes usar Sincronizar ahora."
             } finally { setBusy(false) }

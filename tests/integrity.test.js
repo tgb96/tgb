@@ -34,6 +34,7 @@ test("la pulsera recupera sesiones aunque Health Connect use otra fuente para lo
   assert.match(bridge, /dataOriginFilter = workoutOrigin/);
   assert.match(bridge, /wearableSyncStatus/);
   assert.match(bridge, /workoutsToday/);
+  assert.match(bridge, /sleepSessionsToday/);
   assert.match(bridge, /normalizedSleepTime/);
   assert.match(bridge, /sleepSessionsClockAdjusted/);
   assert.match(bridge, /sleepRawStart/);
@@ -42,6 +43,10 @@ test("la pulsera recupera sesiones aunque Health Connect use otra fuente para lo
   assert.match(app, /slice\(0, 8\)/);
   assert.match(app, /refreshWearableAfterBridge/);
   assert.match(app, /refreshWearableNow/);
+  assert.match(app, /Health Connect aún no entregó el sueño terminado hoy/);
+  const activity = await readFile(resolve(root, "android/tgtrain-sync/app/src/main/java/cl/tgtrain/sync/MainActivity.kt"), "utf8");
+  assert.match(activity, /report\.workoutsToday == 0 \|\| report\.sleepSessionsToday == 0/);
+  assert.match(activity, /AutomaticSync\.scheduleRecovery/);
 });
 
 test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async () => {
@@ -446,7 +451,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=110/);
+  assert.match(html, /assets\/js\/app\.js\?v=111/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

@@ -992,13 +992,22 @@ function renderWearableSyncStatus(message = "") {
   }
   const when = new Date(status.syncedAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" });
   const todayCount = Number(status.workoutsToday) || 0;
+  const sleepTodayCount = Number(status.sleepSessionsToday) || 0;
   const total = Number(status.workoutsUploaded) || 0;
   const adjusted = Number(status.workoutsClockAdjusted) || 0;
   const adjustedSleep = Number(status.sleepSessionsClockAdjusted) || 0;
+  const newestSleepEnd = status.newestSleepEndTime ? new Date(status.newestSleepEndTime) : null;
+  const newestSleepLabel = newestSleepEnd && Number.isFinite(newestSleepEnd.getTime())
+    ? ` El último sueño disponible terminó ${newestSleepEnd.toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}.`
+    : "";
   const clockCorrection = `${adjusted ? ` TGTrain corrigió el desfase horario de ${adjusted} entrenamiento${adjusted === 1 ? "" : "s"} de Mi Fitness.` : ""}${adjustedSleep ? ` También corrigió la hora de ${adjustedSleep} sesión${adjustedSleep === 1 ? "" : "es"} de sueño sin cambiar su duración.` : ""}`;
-  output.textContent = todayCount > 0
-    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).${clockCorrection}`
-    : `Última lectura ${when}: TGTrain Sync funcionó, pero Health Connect entregó 0 entrenamientos de hoy. Abre Mi Fitness y comprueba que la sesión ya figure allí.${status.backgroundReadGranted ? " TGTrain Sync volverá a revisar automáticamente." : ""}${clockCorrection}`;
+  const sleepStatus = sleepTodayCount > 0
+    ? `Health Connect entregó el sueño de anoche (${sleepTodayCount} sesión${sleepTodayCount === 1 ? "" : "es"}).`
+    : `Health Connect aún no entregó el sueño terminado hoy.${newestSleepLabel}${status.backgroundReadGranted ? " TGTrain Sync volverá a revisarlo automáticamente." : " Abre Mi Fitness y vuelve a sincronizar."}`;
+  const workoutStatus = todayCount > 0
+    ? `Entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).`
+    : `Entregó 0 entrenamientos de hoy.${status.backgroundReadGranted ? " También volverá a revisarlos automáticamente." : ""}`;
+  output.textContent = `Última lectura ${when}: ${sleepStatus} ${workoutStatus}${clockCorrection}`;
 }
 
 const wait = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));
@@ -1010,7 +1019,7 @@ async function refreshWearableAfterBridge(startedAt, knownSessionIds) {
     if (delay) await wait(delay);
     if (token !== wearableBridgePollToken) return;
     try {
-      renderWearableSyncStatus("Comprobando directamente en la nube si llegó el entrenamiento…");
+      renderWearableSyncStatus("Comprobando directamente en la nube si llegaron datos nuevos…");
       const fresh = await cloudSync.refreshWearableNow();
       const newSessions = (fresh.sessions || []).filter(session => session?.id && !knownSessionIds.has(session.id));
       if (newSessions.length) {
@@ -1024,11 +1033,13 @@ async function refreshWearableAfterBridge(startedAt, knownSessionIds) {
       const statusTime = Date.parse(fresh.status?.syncedAt || "");
       if (Number.isFinite(statusTime) && statusTime >= startedAt - 5000) {
         renderWearableSyncStatus();
-        showToast(Number(fresh.status?.workoutsToday) > 0
-          ? "El puente encontró el entrenamiento. Revisa si ya está vinculado o abre la bandeja de la pulsera."
+        showToast(Number(fresh.status?.sleepSessionsToday) > 0
+          ? "El sueño de anoche ya llegó a TGTrain."
+          : Number(fresh.status?.workoutsToday) > 0
+            ? "El puente encontró el entrenamiento, pero Health Connect todavía no entregó el sueño de anoche."
           : fresh.status?.backgroundReadGranted
-            ? "El puente respondió, pero Health Connect todavía no entregó el entrenamiento. TGTrain Sync volverá a revisar a los 2, 8 y 20 minutos."
-            : "El puente respondió, pero Health Connect todavía no entregó el entrenamiento de hoy.");
+            ? "El puente respondió, pero Health Connect todavía no entregó los datos de hoy. TGTrain Sync volverá a revisar a los 2, 8 y 20 minutos."
+            : "El puente respondió, pero Health Connect todavía no entregó los datos de hoy.");
         button.disabled = false;
         return;
       }

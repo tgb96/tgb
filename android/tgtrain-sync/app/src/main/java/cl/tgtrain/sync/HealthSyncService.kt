@@ -308,7 +308,10 @@ class HealthSyncService(private val context: Context) {
         val newestWorkout = normalizedWorkouts.maxByOrNull { (_, time) -> time.start }
         val adjustedWorkouts = normalizedWorkouts.count { (_, time) -> time.adjustmentMinutes != 0 }
         val adjustedSleepSessions = normalizedSleep.count { (_, time) -> time.adjustmentMinutes != 0 }
+        val sleepSessionsToday = sleepByDay[today]?.size ?: 0
+        val newestSleep = normalizedSleep.maxByOrNull { (_, time) -> time.end }
         val workoutOrigins = workoutRecords.groupingBy { it.metadata.dataOrigin.packageName }.eachCount()
+        val sleepOrigins = sleepCandidates.groupingBy { it.metadata.dataOrigin.packageName }.eachCount()
         val deviceZone = ZoneId.systemDefault()
         val now = Instant.now()
         val deviceOffsetMinutes = deviceZone.rules.getOffset(now).totalSeconds / 60
@@ -325,11 +328,16 @@ class HealthSyncService(private val context: Context) {
                 "workoutsUploaded" to workouts.size,
                 "workoutsToday" to workoutsToday,
                 "workoutsClockAdjusted" to adjustedWorkouts,
+                "sleepRecordsRead" to sleepCandidates.size,
+                "sleepSessionsToday" to sleepSessionsToday,
                 "sleepSessionsClockAdjusted" to adjustedSleepSessions,
+                "newestSleepStartTime" to newestSleep?.second?.start?.toString(),
+                "newestSleepEndTime" to newestSleep?.second?.end?.toString(),
                 "newestWorkoutStartTime" to newestWorkout?.second?.start?.toString(),
                 "newestWorkoutEndTime" to newestWorkout?.second?.end?.toString(),
                 "newestWorkoutTitle" to newestWorkout?.first?.let { exerciseTitle(it.exerciseType) },
                 "workoutOrigins" to workoutOrigins,
+                "sleepOrigins" to sleepOrigins,
                 "syncZoneId" to zone.id,
                 "deviceZoneId" to deviceZone.id,
                 "deviceOffsetMinutes" to deviceOffsetMinutes,
@@ -344,6 +352,9 @@ class HealthSyncService(private val context: Context) {
             days,
             sleep.size,
             sleepSessionsWithStages,
+            sleepCandidates.size,
+            sleepSessionsToday,
+            newestSleep?.second?.end?.toString(),
             adjustedSleepSessions,
             workouts.size,
             workoutsToday,
@@ -505,6 +516,9 @@ data class SyncReport(
     val days: Int,
     val sleepSessions: Int,
     val sleepSessionsWithStages: Int,
+    val sleepRecordsRead: Int,
+    val sleepSessionsToday: Int,
+    val newestSleepEndTime: String?,
     val sleepSessionsClockAdjusted: Int,
     val workouts: Int,
     val workoutsToday: Int,
