@@ -12,14 +12,14 @@ const retiredFoodIds = new Set(["kiwi", "oats", "honey", "avocadoHalf"]);
 
 export const defaultFoodCatalog = {
   integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
-  semiIntegralArtisanBread: food("Pan semi integral artesanal", "1 rebanada · aprox. 45 g", 112, 4, 21, 1.5),
+  semiIntegralArtisanBread: food("Pan semi integral artesanal", "1 rebanada · aprox. 50 g", 124, 4.4, 23.3, 1.7),
   whiteBread: food("Pan de molde normal", "1 rebanada · aprox. 30 g", 80, 2.5, 15, 1),
   egg: food("Huevo", "1 unidad · aprox. 50 g", 72, 6.3, 0.4, 4.8),
   avocado: food("Palta", "1 porción normal · aprox. 50 g", 80, 1, 4.3, 7.3),
   avocadoHalf: food("Palta · media porción", "½ porción · 25 g", 40, 0.5, 2.2, 3.7, "measured"),
   cheeseSlice: food("Queso", "1 lámina · aprox. 20 g", 80, 5, 0.3, 6.7),
   hamSlice: food("Jamón", "1 lámina · aprox. 20 g", 25, 4, 0.5, 1),
-  butter: food("Mantequilla", "1 untada · aprox. 5 g", 36, 0, 0, 4.1),
+  butter: food("Mantequilla", "1 untada · aprox. 3 g", 22, 0, 0, 2.5),
   yogurtPlain: food("Yogur normal", "1 envase · aprox. 170 g", 110, 6, 9, 5),
   yogurtProtein: food("Yogur alto en proteína", "1 envase · aprox. 170 g", 120, 17, 10, 1),
   milk: food("Leche", "1 vaso · aprox. 200 ml", 120, 6.4, 9.6, 6.4),

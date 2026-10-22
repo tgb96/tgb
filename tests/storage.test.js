@@ -98,13 +98,13 @@ test("guarda estimaciones faltantes una sola vez sin sobrescribir cifras manuale
   const changes = [];
   repository.subscribe(change => changes.push(change));
   assert.equal(repository.fillMissingNutritionEstimates().length, 1);
-  assert.equal(repository.getNutritionEntry("breakfast").caloriesKcal, 559);
+  assert.equal(repository.getNutritionEntry("breakfast").caloriesKcal, 545);
   assert.equal(repository.getNutritionEntry("breakfast").estimateSource, "generic");
   assert.match(repository.getNutritionEntry("breakfast").text, /porción normal/);
   assert.equal(repository.getNutritionEntry("corrected").caloriesKcal, 410);
   assert.equal(repository.fillMissingNutritionEstimates().length, 0);
   assert.equal(changes.filter(change => change.type === "nutrition-upsert").length, 1);
-  assert.match(repository.backup(), /"caloriesKcal": 559/);
+  assert.match(repository.backup(), /"caloriesKcal": 545/);
 });
 
 test("guarda el plan semanal, lo respalda y acepta actualizaciones de la nube", () => {

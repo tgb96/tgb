@@ -66,8 +66,12 @@ test("los rangos de kcal del entrenador dependen del día y del escenario real",
 
 test("los ingredientes se suman por unidad con etiqueta o porciones promedio", () => {
   assert.equal(foodCatalog.integralBread.kcal, 73);
-  assert.deepEqual(estimateParts({ semiIntegralArtisanBread: 2 }), { caloriesKcal: 224, proteinG: 8, carbsG: 42, fatG: 3 });
-  assert.equal(foodCatalog.semiIntegralArtisanBread.portion, "1 rebanada · aprox. 45 g");
+  assert.deepEqual(estimateParts({ semiIntegralArtisanBread: 2 }), { caloriesKcal: 248, proteinG: 8.8, carbsG: 46.6, fatG: 3.4 });
+  assert.equal(foodCatalog.semiIntegralArtisanBread.portion, "1 rebanada · aprox. 50 g");
+  assert.deepEqual(
+    { portion: foodCatalog.butter.portion, kcal: foodCatalog.butter.kcal, fatG: foodCatalog.butter.fatG },
+    { portion: "1 untada · aprox. 3 g", kcal: 22, fatG: 2.5 }
+  );
   assert.ok(Object.values(foodCatalog).every(food => food.portion));
   assert.ok(Object.values(foodCatalog).every(food => Number.isFinite(food.kcal)));
   assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 2);
@@ -90,7 +94,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(foodCatalog.tuna, undefined);
   assert.deepEqual(estimateParts({ integralBread: 3 }), { caloriesKcal: 219, proteinG: 11.3, carbsG: 36.9, fatG: 2.9 });
   assert.deepEqual(estimateParts({ integralBread: 3, avocado: 2, cheeseSlice: 1, hamSlice: 1, butter: 1, applePortion: 1 }),
-    { caloriesKcal: 559, proteinG: 22.5, carbsG: 56.8, fatG: 29.4 });
+    { caloriesKcal: 545, proteinG: 22.5, carbsG: 56.8, fatG: 27.8 });
   assert.equal(knownPartsSubtotal({ integralBread: 3, avocado: 2 }).caloriesKcal, 379);
   assert.equal(estimateParts({ integralBread: 3, futureFood: 1 }), null);
   assert.match(describeParts({ integralBread: 3, avocado: 2 }), /3 × pan integral/);
@@ -139,9 +143,9 @@ test("una comida ya guardada recibe la estimación visible sin modificar el regi
   }]))[0];
   const shown = nutritionEntryWithEstimate(entry);
   assert.equal(entry.caloriesKcal, null);
-  assert.equal(shown.caloriesKcal, 559);
+  assert.equal(shown.caloriesKcal, 545);
   assert.equal(shown.estimateSource, "generic");
-  assert.equal(nutritionDayTotals([shown]).caloriesKcal, 559);
+  assert.equal(nutritionDayTotals([shown]).caloriesKcal, 545);
   assert.equal(nutritionEntryWithEstimate({ ...entry, caloriesKcal: 510, estimateSource: "manual" }).caloriesKcal, 510);
 });
 

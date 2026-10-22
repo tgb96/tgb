@@ -96,7 +96,7 @@ test("un plan importado se sube al servidor y aparece en otro dispositivo", asyn
   assert.equal(remote.trainingBlocks.get(block.id).title, "Plan del teléfono");
   assert.equal([...remote.coachQuestions.values()][0].answer, "Cuida la rodilla.");
   assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "food-1")?.text, "Pollo y arroz");
-  assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.caloriesKcal, 559);
+  assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.caloriesKcal, 545);
   assert.equal([...remote.nutritionEntries.values()].find(entry => entry.id === "old-breakfast")?.estimateSource, "generic");
   assert.equal([...remote.nutritionFoods.values()][0].name, "Lentejas");
   const computerStorage = makeStorage();
