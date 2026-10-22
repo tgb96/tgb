@@ -1,5 +1,5 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=96";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=97";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
 
@@ -226,7 +226,7 @@ export function createNutritionUI(repository, {
       const analysis = result?.analysis || result;
       const parts = {};
       for (const item of analysis?.catalogParts || []) {
-        if (foodCatalog[item.foodId] && Number.isInteger(item.count) && item.count > 0 && item.count <= 20) parts[item.foodId] = item.count;
+        if (foodCatalog[item.foodId] && isHalfPortionCount(item.count) && item.count <= 20) parts[item.foodId] = Number(item.count);
       }
       applyMealDraft({
         parts,
@@ -277,12 +277,14 @@ export function createNutritionUI(repository, {
       const row = document.createElement("div"); row.className = "nutrition-selected-row";
       const name = document.createElement("span"); name.textContent = `${foodCatalog[id].name} · ${foodCatalog[id].portion}`;
       const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−";
-      minus.setAttribute("aria-label", `Quitar una unidad de ${foodCatalog[id].name}`);
-      minus.addEventListener("click", () => changePart(id, -1));
-      const amount = document.createElement("strong"); amount.textContent = String(count);
-      const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+";
-      plus.setAttribute("aria-label", `Agregar una unidad de ${foodCatalog[id].name}`);
-      plus.addEventListener("click", () => changePart(id, 1));
+      minus.setAttribute("aria-label", `Quitar media porción de ${foodCatalog[id].name}`);
+      minus.addEventListener("click", () => changePart(id, -0.5));
+      const amount = document.createElement("strong"); amount.textContent = formatPortionCount(count);
+      amount.title = `${String(count).replace(".", ",")} porciones`;
+      const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+½";
+      plus.setAttribute("aria-label", `Agregar media porción de ${foodCatalog[id].name}`);
+      plus.addEventListener("click", () => changePart(id, 0.5));
+      minus.textContent = "−½";
       row.append(name, minus, amount);
       if (isSelectableFood(id)) row.append(plus);
       list.append(row);
@@ -291,7 +293,7 @@ export function createNutritionUI(repository, {
   }
 
   function changePart(id, delta) {
-    const count = Math.max(0, Math.min(99, (selectedParts[id] || 0) + delta));
+    const count = Math.round(Math.max(0, Math.min(99, (Number(selectedParts[id]) || 0) + delta)) * 2) / 2;
     if (count) selectedParts[id] = count;
     else delete selectedParts[id];
     renderSelectedParts();
@@ -303,10 +305,10 @@ export function createNutritionUI(repository, {
     if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
-      const name = document.createElement("strong"); name.textContent = `${item.name}  +`;
+      const name = document.createElement("strong"); name.textContent = `${item.name}  +½`;
       const detail = document.createElement("small"); detail.textContent = `${item.portion} · ${item.source === "label" ? "" : "≈ "}${item.kcal} kcal`;
       button.append(name, detail);
-      button.addEventListener("click", () => changePart(item.id, 1));
+      button.addEventListener("click", () => changePart(item.id, 0.5));
       list.append(button);
     }
   }

@@ -237,7 +237,7 @@ const mealPhotoSchema = {
         type: "object",
         properties: {
           foodId: stringSchema,
-          count: { type: "integer" }
+          count: { type: "number" }
         },
         required: ["foodId", "count"]
       }
@@ -327,7 +327,7 @@ export function createAiClient() {
         "Describe solo alimentos visibles. No inventes ingredientes ocultos, aceite, salsas, marcas, método de cocción, peso ni tamaño del plato si el contexto no los entrega.",
         "Estima un rango visual razonable y devuelve en los campos numéricos el punto medio aproximado. Usa null si la imagen no permite estimarlo.",
         "Las calorías y macronutrientes deben corresponder al total visible que razonablemente comería la persona, no a 100 gramos.",
-        "catalogParts solo puede usar foodId entregados en catalog y únicamente cuando la coincidencia y la unidad sean razonables. No fuerces coincidencias; puede quedar vacío.",
+        "catalogParts solo puede usar foodId entregados en catalog y únicamente cuando la coincidencia y la unidad sean razonables. count representa porciones y debe avanzar en medios: 0.5, 1, 1.5, 2, etc. No fuerces coincidencias; puede quedar vacío.",
         "En portionNotes explica brevemente la principal incertidumbre. Responde en español claro y conciso."
       ].join("\n");
       const analysis = await generateJson({

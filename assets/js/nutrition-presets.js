@@ -7,7 +7,7 @@
 const food = (name, portion, kcal, proteinG, carbsG, fatG, source = "generic") =>
   ({ name, portion, kcal, proteinG, carbsG, fatG, source });
 // Se conservan solo para leer comidas antiguas; no se pueden agregar a registros nuevos.
-const retiredFoodIds = new Set(["kiwi", "oats", "honey"]);
+const retiredFoodIds = new Set(["kiwi", "oats", "honey", "avocadoHalf"]);
 
 export const defaultFoodCatalog = {
   integralBread: food("Pan integral Ideal 100%", "1 rebanada · aprox. 31,5 g", 73, 3.78, 12.285, 0.975, "label"),
@@ -94,8 +94,8 @@ export const isRetiredFood = id => retiredFoodIds.has(String(id));
 export const isSelectableFood = id => Boolean(foodCatalog[id]) && !foodCatalog[id].hidden && !retiredFoodIds.has(id);
 configureFoodCatalog();
 
-const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "avocadoHalf", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
-const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "avocadoHalf", "granola", "nuts", "proteinDrink"];
+const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
+const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {
@@ -107,8 +107,8 @@ export function foodsForSlot(slotId, query = "") {
 }
 
 export function describeParts(parts) {
-  return Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && Number.isInteger(count) && count > 0)
-    .map(([id, count]) => `${count} × ${foodCatalog[id].name.toLowerCase()} (${foodCatalog[id].portion})`).join(" · ");
+  return Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && isHalfPortionCount(count))
+    .map(([id, count]) => `${formatPortionCount(count)} × ${foodCatalog[id].name.toLowerCase()} (${foodCatalog[id].portion})`).join(" · ");
 }
 
 const compactFoodNames = {
@@ -120,20 +120,35 @@ const compactFoodNames = {
 const pluralize = (text, count) => count === 1 ? text : text
   .replace("rebanada", "rebanadas").replace("lámina", "láminas").replace("huevo", "huevos").replace("porción", "porciones");
 
+export const isHalfPortionCount = count => Number.isFinite(Number(count)) && Number(count) >= 0.5 && Number(count) <= 99 && Number.isInteger(Number(count) * 2);
+export const formatPortionCount = count => Number(count) % 1 === 0.5
+  ? `${Math.floor(Number(count)) || ""}½`
+  : String(Number(count));
+
+const fractionalPartSummary = (id, count) => `${formatPortionCount(count)} ${count === 0.5 ? "porción" : "porciones"} de ${foodCatalog[id].name.toLocaleLowerCase("es-CL")}`;
+
 export function summarizeParts(parts) {
-  const counts = Object.fromEntries(Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && Number.isInteger(count) && count > 0));
+  const counts = Object.fromEntries(Object.entries(parts || {}).filter(([id, count]) => foodCatalog[id] && isHalfPortionCount(count)));
   const breadId = counts.integralBread ? "integralBread" : counts.semiIntegralArtisanBread ? "semiIntegralArtisanBread" : counts.whiteBread ? "whiteBread" : "";
   const pieces = [];
   if (breadId) {
     const breadCount = counts[breadId];
-    const bread = `${breadCount} ${pluralize(compactFoodNames[breadId], breadCount)}`;
+    const bread = Number.isInteger(breadCount)
+      ? `${breadCount} ${pluralize(compactFoodNames[breadId], breadCount)}`
+      : fractionalPartSummary(breadId, breadCount);
     const toppingIds = ["avocado", "avocadoHalf", "cheeseSlice", "hamSlice", "butter"];
-    const toppings = toppingIds.filter(id => counts[id]).map(id => id === "avocadoHalf" ? compactFoodNames[id] : foodCatalog[id].name.toLocaleLowerCase("es-CL"));
+    const toppings = toppingIds.filter(id => counts[id]).map(id => Number.isInteger(counts[id])
+      ? (id === "avocadoHalf" ? compactFoodNames[id] : foodCatalog[id].name.toLocaleLowerCase("es-CL"))
+      : fractionalPartSummary(id, counts[id]));
     pieces.push(`${bread}${toppings.length ? ` con ${new Intl.ListFormat("es", { style: "long", type: "conjunction" }).format(toppings)}` : ""}`);
     delete counts[breadId];
     toppingIds.forEach(id => delete counts[id]);
   }
   for (const [id, count] of Object.entries(counts)) {
+    if (!Number.isInteger(count)) {
+      pieces.push(fractionalPartSummary(id, count));
+      continue;
+    }
     const compact = compactFoodNames[id] || foodCatalog[id].name.toLocaleLowerCase("es-CL");
     pieces.push(`${count === 1 && ["applePortion", "bananaPortion"].includes(id) ? "" : `${count} `}${pluralize(compact, count)}`.trim());
   }
@@ -144,7 +159,7 @@ export function knownPartsSubtotal(parts) {
   const totals = { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0, knownItems: 0, unknownItems: 0, genericItems: 0, labelItems: 0 };
   for (const [id, count] of Object.entries(parts || {})) {
     const item = foodCatalog[id];
-    if (!Number.isInteger(count) || count <= 0) continue;
+    if (!isHalfPortionCount(count)) continue;
     if (!item) { totals.unknownItems += count; continue; }
     if (item.kcal == null) { totals.unknownItems += count; continue; }
     totals.knownItems += count;

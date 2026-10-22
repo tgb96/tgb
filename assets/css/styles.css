@@ -1001,7 +1001,7 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
 .nutrition-selected-row { display: flex; align-items: center; gap: 6px; min-height: 45px; padding: 6px 8px; border-radius: 11px; background: #eef7d9; }
 .nutrition-selected-row span { flex: 1; min-width: 0; font-size: 11px; line-height: 1.3; }
 .nutrition-selected-row strong { min-width: 18px; text-align: center; }
-.nutrition-selected-row button { width: 32px; height: 32px; border: 0; border-radius: 9px; background: white; color: var(--ink); font-size: 18px; font-weight: 800; }
+.nutrition-selected-row button { width: 38px; height: 32px; border: 0; border-radius: 9px; background: white; color: var(--ink); font-size: 14px; font-weight: 800; }
 .nutrition-entry { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; padding: 11px; border-radius: 12px; background: #ebf5d7; }
 .nutrition-entry > div { flex: 1; min-width: 0; }
 .nutrition-entry strong { display: block; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }

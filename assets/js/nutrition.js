@@ -162,7 +162,8 @@ export function normalizeNutritionEntries(value) {
     if (kind === "meal" && !text) return [];
     if (["nutrition-analysis", "monthly-summary"].includes(kind) && !String(item?.summary || "").trim()) return [];
     const parts = Object.fromEntries(Object.entries(item?.parts && typeof item.parts === "object" && !Array.isArray(item.parts) ? item.parts : {})
-      .filter(([id, count]) => /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(id) && Number.isInteger(count) && count >= 1 && count <= 99)
+      .filter(([id, count]) => /^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(id) && Number.isFinite(Number(count)) && Number(count) >= 0.5 && Number(count) <= 99 && Number.isInteger(Number(count) * 2))
+      .map(([id, count]) => [id, Number(count)])
       .slice(0, 50));
     const optional = key => item?.[key] === "" || item?.[key] == null ? null : Number(item[key]);
     const metrics = Object.fromEntries(["caloriesKcal", "proteinG", "carbsG", "fatG"].map(key => [key, kind === "meal" ? optional(key) : null]));

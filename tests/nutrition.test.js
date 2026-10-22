@@ -73,7 +73,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.equal(Object.values(foodCatalog).filter(food => food.source === "label").length, 1);
   assert.equal(foodCatalog.avocado.portion, "1 porción normal · aprox. 50 g");
   assert.equal(foodCatalog.avocadoHalf.portion, "½ porción · 25 g");
-  assert.deepEqual(estimateParts({ avocadoHalf: 1 }), { caloriesKcal: 40, proteinG: 0.5, carbsG: 2.2, fatG: 3.7 });
+  assert.equal(isSelectableFood("avocadoHalf"), false);
   assert.deepEqual(
     { name: foodCatalog.rice.name, portion: foodCatalog.rice.portion, kcal: foodCatalog.rice.kcal, proteinG: foodCatalog.rice.proteinG, carbsG: foodCatalog.rice.carbsG, fatG: foodCatalog.rice.fatG, source: foodCatalog.rice.source },
     { name: "Arroz blanco", portion: "1 porción habitual · 151 g", kcal: 196, proteinG: 4.1, carbsG: 42.5, fatG: 0.4, source: "measured" }
@@ -90,13 +90,18 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
     "3 rebanadas de pan integral con palta, queso, jamón y mantequilla · ½ manzana");
   assert.equal(summarizeParts({ integralBread: 1, avocadoHalf: 1 }),
     "1 rebanada de pan integral con ½ porción de palta");
+  assert.deepEqual(estimateParts({ rice: 0.5, beef: 1.5 }),
+    { caloriesKcal: 398, proteinG: 42.6, carbsG: 21.3, fatG: 15.2 });
+  assert.equal(summarizeParts({ rice: 0.5, beef: 1.5 }),
+    "½ porción de arroz blanco · 1½ porciones de carne de vacuno");
+  assert.match(describeParts({ rice: 0.5 }), /^½ × arroz blanco/);
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
-  assert.ok(foodsForSlot("breakfast").some(food => food.id === "avocadoHalf"));
+  assert.ok(!foodsForSlot("breakfast").some(food => food.id === "avocadoHalf"));
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "semiIntegralArtisanBread"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
   assert.ok(!foodsForSlot("lunch").some(food => food.name.includes("Atún")));
-  for (const id of ["oats", "honey", "kiwi"]) {
+  for (const id of ["oats", "honey", "kiwi", "avocadoHalf"]) {
     assert.equal(isSelectableFood(id), false);
     assert.ok(!foodsForSlot("breakfast").some(food => food.id === id));
     assert.ok(!foodsForSlot("breakfast", foodCatalog[id].name).some(food => food.id === id));
@@ -104,6 +109,14 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   }
   assert.deepEqual(estimateParts({ kiwi: 1, oats: 1, honey: 1 }),
     { caloriesKcal: 106, proteinG: 2.5, carbsG: 23.3, fatG: 1.1 });
+});
+
+test("cada alimento admite cantidades en medias porciones", () => {
+  const entry = Object.values(normalizeNutritionEntries([{
+    id: "half-portions", dateISO: "2026-10-22", kind: "meal", text: "Picoteo",
+    parts: { rice: 0.5, beef: 1.5, chicken: 2, potato: 0.25 }
+  }]))[0];
+  assert.deepEqual(entry.parts, { rice: 0.5, beef: 1.5, chicken: 2 });
 });
 
 test("una comida ya guardada recibe la estimación visible sin modificar el registro original", () => {
