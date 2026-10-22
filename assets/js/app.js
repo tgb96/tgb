@@ -28,7 +28,7 @@ import {
 } from "./coach-plan.js?v=99";
 import { createRepository } from "./storage.js?v=105";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=104";
+import { createNutritionUI } from "./nutrition-ui.js?v=105";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=99";
 import { createGuidedUI } from "./guided-ui.js?v=99";

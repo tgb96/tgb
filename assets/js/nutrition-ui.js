@@ -305,10 +305,10 @@ export function createNutritionUI(repository, {
     if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
-      const name = document.createElement("strong"); name.textContent = `${item.name}  +½`;
+      const name = document.createElement("strong"); name.textContent = `${item.name}  +1`;
       const detail = document.createElement("small"); detail.textContent = `${item.portion} · ${item.source === "label" ? "" : "≈ "}${item.kcal} kcal`;
       button.append(name, detail);
-      button.addEventListener("click", () => changePart(item.id, 0.5));
+      button.addEventListener("click", () => changePart(item.id, 1));
       list.append(button);
     }
   }
