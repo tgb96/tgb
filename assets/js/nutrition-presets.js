@@ -15,6 +15,7 @@ export const defaultFoodCatalog = {
   whiteBread: food("Pan de molde normal", "1 rebanada · aprox. 30 g", 80, 2.5, 15, 1),
   egg: food("Huevo", "1 unidad · aprox. 50 g", 72, 6.3, 0.4, 4.8),
   avocado: food("Palta", "1 porción normal · aprox. 50 g", 80, 1, 4.3, 7.3),
+  avocadoHalf: food("Palta · media porción", "½ porción · 25 g", 40, 0.5, 2.2, 3.7, "measured"),
   cheeseSlice: food("Queso", "1 lámina · aprox. 20 g", 80, 5, 0.3, 6.7),
   hamSlice: food("Jamón", "1 lámina · aprox. 20 g", 25, 4, 0.5, 1),
   butter: food("Mantequilla", "1 untada · aprox. 5 g", 36, 0, 0, 4.1),
@@ -93,8 +94,8 @@ export const isRetiredFood = id => retiredFoodIds.has(String(id));
 export const isSelectableFood = id => Boolean(foodCatalog[id]) && !foodCatalog[id].hidden && !retiredFoodIds.has(id);
 configureFoodCatalog();
 
-const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
-const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "proteinDrink"];
+const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "avocadoHalf", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
+const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "avocadoHalf", "granola", "nuts", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {
@@ -111,7 +112,7 @@ export function describeParts(parts) {
 }
 
 const compactFoodNames = {
-  integralBread: "rebanada de pan integral", semiIntegralArtisanBread: "rebanada de pan semi integral artesanal", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta",
+  integralBread: "rebanada de pan integral", semiIntegralArtisanBread: "rebanada de pan semi integral artesanal", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta", avocadoHalf: "½ porción de palta",
   cheeseSlice: "lámina de queso", hamSlice: "lámina de jamón", butter: "mantequilla", applePortion: "½ manzana",
   bananaPortion: "½ plátano"
 };
@@ -126,10 +127,11 @@ export function summarizeParts(parts) {
   if (breadId) {
     const breadCount = counts[breadId];
     const bread = `${breadCount} ${pluralize(compactFoodNames[breadId], breadCount)}`;
-    const toppings = ["avocado", "cheeseSlice", "hamSlice", "butter"].filter(id => counts[id]).map(id => foodCatalog[id].name.toLocaleLowerCase("es-CL"));
+    const toppingIds = ["avocado", "avocadoHalf", "cheeseSlice", "hamSlice", "butter"];
+    const toppings = toppingIds.filter(id => counts[id]).map(id => id === "avocadoHalf" ? compactFoodNames[id] : foodCatalog[id].name.toLocaleLowerCase("es-CL"));
     pieces.push(`${bread}${toppings.length ? ` con ${new Intl.ListFormat("es", { style: "long", type: "conjunction" }).format(toppings)}` : ""}`);
     delete counts[breadId];
-    ["avocado", "cheeseSlice", "hamSlice", "butter"].forEach(id => delete counts[id]);
+    toppingIds.forEach(id => delete counts[id]);
   }
   for (const [id, count] of Object.entries(counts)) {
     const compact = compactFoodNames[id] || foodCatalog[id].name.toLocaleLowerCase("es-CL");
