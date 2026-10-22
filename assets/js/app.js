@@ -993,9 +993,11 @@ function renderWearableSyncStatus(message = "") {
   const todayCount = Number(status.workoutsToday) || 0;
   const total = Number(status.workoutsUploaded) || 0;
   const adjusted = Number(status.workoutsClockAdjusted) || 0;
+  const adjustedSleep = Number(status.sleepSessionsClockAdjusted) || 0;
+  const clockCorrection = `${adjusted ? ` TGTrain corrigió el desfase horario de ${adjusted} entrenamiento${adjusted === 1 ? "" : "s"} de Mi Fitness.` : ""}${adjustedSleep ? ` También corrigió la hora de ${adjustedSleep} sesión${adjustedSleep === 1 ? "" : "es"} de sueño sin cambiar su duración.` : ""}`;
   output.textContent = todayCount > 0
-    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).${adjusted ? ` TGTrain corrigió el desfase horario de ${adjusted} sesión${adjusted === 1 ? "" : "es"} de Mi Fitness.` : ""}`
-    : `Última lectura ${when}: TGTrain Sync funcionó, pero Health Connect entregó 0 entrenamientos de hoy. Abre Mi Fitness y comprueba que la sesión ya figure allí.${status.backgroundReadGranted ? " TGTrain Sync volverá a revisar automáticamente." : ""}`;
+    ? `Última lectura ${when}: Health Connect entregó ${todayCount} entrenamiento${todayCount === 1 ? "" : "s"} de hoy (${total} en el período revisado).${clockCorrection}`
+    : `Última lectura ${when}: TGTrain Sync funcionó, pero Health Connect entregó 0 entrenamientos de hoy. Abre Mi Fitness y comprueba que la sesión ya figure allí.${status.backgroundReadGranted ? " TGTrain Sync volverá a revisar automáticamente." : ""}${clockCorrection}`;
 }
 
 const wait = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));

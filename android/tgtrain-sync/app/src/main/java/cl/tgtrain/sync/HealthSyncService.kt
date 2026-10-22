@@ -115,10 +115,13 @@ class HealthSyncService(private val context: Context) {
                     ?: copies.first()
             }
         val normalizedWorkouts = workouts.map { workout -> workout to normalizedWorkoutTime(workout) }
-        val sleepByDay = sleepCandidates.groupBy { it.endTime.atZone(zone).toLocalDate() }
+        val normalizedSleep = sleepCandidates.map { session -> session to normalizedSleepTime(session) }
+        val sleepByDay = normalizedSleep.groupBy { (_, time) -> time.end.atZone(zone).toLocalDate() }
             .mapValues { (_, records) ->
-                records.groupBy { it.metadata.dataOrigin.packageName }.values.maxBy { sourceRecords ->
-                    sourceRecords.sumOf { Duration.between(it.startTime, it.endTime).seconds.coerceAtLeast(0) }
+                records.groupBy { (session, _) -> session.metadata.dataOrigin.packageName }.values.maxBy { sourceRecords ->
+                    sourceRecords.sumOf { (session, _) ->
+                        Duration.between(session.startTime, session.endTime).seconds.coerceAtLeast(0)
+                    }
                 }
             }
         val sleep = sleepByDay.values.flatten()
@@ -153,6 +156,11 @@ class HealthSyncService(private val context: Context) {
                 "sleepStageCount" to 0,
                 "sleepStagesAvailable" to false,
                 "sleepStagesMinutes" to null,
+                "sleepRawStart" to null,
+                "sleepRawEnd" to null,
+                "sleepClockAdjusted" to false,
+                "sleepClockAdjustmentMinutes" to 0,
+                "sleepClockAdjustmentReason" to null,
                 "sleepHeartRateSampleCount" to 0,
                 "sleepHeartRateAvgBpm" to null,
                 "sleepHeartRateMinBpm" to null,
@@ -166,26 +174,36 @@ class HealthSyncService(private val context: Context) {
                 "syncedAt" to syncedAt
             )
             if (night.isNotEmpty()) {
-                val stages = night.flatMap { it.stages }
+                val sessions = night.map { (session, _) -> session }
+                val times = night.map { (_, time) -> time }
+                val stages = sessions.flatMap { it.stages }
                 val stageMinutes = stages.groupingBy { sleepStageKey(it.stage) }.fold(0L) { total, stage ->
                     total + Duration.between(stage.startTime, stage.endTime).toMinutes().coerceAtLeast(0)
                 }
-                dayData["sleepMinutes"] = night.sumOf {
+                dayData["sleepMinutes"] = sessions.sumOf {
                     Duration.between(it.startTime, it.endTime).toMinutes().coerceAtLeast(0)
                 }
-                dayData["sleepStart"] = night.minOf { it.startTime }.toString()
-                dayData["sleepEnd"] = night.maxOf { it.endTime }.toString()
-                dayData["sleepSessions"] = night.size
-                dayData["sleepOriginPackage"] = night.first().metadata.dataOrigin.packageName
+                dayData["sleepStart"] = times.minOf { it.start }.toString()
+                dayData["sleepEnd"] = times.maxOf { it.end }.toString()
+                dayData["sleepRawStart"] = sessions.minOf { it.startTime }.toString()
+                dayData["sleepRawEnd"] = sessions.maxOf { it.endTime }.toString()
+                dayData["sleepSessions"] = sessions.size
+                dayData["sleepOriginPackage"] = sessions.first().metadata.dataOrigin.packageName
                 dayData["sleepStageCount"] = stages.size
                 dayData["sleepStagesAvailable"] = stages.isNotEmpty()
+                val clockAdjustment = times.firstOrNull { it.adjustmentMinutes != 0 }
+                dayData["sleepClockAdjusted"] = clockAdjustment != null
+                dayData["sleepClockAdjustmentMinutes"] = clockAdjustment?.adjustmentMinutes ?: 0
+                dayData["sleepClockAdjustmentReason"] = clockAdjustment?.reason
                 if (stages.isNotEmpty()) {
-                    sleepSessionsWithStages += night.count { it.stages.isNotEmpty() }
+                    sleepSessionsWithStages += sessions.count { it.stages.isNotEmpty() }
                     dayData["sleepStagesMinutes"] = stageMinutes
                 }
-                val sleepStart = night.minOf { it.startTime }
-                val sleepEnd = night.maxOf { it.endTime }
-                val sleepOrigins = night.map { DataOrigin(it.metadata.dataOrigin.packageName) }.toSet()
+                // Related biometric samples remain on Health Connect's raw timeline.
+                // Only the wall-clock labels shown by TGTrain are corrected.
+                val sleepStart = sessions.minOf { it.startTime }
+                val sleepEnd = sessions.maxOf { it.endTime }
+                val sleepOrigins = sessions.map { DataOrigin(it.metadata.dataOrigin.packageName) }.toSet()
                 if (heartRateGranted) {
                     val samples = readAll(HeartRateRecord::class, sleepStart, sleepEnd, sleepOrigins)
                         .flatMap { it.samples }
@@ -289,6 +307,7 @@ class HealthSyncService(private val context: Context) {
         val workoutsToday = normalizedWorkouts.count { (_, time) -> time.start.atZone(zone).toLocalDate() == today }
         val newestWorkout = normalizedWorkouts.maxByOrNull { (_, time) -> time.start }
         val adjustedWorkouts = normalizedWorkouts.count { (_, time) -> time.adjustmentMinutes != 0 }
+        val adjustedSleepSessions = normalizedSleep.count { (_, time) -> time.adjustmentMinutes != 0 }
         val workoutOrigins = workoutRecords.groupingBy { it.metadata.dataOrigin.packageName }.eachCount()
         val deviceZone = ZoneId.systemDefault()
         val now = Instant.now()
@@ -306,6 +325,7 @@ class HealthSyncService(private val context: Context) {
                 "workoutsUploaded" to workouts.size,
                 "workoutsToday" to workoutsToday,
                 "workoutsClockAdjusted" to adjustedWorkouts,
+                "sleepSessionsClockAdjusted" to adjustedSleepSessions,
                 "newestWorkoutStartTime" to newestWorkout?.second?.start?.toString(),
                 "newestWorkoutEndTime" to newestWorkout?.second?.end?.toString(),
                 "newestWorkoutTitle" to newestWorkout?.first?.let { exerciseTitle(it.exerciseType) },
@@ -324,6 +344,7 @@ class HealthSyncService(private val context: Context) {
             days,
             sleep.size,
             sleepSessionsWithStages,
+            adjustedSleepSessions,
             workouts.size,
             workoutsToday,
             newestWorkout?.second?.start?.toString(),
@@ -375,6 +396,34 @@ class HealthSyncService(private val context: Context) {
             workout.endTime.plusSeconds(adjustmentSeconds),
             (adjustmentSeconds / 60).toInt(),
             reason
+        )
+    }
+
+    /**
+     * Mi Fitness can retain Chile's previous UTC offset in sleep records after
+     * daylight-saving time changes. Correct only an exact, consistent one-hour
+     * mismatch declared by the record. Shifting both endpoints keeps the total
+     * sleep duration and every stage duration unchanged.
+     */
+    private fun normalizedSleepTime(session: SleepSessionRecord): SleepTime {
+        val origin = session.metadata.dataOrigin.packageName
+        if (!isMiFitnessSource(origin)) return SleepTime(session.startTime, session.endTime)
+
+        val expectedStartOffset = zone.rules.getOffset(session.startTime).totalSeconds
+        val expectedEndOffset = zone.rules.getOffset(session.endTime).totalSeconds
+        val startOffsetDelta = session.startZoneOffset?.totalSeconds?.minus(expectedStartOffset)
+        val endOffsetDelta = session.endZoneOffset?.totalSeconds?.minus(expectedEndOffset)
+        val adjustmentSeconds = if (
+            startOffsetDelta != null &&
+            startOffsetDelta == endOffsetDelta &&
+            abs(startOffsetDelta) == 3600
+        ) startOffsetDelta.toLong() else 0L
+
+        return SleepTime(
+            session.startTime.plusSeconds(adjustmentSeconds),
+            session.endTime.plusSeconds(adjustmentSeconds),
+            (adjustmentSeconds / 60).toInt(),
+            if (adjustmentSeconds == 0L) "" else "mi_fitness_stale_zone_offset"
         )
     }
 
@@ -445,10 +494,18 @@ private data class WorkoutTime(
     val reason: String = ""
 )
 
+private data class SleepTime(
+    val start: Instant,
+    val end: Instant,
+    val adjustmentMinutes: Int = 0,
+    val reason: String = ""
+)
+
 data class SyncReport(
     val days: Int,
     val sleepSessions: Int,
     val sleepSessionsWithStages: Int,
+    val sleepSessionsClockAdjusted: Int,
     val workouts: Int,
     val workoutsToday: Int,
     val newestWorkoutStartTime: String?,

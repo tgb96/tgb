@@ -274,6 +274,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val clockStatus = buildString {
                     if (report.workoutsClockAdjusted > 0) append(" Corregí el desfase horario de una hora detectado en ${report.workoutsClockAdjusted} sesión(es) de Mi Fitness.")
+                    if (report.sleepSessionsClockAdjusted > 0) append(" Corregí también la hora de ${report.sleepSessionsClockAdjusted} sesión(es) de sueño sin cambiar su duración.")
                     if (report.deviceOffsetMinutes != report.chileOffsetMinutes) append(" La zona del teléfono (${report.deviceZoneId}, UTC${offsetLabel(report.deviceOffsetMinutes)}) no coincide con Chile (UTC${offsetLabel(report.chileOffsetMinutes)}); pulsa Corregir hora del teléfono.")
                 }
                 status.text = "Sincronizado: ${report.days} días, ${report.sleepSessions} sesiones de sueño y ${report.workouts} entrenamientos. $workoutStatus " +

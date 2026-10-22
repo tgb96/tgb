@@ -34,6 +34,11 @@ test("la pulsera recupera sesiones aunque Health Connect use otra fuente para lo
   assert.match(bridge, /dataOriginFilter = workoutOrigin/);
   assert.match(bridge, /wearableSyncStatus/);
   assert.match(bridge, /workoutsToday/);
+  assert.match(bridge, /normalizedSleepTime/);
+  assert.match(bridge, /sleepSessionsClockAdjusted/);
+  assert.match(bridge, /sleepRawStart/);
+  assert.match(bridge, /sleepRawEnd/);
+  assert.match(bridge, /abs\(startOffsetDelta\) == 3600/);
   assert.match(app, /slice\(0, 8\)/);
   assert.match(app, /refreshWearableAfterBridge/);
   assert.match(app, /refreshWearableNow/);
@@ -437,7 +442,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=108/);
+  assert.match(html, /assets\/js\/app\.js\?v=109/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
