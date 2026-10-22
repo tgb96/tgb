@@ -107,6 +107,8 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(!foodsForSlot("breakfast").some(food => food.id === "avocadoHalf"));
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "semiIntegralArtisanBread"));
   assert.ok(foodsForSlot("snack").some(food => food.id === "mandarin"));
+  assert.ok(foodsForSlot("lunch").some(food => food.id === "mandarin"));
+  assert.ok(foodsForSlot("dinner").some(food => food.id === "mandarin"));
   assert.ok(foodsForSlot("snack").some(food => food.id === "cerealBar"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));

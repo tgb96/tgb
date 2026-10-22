@@ -98,7 +98,7 @@ configureFoodCatalog();
 
 const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "mandarin", "granola"];
 const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "mandarin", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "cerealBar", "proteinDrink"];
-const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
+const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "mandarin", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {
   const preferred = slotId === "breakfast" ? breakfast : ["morning", "pre", "snack", "during"].includes(slotId) ? snack : main;
