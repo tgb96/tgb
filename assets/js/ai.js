@@ -8,13 +8,14 @@ const MODEL_NAME = "gemini-3.5-flash-lite";
 const ALLOWED_UID = "X37HE24wq5bzbmU2tpowWZ4S7io1";
 const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9";
 export const COACH_PROFILE_VERSION = "tennis-v1";
-export const DEFAULT_COACH_EQUIPMENT = [
-  "Mancuernas ajustables con una capacidad máxima de 40 kg.",
-  "Kettlebell de 8 kg.",
-  "Kettlebell de 4,5 kg.",
-  "Bicicleta estática.",
-  "Espacio para shadow tennis, split step, desplazamientos y pliometría."
-].join("\n");
+export const COACH_EQUIPMENT_OPTIONS = [
+  { id: "dumbbells", label: "Mancuernas ajustables", value: "Mancuernas ajustables con una capacidad máxima de 40 kg." },
+  { id: "kettlebell-8", label: "Kettlebell de 8 kg", value: "Kettlebell de 8 kg." },
+  { id: "kettlebell-4-5", label: "Kettlebell de 4,5 kg", value: "Kettlebell de 4,5 kg." },
+  { id: "stationary-bike", label: "Bicicleta estática", value: "Bicicleta estática." },
+  { id: "indoor-space", label: "Espacio interior", value: "Espacio para shadow tennis, split step, desplazamientos y pliometría." }
+];
+export const DEFAULT_COACH_EQUIPMENT = COACH_EQUIPMENT_OPTIONS.map(option => option.value).join("\n");
 
 const stringSchema = { type: "string" };
 const nullableNumberSchema = { type: "number", nullable: true };
@@ -155,10 +156,11 @@ const coachQuestionSchema = {
         cardioTypeId: stringSchema,
         tennisTypeId: stringSchema,
         restTypeId: stringSchema,
+        exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
         nutritionMode: { type: "string", enum: ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
         nutritionReason: stringSchema
       },
-      required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "nutritionMode", "nutritionReason"]
+      required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]
     },
     recordAdjustment: {
       type: "object",
@@ -330,7 +332,12 @@ export function createAiClient() {
     },
     async askCoach(question, context = {}) {
       const catalog = {
-        routines: physicalRoutines.map(item => ({ id: item.id, name: item.name })),
+        routines: physicalRoutines.map(item => ({
+          id: item.id,
+          name: item.name,
+          objective: item.objective,
+          exercises: item.exercises.map(exercise => ({ id: exercise.id, name: exercise.name, phase: exercise.phase, sets: exercise.sets, target: exercise.target, weightKg: exercise.weightKg, caution: exercise.caution || "" }))
+        })),
         cardio: cardioTypes.map(item => ({ id: item.id, name: item.name })),
         tennis: tennisTypes.map(item => ({ id: item.id, name: item.name })),
         rest: restTypes.map(item => ({ id: item.id, name: item.name }))
@@ -345,6 +352,8 @@ export function createAiClient() {
         "Si el usuario corrige o completa un hecho de una actividad ya registrada, devuelve hasRecordAdjustment=true y una sola recordAdjustment. Usa exclusivamente el recordId, dateISO y recordUpdatedAt exactos de recentActivities. Solo completa los campos que realmente cambian y deja los demás como cadena vacía. No cambies el tipo de actividad ni inventes otro registro. Para lluvia u otra imposibilidad climática en un descanso usa restTypeId weather y explica el motivo en restDetail. sensationsAppend agrega contexto sin borrar las sensaciones existentes. routineEffort admite 1–10, routinePain 0–10 y activityStartTime HH:MM.",
         "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
         "El calendario competitivo incluido en el contexto es la fuente común para entrenamiento y nutrición. Un evento calendarStatus=scheduled es un partido confirmado para planificar; likely-suspended, suspended y pending no deben contarse como carga competitiva hasta que Open Tennis o el usuario confirme que se jugará. Mantén una alternativa suave o descanso y no compenses una suspensión con carga excesiva.",
+        "Si la lluvia impide el tenis, no propongas descanso automáticamente. Revisa primero equipment, lo realizado en las últimas 24–48 horas, sueño, molestias y el próximo partido. Si la recuperación lo permite, prioriza una alternativa suave bajo techo usando solo implementos disponibles: físico reducido, bicicleta estática, core, movilidad o técnica sin cancha. Evita repetir el grupo muscular trabajado el día anterior y evita piernas pesadas o pliometría cerca de un partido. Propón descanso solo si los datos de recuperación, dolor o carga realmente lo justifican, y explica por qué.",
+        "Cuando propongas una rutina física adaptada, usa exerciseSettings para bajar series, carga o repeticiones y para omitir ejercicios incompatibles con el objetivo del día. No incluyas ejercicios ajenos a la rutina elegida ni implementos que no figuren en equipment. Si la disponibilidad no está clara, dilo en la respuesta y pide actualizar los implementos antes de confirmar.",
         "Para un ajuste usa exclusivamente los identificadores del CATÁLOGO. Un peloteo amistoso es tennisTypeId friendly-hitting; un descanso normal es restTypeId planned. Conserva el objetivo semanal, considera lo ya realizado y evita compensar con exceso de carga. No propongas dos actividades principales para el mismo día.",
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
       ].join("\n");

@@ -1,5 +1,5 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=73";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=98";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=99";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=94";
 import { describeParts, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 
@@ -71,6 +71,21 @@ export function normalizeCoachQuestions(value) {
     const rawAdjustment = item?.planAdjustment;
     const targetDateISO = String(rawAdjustment?.targetDateISO || "");
     const category = ["physical", "cardio", "tennis", "rest"].includes(rawAdjustment?.category) ? rawAdjustment.category : "";
+    const exerciseSettings = (Array.isArray(rawAdjustment?.exerciseSettings) ? rawAdjustment.exerciseSettings : []).slice(0, 30).flatMap(setting => {
+      const exerciseId = String(setting?.exerciseId || "").slice(0, 100);
+      if (!exerciseId) return [];
+      const sets = Math.min(10, Math.max(1, Number.parseInt(setting?.sets, 10) || 1));
+      const rawWeight = setting?.weightKg;
+      const weightKg = rawWeight === "" || rawWeight === null || rawWeight === undefined || !Number.isFinite(Number(rawWeight))
+        ? null : Math.max(0, Number(rawWeight));
+      return [{
+        exerciseId,
+        sets,
+        target: String(setting?.target || "").trim().slice(0, 100),
+        weightKg,
+        omit: Boolean(setting?.omit)
+      }];
+    });
     const planAdjustment = isValidISODate(targetDateISO) && category ? {
       targetDateISO,
       title: String(rawAdjustment?.title || "Ajuste propuesto").trim().slice(0, 200),
@@ -83,6 +98,7 @@ export function normalizeCoachQuestions(value) {
       cardioTypeId: String(rawAdjustment?.cardioTypeId || "").slice(0, 100),
       tennisTypeId: String(rawAdjustment?.tennisTypeId || "").slice(0, 100),
       restTypeId: String(rawAdjustment?.restTypeId || "").slice(0, 100),
+      exerciseSettings,
       nutritionMode: nutritionModes.includes(rawAdjustment?.nutritionMode) ? rawAdjustment.nutritionMode : "default",
       nutritionReason: String(rawAdjustment?.nutritionReason || "").trim().slice(0, 1000)
     } : null;

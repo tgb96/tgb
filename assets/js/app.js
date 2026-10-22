@@ -22,17 +22,18 @@ import {
   coachSessionForDate,
   coachTrainingBlock,
   coachWeekForDate,
+  withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=98";
-import { createRepository } from "./storage.js?v=98";
+} from "./coach-plan.js?v=99";
+import { createRepository } from "./storage.js?v=99";
 import { createCloudSync } from "./cloud.js?v=75";
 import { createNutritionUI } from "./nutrition-ui.js?v=98";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=94";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=94";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=99";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=98";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=100";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=95";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
@@ -280,7 +281,8 @@ function openQuickRestRegistration(dateISO) {
 function activeTrainingBlock(referenceDateISO = getChileDateISO()) {
   const saved = newestTrainingBlock(repository.listTrainingBlocks());
   const block = saved ? withMatchCalendar(saved) : coachTrainingBlock;
-  return withWeeklyCadenceForDate(block, referenceDateISO);
+  const coordinated = withWeeklyCadenceForDate(block, referenceDateISO);
+  return withCoachPlanAdjustments(coordinated, repository.listCoachQuestions());
 }
 
 function planRecordForSession(session, records = repository.list(), block = activeTrainingBlock()) {
@@ -896,10 +898,36 @@ function setCoachProfileMessage(text = "", kind = "error") {
   message.className = `form-message ${kind}${text ? "" : " hidden"}`;
 }
 
+function renderCoachEquipmentChoices() {
+  const container = $("coachEquipmentChoices");
+  const textarea = $("coachProfileEquipment");
+  if (!container || !textarea) return;
+  container.replaceChildren();
+  const selectedText = textarea.value;
+  COACH_EQUIPMENT_OPTIONS.forEach(option => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = option.value;
+    input.checked = selectedText.includes(option.value);
+    const copy = document.createElement("span");
+    copy.textContent = option.label;
+    input.addEventListener("change", () => {
+      const selected = [...container.querySelectorAll('input[type="checkbox"]:checked')].map(item => item.value);
+      const custom = textarea.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+        .filter(line => !COACH_EQUIPMENT_OPTIONS.some(candidate => candidate.value === line));
+      textarea.value = [...selected, ...custom].join("\n");
+    });
+    label.append(input, copy);
+    container.append(label);
+  });
+}
+
 function openCoachProfileDialog() {
   const profile = repository.getCoachProfile();
   $("coachProfileText").value = profile?.profileText || "";
   $("coachProfileEquipment").value = profile?.equipment || DEFAULT_COACH_EQUIPMENT;
+  renderCoachEquipmentChoices();
   setCoachProfileMessage();
   if ($("cloudDialog").open) $("cloudDialog").close();
   if (!$("coachProfileDialog").open) $("coachProfileDialog").showModal();
@@ -1051,6 +1079,50 @@ function openRegistrationOrActiveRoutine() {
   openRegistration();
 }
 
+function isWeatherPlanAdjustment(item) {
+  const text = [item?.question, item?.answer, item?.planAdjustment?.title, item?.planAdjustment?.reason]
+    .filter(Boolean).join(" ").toLocaleLowerCase("es");
+  return /lluv|clima|cancha.*(?:cerr|mojad|indispon)|mal tiempo/.test(text);
+}
+
+function coachEquipmentSummary() {
+  const equipment = String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT);
+  const selected = COACH_EQUIPMENT_OPTIONS.filter(option => equipment.includes(option.value)).map(option => option.label);
+  return selected.length ? selected.join(" · ") : "Revisa tus implementos disponibles antes de pedir otra alternativa.";
+}
+
+function requestCoveredPlanAlternative(item) {
+  if (coachQuestionInFlight) return;
+  const adjustment = item.planAdjustment;
+  const input = $("coachQuestionText");
+  input.value = `Para el ${adjustment.targetDateISO}, en vez de descanso por lluvia, proponme una sesión suave bajo techo. Usa solamente mis implementos disponibles, considera lo que entrené el día anterior y el próximo partido, y evita repetir grupos musculares o acumular fatiga innecesaria.`;
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+  submitCoachQuestion();
+}
+
+function appendWeatherAdjustmentActions(proposal, item) {
+  if (!isWeatherPlanAdjustment(item)) return;
+  const context = document.createElement("small");
+  context.className = "coach-equipment-context";
+  context.textContent = `Para una alternativa cubierta, la guía considerará: ${coachEquipmentSummary()}`;
+  const actions = document.createElement("div");
+  actions.className = "coach-equipment-actions";
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "secondary";
+  edit.textContent = "Revisar implementos";
+  edit.addEventListener("click", openCoachProfileDialog);
+  actions.append(edit);
+  if (item.planAdjustment?.category === "rest") {
+    const alternative = document.createElement("button");
+    alternative.type = "button";
+    alternative.textContent = "Proponer opción cubierta";
+    alternative.addEventListener("click", () => requestCoveredPlanAlternative(item));
+    actions.append(alternative);
+  }
+  proposal.append(context, actions);
+}
+
 function renderCoachQuestions() {
   const history = $("coachQuestionHistory");
   history.replaceChildren();
@@ -1141,6 +1213,7 @@ function renderCoachQuestions() {
         undo.addEventListener("click", () => revertCoachPlanAdjustment(item));
         proposal.append(undo);
       }
+      appendWeatherAdjustmentActions(proposal, item);
       exchange.append(proposal);
     }
     if (!item.answer) {
@@ -1547,7 +1620,8 @@ function applyCoachPlanAdjustment(item) {
     routineId: category === "physical" ? adjustment.routineId : "",
     cardioTypeId: category === "cardio" ? adjustment.cardioTypeId : "",
     tennisTypeId: category === "tennis" ? adjustment.tennisTypeId : "",
-    restTypeId: category === "rest" ? adjustment.restTypeId : ""
+    restTypeId: category === "rest" ? adjustment.restTypeId : "",
+    exerciseSettings: category === "physical" ? adjustment.exerciseSettings : []
   };
   session.options = [...session.options.filter(candidate => candidate.id !== optionId), option];
   const originalOptionId = session.primaryOptionId;

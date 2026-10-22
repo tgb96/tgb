@@ -218,6 +218,26 @@ test("conserva la auditoría necesaria para deshacer un ajuste del plan", () => 
   assert.match(saved.revertedAt, /10:05/);
 });
 
+test("conserva la reducción de ejercicios propuesta para una alternativa cubierta", () => {
+  const storage = new FakeStorage();
+  const repository = createRepository(storage);
+  repository.saveCoachQuestion({
+    id: "q-indoor", question: "¿Qué hago si llueve?", answer: "Propongo físico suave bajo techo.",
+    planAdjustment: {
+      targetDateISO: "2026-10-22", title: "Físico suave bajo techo", category: "physical", routineId: "full-body",
+      exerciseSettings: [
+        { exerciseId: "front-plank", sets: 2, target: "30 seg", weightKg: "", omit: false },
+        { exerciseId: "split-step-short", sets: 1, target: "20 seg", weightKg: "", omit: true }
+      ]
+    },
+    adjustmentStatus: "pending", createdAt: "2026-10-22T09:00:00Z", updatedAt: "2026-10-22T09:00:00Z"
+  });
+  const settings = createRepository(storage).listCoachQuestions()[0].planAdjustment.exerciseSettings;
+  assert.equal(settings[0].sets, 2);
+  assert.equal(settings[0].weightKg, null);
+  assert.equal(settings[1].omit, true);
+});
+
 test("conserva una corrección de registro propuesta por la guía y su versión anterior", () => {
   const storage = new FakeStorage();
   const repository = createRepository(storage);

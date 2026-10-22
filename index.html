@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=100">
+  <link rel="stylesheet" href="assets/css/styles.css?v=101">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -427,7 +427,9 @@
     <form id="coachProfileForm" class="coach-profile-form">
       <label for="coachProfileText">Perfil, objetivo, limitaciones y reglas del entrenador</label>
       <textarea id="coachProfileText" rows="13" maxlength="40000" placeholder="Pega aquí la instrucción maestra que preparó tu entrenador."></textarea>
-      <label for="coachProfileEquipment">Equipamiento disponible</label>
+      <label>Implementos disponibles</label>
+      <div id="coachEquipmentChoices" class="coach-equipment-choices" aria-label="Implementos disponibles para adaptar entrenamientos"></div>
+      <label for="coachProfileEquipment">Detalle editable y otros implementos</label>
       <textarea id="coachProfileEquipment" rows="6" maxlength="5000"></textarea>
       <p class="ai-privacy-note"><span aria-hidden="true">●</span> Al analizar una rutina, este perfil privado se envía a Gemini junto con tus datos de entrenamiento. No se incluye en el código público de TGTrain.</p>
       <div id="coachProfileMessage" class="form-message hidden" role="status" aria-live="polite"></div>
@@ -565,6 +567,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=107"></script>
+<script type="module" src="assets/js/app.js?v=108"></script>
 </body>
 </html>

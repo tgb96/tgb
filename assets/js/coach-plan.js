@@ -390,6 +390,59 @@ export function withWeeklyCadenceForDate(sourceBlock, dateISO) {
   return block;
 }
 
+function adjustmentOption(item) {
+  const adjustment = item.planAdjustment;
+  const optionId = item.appliedOptionId || `coach-${adjustment.targetDateISO}-${String(item.id || "adjustment").slice(0, 12)}`;
+  const exerciseSettings = Array.isArray(adjustment.exerciseSettings) ? adjustment.exerciseSettings : [];
+  return {
+    id: optionId,
+    title: adjustment.title,
+    category: adjustment.category,
+    summary: adjustment.summary,
+    details: adjustment.details || [],
+    prefill: {
+      routineId: adjustment.category === "physical" ? adjustment.routineId : "",
+      settings: Object.fromEntries(exerciseSettings.filter(setting => !setting.omit).map(setting => [setting.exerciseId, {
+        sets: setting.sets,
+        target: setting.target,
+        weightKg: setting.weightKg
+      }])),
+      omitExerciseIds: exerciseSettings.filter(setting => setting.omit).map(setting => setting.exerciseId),
+      cardioTypeId: adjustment.category === "cardio" ? adjustment.cardioTypeId : "",
+      tennisTypeId: adjustment.category === "tennis" ? adjustment.tennisTypeId : "",
+      restTypeId: adjustment.category === "rest" ? adjustment.restTypeId : "",
+      distanceKm: ""
+    }
+  };
+}
+
+// Los cambios confirmados por el usuario son una capa sobre el calendario.
+// Así sobreviven una actualización de Open Tennis y también reparan ajustes
+// antiguos que quedaron guardados en la conversación, pero no en el bloque.
+export function withCoachPlanAdjustments(sourceBlock, questions = []) {
+  if (!sourceBlock?.weeks) return sourceBlock;
+  const applied = (questions || []).filter(item => item?.adjustmentStatus === "applied" && item.planAdjustment)
+    .sort((left, right) => String(left.appliedAt || left.updatedAt || left.createdAt || "")
+      .localeCompare(String(right.appliedAt || right.updatedAt || right.createdAt || "")));
+  if (!applied.length) return sourceBlock;
+  const block = structuredClone(sourceBlock);
+  for (const item of applied) {
+    const adjustment = item.planAdjustment;
+    const week = block.weeks.find(candidate => adjustment.targetDateISO >= candidate.startISO && adjustment.targetDateISO <= candidate.endISO);
+    if (!week) continue;
+    let session = (week.sessions || []).find(candidate => candidate.dateISO === adjustment.targetDateISO);
+    if (!session) {
+      session = { id: `coach-session-${adjustment.targetDateISO}`, dateISO: adjustment.targetDateISO, objective: adjustment.reason, options: [] };
+      week.sessions = [...(week.sessions || []), session].sort((left, right) => left.dateISO.localeCompare(right.dateISO));
+    }
+    const option = adjustmentOption(item);
+    session.options = [...(session.options || []).filter(candidate => candidate.id !== option.id), option];
+    session.primaryOptionId = option.id;
+    session.objective = adjustment.reason || option.summary;
+  }
+  return block;
+}
+
 export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalendar?.length ? sourceBlock.matchCalendar : matchCalendar) {
   if (!sourceBlock?.weeks) return sourceBlock;
   const block = structuredClone(sourceBlock);

@@ -23,7 +23,7 @@ function normalizeMatchCalendar(value) {
     const courtValue = Number(item?.court);
     return [{
       dateISO,
-      weekKey: info.weekKey,
+      weekKey: info.key,
       weekNumber: info.weekNumber,
       weekStartISO: info.startISO,
       weekEndISO: info.endISO,
@@ -158,8 +158,8 @@ export function normalizeTrainingBlock(raw) {
   const grouped = new Map();
   uniqueSessions.forEach(session => {
     const info = isoWeekInfo(session.dateISO);
-    if (!grouped.has(info.weekKey)) grouped.set(info.weekKey, { info, sessions: [] });
-    grouped.get(info.weekKey).sessions.push(session);
+    if (!grouped.has(info.key)) grouped.set(info.key, { info, sessions: [] });
+    grouped.get(info.key).sessions.push(session);
   });
   const weeks = [...grouped.entries()].map(([weekKey, value], index) => {
     const metadata = weekMetadata.get(weekKey) || rawWeeks[index] || {};

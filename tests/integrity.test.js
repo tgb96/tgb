@@ -310,6 +310,8 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(ai, /hasPlanAdjustment/);
   assert.match(ai, /hasRecordAdjustment/);
   assert.match(ai, /restTypeId weather/);
+  assert.match(ai, /no propongas descanso automáticamente/);
+  assert.match(ai, /exerciseSettings para bajar series/);
   assert.match(ai, /nutritionContext/);
   assert.match(app, /Revisar y aplicar/);
   assert.match(app, /También se coordinará la guía de alimentación/);
@@ -317,8 +319,12 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /applyCoachRecordAdjustment/);
   assert.match(app, /revertCoachRecordAdjustment/);
   assert.match(app, /Aplicar corrección/);
+  assert.match(app, /withCoachPlanAdjustments\(coordinated, repository\.listCoachQuestions\(\)\)/);
+  assert.match(app, /Proponer opción cubierta/);
+  assert.match(app, /COACH_EQUIPMENT_OPTIONS/);
   assert.match(app, /sleepStagesMinutes/);
   assert.match(html, /wearableSleepDetails/);
+  assert.match(html, /coachEquipmentChoices/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
   assert.match(bridge, /OxygenSaturationRecord/);
 });
@@ -431,7 +437,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=107/);
+  assert.match(html, /assets\/js\/app\.js\?v=108/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
