@@ -592,6 +592,21 @@ export function createNutritionUI(repository, {
       ? `Falta estimar la proteína de ${totals.meals - totals.proteinKnownMeals} comida${totals.meals - totals.proteinKnownMeals === 1 ? "" : "s"}; el total es parcial.`
       : "Proteína aproximada según los ingredientes y porciones registrados.";
     proteinProgress.append(proteinNote);
+    const waterProgress = byId("nutritionWaterProgress"); waterProgress.replaceChildren();
+    const liters = ml => `${(ml / 1000).toLocaleString("es-CL", { maximumFractionDigits: 2 })} L`;
+    const waterTitle = document.createElement("strong");
+    waterTitle.textContent = `${liters(totals.waterMl)} de agua anotada · objetivo ${liters(plan.waterMinMl)}–${liters(plan.waterMaxMl)}`;
+    const waterBar = document.createElement("progress");
+    waterBar.max = plan.waterMaxMl;
+    waterBar.value = Math.min(totals.waterMl, plan.waterMaxMl);
+    waterBar.setAttribute("aria-label", "Agua anotada respecto al máximo orientativo del día");
+    const waterNote = document.createElement("small");
+    waterNote.textContent = totals.waterMl < plan.waterMinMl
+      ? `Te faltan ${liters(plan.waterMinMl - totals.waterMl)} para alcanzar el mínimo orientativo del día.`
+      : totals.waterMl <= plan.waterMaxMl
+        ? "Ya alcanzaste el mínimo orientativo de hidratación del día."
+        : "Superaste el rango orientativo; ajusta el resto según sed, entrenamiento y temperatura.";
+    waterProgress.append(waterTitle, waterBar, waterNote);
     renderCoachInsight(repository.listNutritionEntries(selectedDate).filter(entry => ["meal", "water", "plan"].includes(entry.kind)));
     const slots = byId("nutritionSlots"); slots.replaceChildren();
     plan.slots.forEach(item => {
