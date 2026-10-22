@@ -26,6 +26,7 @@ export const defaultFoodCatalog = {
   proteinDrink: food("Bebida proteica", "1 envase · aprox. 250 ml", 160, 25, 13, 2),
   applePortion: food("Manzana", "1 porción · aprox. ½ unidad (75 g)", 39, 0.2, 10.5, 0.1),
   bananaPortion: food("Plátano", "1 porción · aprox. ½ unidad (60 g)", 53, 0.7, 13.7, 0.2),
+  mandarin: food("Mandarina", "1 unidad mediana · aprox. 90 g comestibles", 47, 0.7, 12, 0.3),
   kiwi: food("Kiwi", "1 unidad · aprox. 75 g", 46, 0.8, 11, 0.4),
   granola: food("Granola", "1 cucharada · aprox. 10 g", 45, 1, 6.5, 1.8),
   oats: food("Avena", "1 cucharada · aprox. 10 g", 39, 1.7, 6.6, 0.7),
@@ -95,8 +96,8 @@ export const isRetiredFood = id => retiredFoodIds.has(String(id));
 export const isSelectableFood = id => Boolean(foodCatalog[id]) && !foodCatalog[id].hidden && !retiredFoodIds.has(id);
 configureFoodCatalog();
 
-const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "granola"];
-const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "cerealBar", "proteinDrink"];
+const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "egg", "avocado", "cheeseSlice", "hamSlice", "butter", "yogurtPlain", "yogurtProtein", "milk", "proteinDrink", "applePortion", "bananaPortion", "mandarin", "granola"];
+const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "mandarin", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "granola", "nuts", "cerealBar", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "tomatoSauce", "bolognese", "vegetables", "tomato", "egg", "integralBread", "semiIntegralArtisanBread"];
 
 export function foodsForSlot(slotId, query = "") {
@@ -115,11 +116,11 @@ export function describeParts(parts) {
 const compactFoodNames = {
   integralBread: "rebanada de pan integral", semiIntegralArtisanBread: "rebanada de pan semi integral artesanal", whiteBread: "rebanada de pan", egg: "huevo", avocado: "palta", avocadoHalf: "½ porción de palta",
   cheeseSlice: "lámina de queso", hamSlice: "lámina de jamón", butter: "mantequilla", applePortion: "½ manzana",
-  bananaPortion: "½ plátano"
+  bananaPortion: "½ plátano", mandarin: "mandarina"
 };
 
 const pluralize = (text, count) => count === 1 ? text : text
-  .replace("rebanada", "rebanadas").replace("lámina", "láminas").replace("huevo", "huevos").replace("porción", "porciones");
+  .replace("rebanada", "rebanadas").replace("lámina", "láminas").replace("huevo", "huevos").replace("porción", "porciones").replace("mandarina", "mandarinas");
 
 export const isHalfPortionCount = count => Number.isFinite(Number(count)) && Number(count) >= 0.5 && Number(count) <= 99 && Number.isInteger(Number(count) * 2);
 export const formatPortionCount = count => Number(count) % 1 === 0.5
@@ -151,7 +152,7 @@ export function summarizeParts(parts) {
       continue;
     }
     const compact = compactFoodNames[id] || foodCatalog[id].name.toLocaleLowerCase("es-CL");
-    pieces.push(`${count === 1 && ["applePortion", "bananaPortion"].includes(id) ? "" : `${count} `}${pluralize(compact, count)}`.trim());
+    pieces.push(`${count === 1 && ["applePortion", "bananaPortion", "mandarin"].includes(id) ? "" : `${count} `}${pluralize(compact, count)}`.trim());
   }
   return pieces.join(" · ");
 }

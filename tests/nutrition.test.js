@@ -82,6 +82,10 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
     { name: foodCatalog.cerealBar.name, portion: foodCatalog.cerealBar.portion, kcal: foodCatalog.cerealBar.kcal, proteinG: foodCatalog.cerealBar.proteinG, carbsG: foodCatalog.cerealBar.carbsG, fatG: foodCatalog.cerealBar.fatG, source: foodCatalog.cerealBar.source },
     { name: "Costa Cereal Bar Nuts", portion: "1 barrita · 30 g", kcal: 151, proteinG: 3.6, carbsG: 16, fatG: 8.9, source: "label" }
   );
+  assert.deepEqual(estimateParts({ mandarin: 1 }),
+    { caloriesKcal: 47, proteinG: 0.7, carbsG: 12, fatG: 0.3 });
+  assert.equal(summarizeParts({ mandarin: 1 }), "mandarina");
+  assert.equal(summarizeParts({ mandarin: 2 }), "2 mandarinas");
   assert.equal(foodCatalog.arepa, undefined);
   assert.equal(foodCatalog.tuna, undefined);
   assert.deepEqual(estimateParts({ integralBread: 3 }), { caloriesKcal: 219, proteinG: 11.3, carbsG: 36.9, fatG: 2.9 });
@@ -102,6 +106,7 @@ test("los ingredientes se suman por unidad con etiqueta o porciones promedio", (
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "yogurtPlain"));
   assert.ok(!foodsForSlot("breakfast").some(food => food.id === "avocadoHalf"));
   assert.ok(foodsForSlot("breakfast").some(food => food.id === "semiIntegralArtisanBread"));
+  assert.ok(foodsForSlot("snack").some(food => food.id === "mandarin"));
   assert.ok(foodsForSlot("snack").some(food => food.id === "cerealBar"));
   assert.ok(foodsForSlot("lunch").some(food => food.id === "bolognese"));
   assert.ok(foodsForSlot("breakfast", "pescado").some(food => food.id === "fish"));
