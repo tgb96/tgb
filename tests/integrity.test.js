@@ -325,6 +325,8 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /async estimateFoodNutrition\(name, context/);
   assert.match(ai, /async estimateMealDescription\(description, context/);
   assert.match(ai, /async transcribeCoachAudio\(audioBlob\)/);
+  assert.match(ai, /async analyzeDailyCoach\(context/);
+  assert.match(ai, /async reviewCoachWeek\(context/);
   assert.match(ai, /mealDescriptionSchema/);
   assert.match(ai, /combina una sola foto de comida|combinándola con userContext/);
   assert.match(ai, /plato chico.*23 cm.*plato grande.*27 cm/);
@@ -372,8 +374,13 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /sleepStagesMinutes/);
   assert.match(app, /strongestRecoveryImpact/);
   assert.match(app, /Contexto de recuperación guardado/);
+  assert.match(app, /requestDailyCoachInsight/);
+  assert.match(app, /requestWeeklyCoachReview/);
+  assert.match(app, /speechSynthesis\.speak/);
   assert.match(html, /wearableSleepDetails/);
   assert.match(html, /coachEquipmentChoices/);
+  assert.match(html, /dailyBriefAiAction/);
+  assert.match(html, /coachWeekReviewButton/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
   assert.match(bridge, /OxygenSaturationRecord/);
 });
@@ -492,7 +499,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=130/);
+  assert.match(html, /assets\/js\/app\.js\?v=131/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

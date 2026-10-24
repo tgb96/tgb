@@ -268,6 +268,54 @@ const audioTranscriptionSchema = {
   required: ["transcript"]
 };
 
+const dailyCoachSchema = {
+  type: "object",
+  properties: {
+    decision: { type: "string", enum: ["train", "adapt", "recover", "waiting-data"] },
+    title: stringSchema,
+    summary: stringSchema,
+    signals: { type: "array", items: stringSchema, maxItems: 6 },
+    dataUsed: { type: "array", items: stringSchema, maxItems: 8 },
+    missingData: { type: "array", items: stringSchema, maxItems: 6 },
+    recommendation: stringSchema,
+    encouragement: stringSchema
+  },
+  required: ["decision", "title", "summary", "signals", "dataUsed", "missingData", "recommendation", "encouragement"]
+};
+
+const weeklyAdjustmentSchema = {
+  type: "object",
+  properties: {
+    targetDateISO: stringSchema,
+    title: stringSchema,
+    reason: stringSchema,
+    category: { type: "string", enum: ["physical", "cardio", "tennis", "rest"] },
+    summary: stringSchema,
+    details: { type: "array", items: stringSchema, maxItems: 12 },
+    routineId: stringSchema,
+    cardioTypeId: stringSchema,
+    tennisTypeId: stringSchema,
+    restTypeId: stringSchema,
+    exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
+    nutritionMode: { type: "string", enum: ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+    nutritionReason: stringSchema
+  },
+  required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]
+};
+
+const weeklyCoachSchema = {
+  type: "object",
+  properties: {
+    title: stringSchema,
+    summary: stringSchema,
+    observations: { type: "array", items: stringSchema, maxItems: 8 },
+    focus: { type: "array", items: stringSchema, maxItems: 6 },
+    adjustments: { type: "array", items: weeklyAdjustmentSchema, maxItems: 3 },
+    encouragement: stringSchema
+  },
+  required: ["title", "summary", "observations", "focus", "adjustments", "encouragement"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -475,6 +523,47 @@ export function createAiClient() {
       const transcript = String(result?.transcript || "").trim().slice(0, 2000);
       if (!transcript) throw new Error("No pude reconocer palabras en la grabación. Inténtalo de nuevo hablando cerca del teléfono.");
       return { transcript, model: MODEL_NAME };
+    },
+    async analyzeDailyCoach(context = {}) {
+      const insight = await generateJson({
+        instructions: [
+          "Eres el entrenador diario de TGTrain, centrado en rendimiento para tenis, fuerza funcional y recuperación.",
+          "Evalúa solamente el día actual usando el perfil, plan, actividades recientes, pulsera, sueño, nutrición, molestias, salidas informadas y partidos incluidos en el contexto.",
+          "Distingue hechos, inferencias y datos faltantes. dataUsed debe nombrar datos concretos realmente presentes, con fecha o cifra cuando ayude. missingData solo incluye ausencias que cambian la decisión; no conviertas cada campo opcional en una carencia.",
+          "No inventes calidad de sueño, clima, dolor, carga, comidas, partidos ni métricas. Un dato de pulsera sin vinculación no pertenece automáticamente a una actividad.",
+          "Elige train si corresponde mantener el plan, adapt si conviene regularlo, recover si los datos justifican recuperación y waiting-data si falta un dato decisivo. No modifiques la planificación ni propongas cambios guardables en esta respuesta.",
+          "La recomendación debe ser concreta para hoy y coherente con las próximas 48 horas. Si hay dolor relevante o persistente, evita entrenar con dolor y recomienda evaluación profesional sin diagnosticar.",
+          "Sé breve, claro y prudente. No prescribas dietas ni afirmes que una pulsera diagnostica recuperación."
+        ].join("\n"),
+        input: JSON.stringify(context),
+        schema: dailyCoachSchema,
+        maxOutputTokens: 1600
+      });
+      return { insight, model: MODEL_NAME };
+    },
+    async reviewCoachWeek(context = {}) {
+      const catalog = {
+        routines: physicalRoutines.map(item => ({ id: item.id, name: item.name, exercises: item.exercises.map(exercise => ({ id: exercise.id, name: exercise.name, sets: exercise.sets, target: exercise.target, weightKg: exercise.weightKg })) })),
+        cardio: cardioTypes.map(item => ({ id: item.id, name: item.name })),
+        tennis: tennisTypes.map(item => ({ id: item.id, name: item.name })),
+        rest: restTypes.map(item => ({ id: item.id, name: item.name }))
+      };
+      const review = await generateJson({
+        instructions: [
+          "Eres el entrenador semanal de TGTrain. Revisa los próximos siete días como un conjunto orientado al tenis.",
+          "Conserva lo que está bien. Devuelve adjustments vacío si no existen razones concretas para cambiar el plan; no hagas cambios por variar la rutina.",
+          "Solo puedes ajustar fechas futuras que ya aparezcan en currentPlan.upcomingSessions. Nunca cambies una fecha pasada ni una actividad ya registrada.",
+          "Respeta partidos confirmados, evita piernas pesadas cerca de ellos y distribuye fuerza, tenis y recuperación sin compensar sesiones perdidas con exceso de carga.",
+          "Integra sueño, molestias, carga reciente, salidas informadas, nutrición disponible y equipment. No inventes clima. Si el usuario solo mencionó una posibilidad de lluvia o suspensión, conserva una alternativa y no la presentes como hecho.",
+          "Usa exclusivamente IDs del catalog. Para rutinas adaptadas, exerciseSettings solo puede contener ejercicios de la rutina elegida. Propón como máximo tres ajustes y una actividad principal por fecha.",
+          "Cada ajuste debe explicar el motivo y un nutritionMode coherente, pero no aplicar nada. TGTrain pedirá confirmación individual.",
+          "Distingue observaciones basadas en datos de recomendaciones. No diagnostiques lesiones ni prescribas tratamientos."
+        ].join("\n"),
+        input: JSON.stringify({ context, catalog }),
+        schema: weeklyCoachSchema,
+        maxOutputTokens: 3200
+      });
+      return { review, model: MODEL_NAME };
     },
     async askCoach(question, context = {}) {
       const catalog = {

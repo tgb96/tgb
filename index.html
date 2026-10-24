@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=107">
+  <link rel="stylesheet" href="assets/css/styles.css?v=108">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -63,7 +63,11 @@
         </div>
         <p id="dailyBriefSummary"></p>
         <ul id="dailyBriefSignals"></ul>
-        <button id="dailyBriefAction" type="button">Continuar mi día</button>
+        <small id="dailyBriefAiMeta" class="daily-brief-ai-meta"></small>
+        <div class="daily-brief-actions">
+          <button id="dailyBriefAction" type="button">Continuar mi día</button>
+          <button id="dailyBriefAiAction" class="secondary" type="button"><span aria-hidden="true">✦</span> Actualizar con Gemini</button>
+        </div>
       </section>
 
       <section class="wearable-card" aria-labelledby="wearableTitle">
@@ -100,6 +104,8 @@
       <section class="coach-ask-card" aria-labelledby="coachAskTitle">
         <p class="eyebrow dark">Tu entrenador IA</p>
         <h2 id="coachAskTitle">Habla con TGTrain</h2>
+        <button id="coachWeekReviewButton" class="coach-week-review-button" type="button"><span aria-hidden="true">✦</span> Revisar y adaptar los próximos 7 días</button>
+        <p id="coachWeekReviewStatus" class="coach-question-status" role="status"></p>
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Conversación reciente con TGTrain"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
         <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar conversación</button>
@@ -617,6 +623,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=130"></script>
+<script type="module" src="assets/js/app.js?v=131"></script>
 </body>
 </html>

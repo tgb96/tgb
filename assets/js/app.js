@@ -26,13 +26,13 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=113";
+import { createRepository } from "./storage.js?v=114";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=115";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=97";
+import { createNutritionUI } from "./nutrition-ui.js?v=116";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=98";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=107";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=108";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -153,6 +153,9 @@ let coachAudioTicker = null;
 let coachAudioAutoStop = null;
 let coachAudioTranscriptionInFlight = false;
 let coachQuestionDraftSource = "text";
+let dailyCoachInFlight = false;
+let weeklyCoachInFlight = false;
+let automaticCoachChecksQueued = false;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -886,7 +889,10 @@ function updateCloudStatus(status) {
   $("cloudSyncButton").classList.toggle("hidden", !hasUser || status.state === "account-mismatch");
   $("cloudSignOutButton").classList.toggle("hidden", !hasUser);
   $("cloudSyncButton").disabled = status.state === "syncing";
-  if (status.state === "synced") queueMicrotask(maybeGenerateMonthlySummary);
+  if (status.state === "synced") {
+    queueMicrotask(maybeGenerateMonthlySummary);
+    queueMicrotask(maybeRunAutomaticCoachChecks);
+  }
 }
 
 function openCloudDialog() {
@@ -964,6 +970,8 @@ function saveCoachProfile(event) {
     setCoachProfileMessage(cloudSync.currentUser
       ? "Perfil guardado y preparado para sincronizarse con tu cuenta."
       : "Perfil guardado en este dispositivo. Inicia sesión para sincronizarlo.", "success");
+    automaticCoachChecksQueued = false;
+    queueMicrotask(maybeRunAutomaticCoachChecks);
     showToast("Perfil privado del entrenador guardado.");
   } catch (error) {
     setCoachProfileMessage(error.message);
@@ -1157,6 +1165,14 @@ function renderCoachQuestions() {
   const history = $("coachQuestionHistory");
   history.replaceChildren();
   const allQuestions = repository.listCoachQuestions();
+  if (!weeklyCoachInFlight) {
+    const weekReview = repository.getNutritionEntry(`weekly-review-${isoWeekInfo(getChileDateISO()).startISO}`);
+    const count = Number(weekReview?.stats?.proposedAdjustments || 0);
+    $("coachWeekReviewStatus").textContent = weekReview
+      ? count ? `Revisión vigente: ${count} ${count === 1 ? "ajuste propuesto" : "ajustes propuestos"}.`
+        : "Revisión vigente: la distribución actual no necesita cambios concretos."
+      : "";
+  }
   const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 3)).reverse();
   const toggle = $("coachHistoryToggle");
   $("coachHistoryClear").classList.toggle("hidden", allQuestions.length === 0);
@@ -1179,6 +1195,26 @@ function renderCoachQuestions() {
     answer.className = "coach-exchange-answer";
     answer.textContent = item.answer || "Sin respuesta todavía. Pulsa Reintentar cuando tengas conexión.";
     exchange.append(question, answer);
+    if (item.answer && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window) {
+      const speak = document.createElement("button");
+      speak.type = "button";
+      speak.className = "coach-speak-button";
+      speak.textContent = "🔊 Escuchar respuesta";
+      speak.addEventListener("click", () => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          speak.textContent = "🔊 Escuchar respuesta";
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(item.answer);
+        utterance.lang = "es-CL";
+        utterance.rate = 1;
+        utterance.onend = utterance.onerror = () => { speak.textContent = "🔊 Escuchar respuesta"; };
+        speak.textContent = "■ Detener audio";
+        window.speechSynthesis.speak(utterance);
+      });
+      exchange.append(speak);
+    }
     if (item.recoveryContext) {
       const recovery = document.createElement("div");
       recovery.className = "coach-plan-proposal recovery-context";
@@ -1764,6 +1800,174 @@ function coachQuestionContext() {
   };
 }
 
+function dailyCoachSourceUpdatedAt(context = coachQuestionContext()) {
+  return newestTimestamp([
+    activeTrainingBlock(),
+    repository.getCoachProfile(),
+    ...repository.list().filter(item => item.dateISO >= addDaysISO(context.todayISO, -6)),
+    ...repository.listNutritionEntries().filter(item => item.dateISO >= addDaysISO(context.todayISO, -2)),
+    ...repository.listCoachQuestions().slice(0, 8),
+    wearableData.status || {}
+  ]) || new Date().toISOString();
+}
+
+async function requestDailyCoachInsight({ interactive = true, force = true } = {}) {
+  const todayISO = getChileDateISO();
+  const existing = repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  if (dailyCoachInFlight || (!force && existing)) return existing;
+  if (!cloudSync.currentUser) {
+    if (interactive) { openCloudDialog(); showToast("Inicia sesión con Google para actualizar el chequeo diario."); }
+    return null;
+  }
+  const profile = repository.getCoachProfile();
+  if (!profile?.profileText) {
+    if (interactive) { openCoachProfileDialog(); showToast("Configura primero el perfil de tu entrenador IA."); }
+    return null;
+  }
+  dailyCoachInFlight = true;
+  const button = $("dailyBriefAiAction");
+  button.disabled = true;
+  button.textContent = "Gemini está revisando tu día…";
+  try {
+    const context = coachQuestionContext();
+    const result = await aiClient.analyzeDailyCoach(context);
+    const insight = result.insight;
+    const sections = [
+      { title: "Señales del día", items: insight.signals || [] },
+      { title: "Datos considerados", items: insight.dataUsed || [] },
+      ...(insight.missingData?.length ? [{ title: "Información que falta", items: insight.missingData }] : []),
+      { title: "Recomendación para hoy", items: [insight.recommendation].filter(Boolean) }
+    ];
+    repository.saveNutritionEntry({
+      id: `daily-coach-${todayISO}`,
+      dateISO: todayISO,
+      kind: "daily-coach",
+      title: insight.title,
+      summary: insight.summary,
+      sections,
+      encouragement: insight.encouragement,
+      stats: { decision: insight.decision },
+      sourceUpdatedAt: dailyCoachSourceUpdatedAt(context),
+      generatedAt: new Date().toISOString(),
+      model: result.model,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    renderHome();
+    renderHistory();
+    if (interactive) showToast("Gemini actualizó tu chequeo diario con los datos disponibles.");
+    return repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  } catch (error) {
+    if (interactive) showToast(error.message || "No se pudo actualizar el chequeo diario.");
+    return null;
+  } finally {
+    dailyCoachInFlight = false;
+    button.disabled = false;
+    button.innerHTML = '<span aria-hidden="true">✦</span> Actualizar con Gemini';
+  }
+}
+
+function validWeeklyAdjustments(adjustments, context) {
+  const todayISO = context.todayISO;
+  const validDates = new Set((context.currentPlan?.upcomingSessions || [])
+    .map(item => item.dateISO).filter(dateISO => dateISO >= todayISO && dateISO <= addDaysISO(todayISO, 7)));
+  const seen = new Set();
+  return (Array.isArray(adjustments) ? adjustments : []).filter(item => {
+    if (!validDates.has(item?.targetDateISO) || seen.has(item.targetDateISO)) return false;
+    if (!["physical", "cardio", "tennis", "rest"].includes(item.category)) return false;
+    if (item.category === "physical" && !physicalRoutines.some(value => value.id === item.routineId)) return false;
+    if (item.category === "cardio" && !cardioTypes.some(value => value.id === item.cardioTypeId)) return false;
+    if (item.category === "tennis" && !tennisTypes.some(value => value.id === item.tennisTypeId)) return false;
+    if (item.category === "rest" && !restTypes.some(value => value.id === item.restTypeId)) return false;
+    if (item.category === "physical") {
+      const routine = physicalRoutines.find(value => value.id === item.routineId);
+      const allowedExercises = new Set((routine?.exercises || []).map(value => value.id));
+      item.exerciseSettings = (item.exerciseSettings || []).filter(value => allowedExercises.has(value.exerciseId));
+    }
+    seen.add(item.targetDateISO);
+    return true;
+  }).slice(0, 3);
+}
+
+async function requestWeeklyCoachReview({ interactive = true, force = true } = {}) {
+  const todayISO = getChileDateISO();
+  const week = isoWeekInfo(todayISO);
+  const reviewId = `weekly-review-${week.startISO}`;
+  const existingReview = repository.getNutritionEntry(reviewId);
+  if (weeklyCoachInFlight || (!force && existingReview)) return existingReview;
+  if (!cloudSync.currentUser) {
+    if (interactive) { openCloudDialog(); showToast("Inicia sesión con Google para revisar la semana."); }
+    return null;
+  }
+  if (!repository.getCoachProfile()?.profileText) {
+    if (interactive) { openCoachProfileDialog(); showToast("Configura primero el perfil de tu entrenador IA."); }
+    return null;
+  }
+  weeklyCoachInFlight = true;
+  const button = $("coachWeekReviewButton");
+  button.disabled = true;
+  button.textContent = "Revisando los próximos 7 días…";
+  $("coachWeekReviewStatus").textContent = "Gemini está cruzando plan, carga, recuperación y partidos.";
+  try {
+    const context = coachQuestionContext();
+    const result = await aiClient.reviewCoachWeek(context);
+    const review = result.review;
+    const adjustments = validWeeklyAdjustments(review.adjustments, context);
+    const timestamp = new Date().toISOString();
+    repository.saveNutritionEntry({
+      id: reviewId, dateISO: todayISO, kind: "weekly-review",
+      title: review.title, summary: review.summary,
+      sections: [
+        { title: "Lo que observó", items: review.observations || [] },
+        { title: "Foco de los próximos 7 días", items: review.focus || [] }
+      ],
+      encouragement: review.encouragement,
+      stats: { proposedAdjustments: adjustments.length },
+      sourceUpdatedAt: dailyCoachSourceUpdatedAt(context), generatedAt: timestamp, model: result.model,
+      createdAt: existingReview?.createdAt || timestamp, updatedAt: timestamp
+    });
+    adjustments.forEach(adjustment => {
+      const id = `weekly-adjustment-${week.startISO}-${adjustment.targetDateISO}`;
+      const current = repository.listCoachQuestions({ includeDeleted: true }).find(item => item.id === id);
+      if (["applied", "reverted", "dismissed"].includes(current?.adjustmentStatus)) return;
+      repository.saveCoachQuestion({
+        id,
+        question: `Revisión semanal para ${formatShortDate(adjustment.targetDateISO)}`,
+        answer: `${review.summary} ${adjustment.reason}`.trim(),
+        source: "text",
+        planAdjustment: adjustment,
+        adjustmentStatus: "pending",
+        createdAt: current?.createdAt || timestamp,
+        updatedAt: timestamp
+      });
+    });
+    renderHome(); renderHistory(); renderCoachQuestions();
+    $("coachWeekReviewStatus").textContent = adjustments.length
+      ? `${adjustments.length} ${adjustments.length === 1 ? "ajuste propuesto" : "ajustes propuestos"}. Revísalos y confirma solo los que quieras aplicar.`
+      : "La distribución actual es coherente con los datos disponibles; no hay cambios concretos que aplicar.";
+    if (interactive) showToast(adjustments.length ? "Revisión lista. Las propuestas esperan tu confirmación." : "Revisión lista: Gemini recomienda conservar la semana.");
+    return repository.getNutritionEntry(reviewId);
+  } catch (error) {
+    $("coachWeekReviewStatus").textContent = error.message || "No se pudo revisar la semana.";
+    if (interactive) showToast(error.message || "No se pudo revisar la semana.");
+    return null;
+  } finally {
+    weeklyCoachInFlight = false;
+    button.disabled = false;
+    button.innerHTML = '<span aria-hidden="true">✦</span> Revisar y adaptar los próximos 7 días';
+  }
+}
+
+async function maybeRunAutomaticCoachChecks() {
+  if (automaticCoachChecksQueued || !cloudSync.currentUser || !repository.getCoachProfile()?.profileText) return;
+  automaticCoachChecksQueued = true;
+  await requestDailyCoachInsight({ interactive: false, force: false });
+  const todayISO = getChileDateISO();
+  if (new Date(`${todayISO}T12:00:00Z`).getUTCDay() === 1) {
+    await requestWeeklyCoachReview({ interactive: false, force: false });
+  }
+}
+
 function clearCoachAudioTimers() {
   if (coachAudioTicker) clearInterval(coachAudioTicker);
   if (coachAudioAutoStop) clearTimeout(coachAudioAutoStop);
@@ -1903,7 +2107,7 @@ async function submitCoachQuestion(existing = null) {
   const question = existing?.question || input.value.trim();
   if (!question) { input.focus(); return; }
   if (!cloudSync.currentUser) {
-    $("coachQuestionStatus").textContent = "Inicia sesión con Google para preguntar a la guía.";
+    $("coachQuestionStatus").textContent = "Inicia sesión con Google para hablar con TGTrain.";
     openCloudDialog();
     return;
   }
@@ -1916,7 +2120,7 @@ async function submitCoachQuestion(existing = null) {
   $("coachAskButton").disabled = true;
   $("coachVoiceButton").disabled = true;
   $("coachAskButton").textContent = "Consultando…";
-  $("coachQuestionStatus").textContent = "La guía está revisando tus registros y tu plan.";
+  $("coachQuestionStatus").textContent = "TGTrain está revisando tus registros y tu plan.";
   const timestamp = new Date().toISOString();
   let saved = existing;
   try {
@@ -1961,7 +2165,7 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     const session = coachSessionForDate(addDaysISO(todayISO, index), block);
     return (session?.options || []).some(item => item.category === "tennis" && item.prefill?.tennisTypeId === "match");
   });
-  const brief = dailyBrief({
+  const localBrief = dailyBrief({
     dateISO: todayISO,
     planTitle: option?.title || "",
     planCategory: option?.category || "",
@@ -1971,6 +2175,23 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     nutritionEntries: repository.listNutritionEntries(),
     recoveryContexts: recoveryContextsFromQuestions(repository.listCoachQuestions())
   });
+  const aiInsight = repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  const decision = aiInsight?.stats?.decision || "";
+  const decisionView = {
+    train: { label: "Plan confirmado por IA", tone: "ready" },
+    adapt: { label: "Conviene adaptar", tone: "caution" },
+    recover: { label: "Priorizar recuperación", tone: "recover" },
+    "waiting-data": { label: "Faltan datos clave", tone: "neutral" }
+  }[decision];
+  const aiSignals = (aiInsight?.sections || []).flatMap(section => section.items || []).slice(0, 6);
+  const brief = aiInsight ? {
+    ...localBrief,
+    title: aiInsight.title,
+    summary: aiInsight.summary,
+    signals: aiSignals.length ? aiSignals : localBrief.signals,
+    label: decisionView?.label || "Revisado por Gemini",
+    tone: decisionView?.tone || "neutral"
+  } : localBrief;
   $("dailyBriefTitle").textContent = brief.title;
   $("dailyBriefSummary").textContent = brief.summary;
   const status = $("dailyBriefStatus");
@@ -1983,6 +2204,11 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     item.textContent = value;
     signals.append(item);
   });
+  const aiGeneratedAt = new Date(aiInsight?.generatedAt || aiInsight?.updatedAt || "");
+  $("dailyBriefAiMeta").textContent = aiInsight
+    ? `Revisado por Gemini ${Number.isFinite(aiGeneratedAt.getTime()) ? aiGeneratedAt.toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "recientemente"} · incluye datos considerados y faltantes en Historial.`
+    : "Evaluación local provisional. Gemini la completará al sincronizar tu cuenta o cuando pulses Actualizar.";
+  $("dailyBriefAiAction").disabled = dailyCoachInFlight;
   const active = loadRoutineSession()?.status === "active" || guidedUI.hasPending() || Boolean(plannedActivityContext(loadPlannedActivity()));
   const button = $("dailyBriefAction");
   // El banner principal y la barra de sesión ya contienen esas acciones.
@@ -5942,7 +6168,10 @@ function createCoachInsightDisclosure(insight) {
   const disclosure = document.createElement("summary");
   const copy = document.createElement("span");
   const eyebrow = document.createElement("small");
-  eyebrow.textContent = insight.kind === "monthly-summary" ? "Resumen mensual IA" : `Nutrición · ${formatShortDate(insight.dateISO)}`;
+  eyebrow.textContent = insight.kind === "monthly-summary" ? "Resumen mensual IA"
+    : insight.kind === "daily-coach" ? `Chequeo diario · ${formatShortDate(insight.dateISO)}`
+      : insight.kind === "weekly-review" ? `Revisión semanal · ${formatShortDate(insight.dateISO)}`
+        : `Nutrición · ${formatShortDate(insight.dateISO)}`;
   const title = document.createElement("strong");
   title.textContent = insight.title;
   copy.append(eyebrow, title);
@@ -5978,14 +6207,14 @@ function createCoachInsightDisclosure(insight) {
 
 function renderHistoryCoachInsights() {
   const container = $("historyCoachInsights");
-  const insights = repository.listNutritionEntries().filter(item => !item.deleted && ["nutrition-analysis", "monthly-summary"].includes(item.kind))
+  const insights = repository.listNutritionEntries().filter(item => !item.deleted && ["nutrition-analysis", "monthly-summary", "daily-coach", "weekly-review"].includes(item.kind))
     .sort((a, b) => String(b.generatedAt || b.updatedAt).localeCompare(String(a.generatedAt || a.updatedAt)));
   container.replaceChildren();
   container.classList.toggle("hidden", !insights.length);
   if (!insights.length) return;
   const heading = document.createElement("div"); heading.className = "history-insights-heading";
   const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow dark"; eyebrow.textContent = "Entrenador IA";
-  const title = document.createElement("h2"); title.textContent = "Nutrición y balances mensuales";
+  const title = document.createElement("h2"); title.textContent = "Chequeos, nutrición y balances";
   heading.append(eyebrow, title); container.append(heading);
   insights.forEach(insight => container.append(createCoachInsightDisclosure(insight)));
 }
@@ -6445,6 +6674,8 @@ async function registerServiceWorker() {
 
 function bindEvents() {
   $("activeSessionDockButton").addEventListener("click", openActiveSession);
+  $("dailyBriefAiAction").addEventListener("click", () => requestDailyCoachInsight({ interactive: true, force: true }));
+  $("coachWeekReviewButton").addEventListener("click", () => requestWeeklyCoachReview({ interactive: true, force: true }));
   $("dailyBriefAction").addEventListener("click", event => {
     const action = event.currentTarget.dataset.action;
     if (action === "active-session") return openActiveSession();

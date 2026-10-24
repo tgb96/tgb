@@ -217,7 +217,7 @@ test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => 
   assert.equal(entries.find(item => item.id === "b").proteinG, null);
 });
 
-test("conserva comentarios nutricionales y resúmenes mensuales sin sumarlos como comidas", () => {
+test("conserva chequeos y balances del entrenador sin sumarlos como comidas", () => {
   const entries = Object.values(normalizeNutritionEntries([
     {
       id: "nutrition-analysis-2026-09-25", dateISO: "2026-09-25", kind: "nutrition-analysis",
@@ -229,11 +229,24 @@ test("conserva comentarios nutricionales y resúmenes mensuales sin sumarlos com
       id: "monthly-summary-2026-08", dateISO: "2026-08-31", kind: "monthly-summary",
       title: "Resumen de agosto", summary: "Mes constante.", periodStartISO: "2026-08-01", periodEndISO: "2026-08-31",
       sections: [{ title: "Entrenamiento", items: ["Hubo 12 sesiones."] }], stats: { sessions: 12 }
+    },
+    {
+      id: "daily-coach-2026-09-25", dateISO: "2026-09-25", kind: "daily-coach",
+      title: "Mantén el plan", summary: "Recuperación suficiente.",
+      sections: [{ title: "Datos considerados", items: ["7 h de sueño."] }], stats: { decision: "train" }
+    },
+    {
+      id: "weekly-review-2026-09-21", dateISO: "2026-09-21", kind: "weekly-review",
+      title: "Revisión semanal", summary: "La semana está equilibrada.",
+      sections: [{ title: "Foco", items: ["Llegar fresco al partido."] }], stats: { proposedAdjustments: 0 }
     }
   ]));
-  assert.equal(entries.length, 2);
+  assert.equal(entries.length, 4);
   assert.equal(entries[0].sections[0].items[0], "Incluiste proteína.");
   assert.equal(entries[1].stats.sessions, 12);
+  assert.equal(entries[2].kind, "daily-coach");
+  assert.equal(entries[2].stats.decision, "train");
+  assert.equal(entries[3].kind, "weekly-review");
   assert.equal(nutritionDayTotals(entries).meals, 0);
 });
 
