@@ -511,7 +511,7 @@
       <label for="nutritionMealTime">Hora</label>
       <input id="nutritionMealTime" type="time" required>
       <section class="nutrition-fast-entry" aria-labelledby="nutritionFastEntryTitle">
-        <div><strong id="nutritionFastEntryTitle">Registro rápido</strong><small>Reutiliza una comida o deja que la IA prepare un borrador desde una foto.</small></div>
+        <div><strong id="nutritionFastEntryTitle">Registro rápido</strong><small>Reutiliza una comida o deja que Gemini combine una foto con tu descripción.</small></div>
         <div id="nutritionRecentMeals" class="nutrition-recent-meals"></div>
         <div class="nutrition-photo-actions">
           <label class="nutrition-photo-button" for="nutritionMealCamera">Sacar foto</label>
@@ -519,12 +519,12 @@
         </div>
         <input id="nutritionMealCamera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
         <input id="nutritionMealPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden>
-        <button id="nutritionAnalyzePhoto" type="button" disabled>Analizar foto con IA</button>
-        <p id="nutritionPhotoStatus" class="nutrition-photo-status" role="status"></p>
         <div class="nutrition-ai-meal-entry">
-          <label for="nutritionAiMealDescription"><strong>Estimar una comida con Gemini</strong><small>Describe el local, el plato, las salsas, el tamaño y cuánto comiste.</small></label>
+          <label for="nutritionAiMealDescription"><strong>Descripción para Gemini</strong><small>Puedes usarla sola o junto con la foto. Indica el local, el plato, las salsas, el tamaño y cuánto comiste.</small></label>
           <textarea id="nutritionAiMealDescription" rows="3" maxlength="1200" placeholder="Ej.: Piccola Italia: dos tipos de pasta con salsa y una milanesa de pollo; comí el plato completo."></textarea>
-          <button id="nutritionEstimateMeal" type="button">Estimar kcal y macros</button>
+          <button id="nutritionAnalyzePhoto" type="button" disabled>Analizar foto con Gemini</button>
+          <p id="nutritionPhotoStatus" class="nutrition-photo-status" role="status"></p>
+          <button id="nutritionEstimateMeal" type="button">Estimar solo la descripción</button>
           <p id="nutritionAiMealStatus" class="nutrition-photo-status" role="status"></p>
         </div>
       </section>
@@ -615,6 +615,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=125"></script>
+<script type="module" src="assets/js/app.js?v=126"></script>
 </body>
 </html>

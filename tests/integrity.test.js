@@ -298,6 +298,8 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.match(ui, /saveNutritionFood/);
   assert.match(ui, /estimateFoodNutrition/);
   assert.match(ui, /estimateMealDescription/);
+  assert.match(ui, /userContext, catalog/);
+  assert.match(ui, /ai-photo-description/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
@@ -314,6 +316,7 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /async estimateFoodNutrition\(name, context/);
   assert.match(ai, /async estimateMealDescription\(description, context/);
   assert.match(ai, /mealDescriptionSchema/);
+  assert.match(ai, /combina una sola foto de comida|combinándola con userContext/);
   assert.match(ai, /foodNutritionSchema/);
   assert.match(ai, /ReCaptchaEnterpriseProvider/);
   assert.match(ai, /6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9/);
@@ -471,7 +474,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=125/);
+  assert.match(html, /assets\/js\/app\.js\?v=126/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
