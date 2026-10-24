@@ -1,17 +1,17 @@
-const CACHE_NAME = "tgtrain-shell-v128";
+const CACHE_NAME = "tgtrain-shell-v129";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./assets/css/styles.css?v=106",
-  "./assets/js/app.js?v=128",
+  "./assets/css/styles.css?v=107",
+  "./assets/js/app.js?v=129",
   "./assets/js/coach-plan.js?v=99",
   "./assets/js/data.js?v=70",
   "./assets/js/storage.js?v=113",
   "./assets/js/utils.js?v=73",
   "./assets/js/cloud.js?v=76",
-  "./assets/js/ai.js?v=106",
+  "./assets/js/ai.js?v=107",
   "./assets/js/progression.js?v=3",
   "./assets/js/training-plan.js?v=99",
   "./assets/js/open-tennis-sync.js?v=100",

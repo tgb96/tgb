@@ -32,7 +32,7 @@ import { createNutritionUI } from "./nutrition-ui.js?v=115";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=97";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=106";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=107";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -145,6 +145,14 @@ let monthlySummaryAttempted = false;
 let coachQuestionInFlight = false;
 let coachHistoryExpanded = false;
 let wearableBridgePollToken = 0;
+let coachAudioRecorder = null;
+let coachAudioStream = null;
+let coachAudioChunks = [];
+let coachAudioStartedAt = 0;
+let coachAudioTicker = null;
+let coachAudioAutoStop = null;
+let coachAudioTranscriptionInFlight = false;
+let coachQuestionDraftSource = "text";
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -1756,6 +1764,139 @@ function coachQuestionContext() {
   };
 }
 
+function clearCoachAudioTimers() {
+  if (coachAudioTicker) clearInterval(coachAudioTicker);
+  if (coachAudioAutoStop) clearTimeout(coachAudioAutoStop);
+  coachAudioTicker = null;
+  coachAudioAutoStop = null;
+}
+
+function releaseCoachAudioStream() {
+  coachAudioStream?.getTracks().forEach(track => track.stop());
+  coachAudioStream = null;
+}
+
+function resetCoachVoiceButton() {
+  const button = $("coachVoiceButton");
+  button.disabled = coachQuestionInFlight || coachAudioTranscriptionInFlight;
+  button.classList.remove("recording");
+  button.setAttribute("aria-pressed", "false");
+  button.textContent = "🎙 Hablar";
+  $("coachAskButton").disabled = coachQuestionInFlight || coachAudioTranscriptionInFlight;
+}
+
+function coachMicrophoneError(error) {
+  const name = String(error?.name || "");
+  if (["NotAllowedError", "PermissionDeniedError"].includes(name)) return "El micrófono está bloqueado. En Android abre Información de la app de TGTrain o Chrome → Permisos → Micrófono → Permitir.";
+  if (name === "NotFoundError") return "No encontré un micrófono disponible en este dispositivo.";
+  if (["NotReadableError", "AbortError"].includes(name)) return "Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentarlo.";
+  if (name === "SecurityError") return "Android no permitió usar el micrófono desde esta instalación de TGTrain.";
+  return error?.message || "No fue posible iniciar el micrófono.";
+}
+
+async function transcribeCoachRecording(audioBlob) {
+  coachAudioTranscriptionInFlight = true;
+  resetCoachVoiceButton();
+  $("coachVoiceButton").textContent = "Transcribiendo…";
+  $("coachQuestionStatus").textContent = "Gemini está transcribiendo la nota. El audio no se guardará.";
+  try {
+    const result = await aiClient.transcribeCoachAudio(audioBlob);
+    const input = $("coachQuestionText");
+    const existing = input.value.trim();
+    const prefix = existing ? `${existing}\n` : "";
+    const available = Math.max(0, input.maxLength - prefix.length);
+    const transcript = String(result?.transcript || "").trim();
+    input.value = `${prefix}${transcript.slice(0, available)}`;
+    coachQuestionDraftSource = "voice";
+    $("coachQuestionStatus").textContent = transcript.length > available
+      ? "Transcripción lista, pero se acortó al límite del campo. Revísala antes de enviarla."
+      : "Transcripción lista. Revísala y luego pulsa Preguntar a la guía.";
+  } catch (error) {
+    $("coachQuestionStatus").textContent = error?.message || "No fue posible transcribir la grabación.";
+  } finally {
+    coachAudioTranscriptionInFlight = false;
+    resetCoachVoiceButton();
+  }
+}
+
+function stopCoachVoiceRecording() {
+  if (!coachAudioRecorder || coachAudioRecorder.state !== "recording") return;
+  clearCoachAudioTimers();
+  $("coachVoiceButton").disabled = true;
+  $("coachVoiceButton").textContent = "Procesando…";
+  $("coachQuestionStatus").textContent = "Preparando la grabación para transcribirla…";
+  coachAudioRecorder.stop();
+}
+
+async function toggleCoachVoice() {
+  if (coachAudioRecorder?.state === "recording") return stopCoachVoiceRecording();
+  if (coachQuestionInFlight || coachAudioTranscriptionInFlight) return;
+  if (!cloudSync.currentUser) {
+    $("coachQuestionStatus").textContent = "Inicia sesión con Google para transcribir una nota de voz con Gemini.";
+    openCloudDialog();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !("MediaRecorder" in window)) {
+    $("coachQuestionStatus").textContent = "Este navegador no permite grabar audio. Actualiza Chrome o abre TGTrain desde Chrome.";
+    return;
+  }
+  const button = $("coachVoiceButton");
+  button.disabled = true;
+  $("coachQuestionStatus").textContent = "Solicitando permiso para usar el micrófono…";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    const preferredTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported?.(type)) || "";
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 })
+      : new MediaRecorder(stream);
+    let recordingFailed = false;
+    coachAudioStream = stream;
+    coachAudioRecorder = recorder;
+    coachAudioChunks = [];
+    recorder.addEventListener("dataavailable", event => { if (event.data?.size) coachAudioChunks.push(event.data); });
+    recorder.addEventListener("error", event => {
+      recordingFailed = true;
+      $("coachQuestionStatus").textContent = coachMicrophoneError(event.error);
+      clearCoachAudioTimers();
+      releaseCoachAudioStream();
+      coachAudioRecorder = null;
+      resetCoachVoiceButton();
+    });
+    recorder.addEventListener("stop", () => {
+      if (recordingFailed) {
+        coachAudioChunks = [];
+        return;
+      }
+      const type = String(recorder.mimeType || coachAudioChunks[0]?.type || "audio/webm").split(";")[0];
+      const audioBlob = new Blob(coachAudioChunks, { type });
+      coachAudioRecorder = null;
+      coachAudioChunks = [];
+      releaseCoachAudioStream();
+      transcribeCoachRecording(audioBlob);
+    }, { once: true });
+    recorder.start(1000);
+    coachAudioStartedAt = Date.now();
+    button.disabled = false;
+    button.classList.add("recording");
+    button.setAttribute("aria-pressed", "true");
+    button.textContent = "■ Detener";
+    $("coachAskButton").disabled = true;
+    $("coachQuestionStatus").textContent = "Grabando… 0:00 de 1:00";
+    coachAudioTicker = setInterval(() => {
+      const elapsed = Math.min(60, Math.floor((Date.now() - coachAudioStartedAt) / 1000));
+      $("coachQuestionStatus").textContent = `Grabando… 0:${String(elapsed).padStart(2, "0")} de 1:00`;
+    }, 1000);
+    coachAudioAutoStop = setTimeout(stopCoachVoiceRecording, 60000);
+  } catch (error) {
+    clearCoachAudioTimers();
+    releaseCoachAudioStream();
+    coachAudioRecorder = null;
+    $("coachQuestionStatus").textContent = coachMicrophoneError(error);
+    resetCoachVoiceButton();
+  }
+}
+
 async function submitCoachQuestion(existing = null) {
   if (coachQuestionInFlight) return;
   const input = $("coachQuestionText");
@@ -1773,6 +1914,7 @@ async function submitCoachQuestion(existing = null) {
   }
   coachQuestionInFlight = true;
   $("coachAskButton").disabled = true;
+  $("coachVoiceButton").disabled = true;
   $("coachAskButton").textContent = "Consultando…";
   $("coachQuestionStatus").textContent = "La guía está revisando tus registros y tu plan.";
   const timestamp = new Date().toISOString();
@@ -1780,7 +1922,7 @@ async function submitCoachQuestion(existing = null) {
   try {
     const context = coachQuestionContext();
     if (!saved) saved = repository.saveCoachQuestion({
-      id: crypto.randomUUID(), question, answer: "", source: "text",
+      id: crypto.randomUUID(), question, answer: "", source: coachQuestionDraftSource,
       createdAt: timestamp, updatedAt: timestamp
     });
     renderCoachQuestions();
@@ -1796,7 +1938,10 @@ async function submitCoachQuestion(existing = null) {
       updatedAt: new Date().toISOString()
     });
     if (result.recoveryContext) renderHome();
-    if (!existing) input.value = "";
+    if (!existing) {
+      input.value = "";
+      coachQuestionDraftSource = "text";
+    }
     $("coachQuestionStatus").textContent = "Respuesta guardada en este dispositivo y sincronizada con tu cuenta cuando haya conexión.";
   } catch (error) {
     $("coachQuestionStatus").textContent = error.message || "No se pudo obtener respuesta. Puedes reintentarlo.";
@@ -1804,6 +1949,7 @@ async function submitCoachQuestion(existing = null) {
     coachQuestionInFlight = false;
     $("coachAskButton").disabled = false;
     $("coachAskButton").textContent = "Preguntar a la guía →";
+    resetCoachVoiceButton();
     renderCoachQuestions();
   }
 }
@@ -6311,6 +6457,10 @@ function bindEvents() {
   $("coachQuestionForm").addEventListener("submit", event => {
     event.preventDefault();
     submitCoachQuestion();
+  });
+  $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
+  $("coachQuestionText").addEventListener("input", event => {
+    if (!event.target.value.trim()) coachQuestionDraftSource = "text";
   });
   $("coachHistoryToggle").addEventListener("click", () => {
     coachHistoryExpanded = !coachHistoryExpanded;

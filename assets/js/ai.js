@@ -262,6 +262,12 @@ const mealDescriptionSchema = {
   required: ["summary", "portionNotes", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence"]
 };
 
+const audioTranscriptionSchema = {
+  type: "object",
+  properties: { transcript: stringSchema },
+  required: ["transcript"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -439,6 +445,36 @@ export function createAiClient() {
         },
         model: MODEL_NAME
       };
+    },
+    async transcribeCoachAudio(audioBlob) {
+      if (!(audioBlob instanceof Blob)) throw new Error("No se recibió una grabación válida.");
+      if (!audioBlob.size) throw new Error("La grabación quedó vacía. Vuelve a intentarlo.");
+      if (audioBlob.size > 8 * 1024 * 1024) throw new Error("La grabación es demasiado grande. Habla durante un máximo de 60 segundos.");
+      const aliases = { "audio/x-m4a": "audio/m4a", "audio/x-wav": "audio/wav" };
+      const rawMimeType = String(audioBlob.type || "audio/webm").toLowerCase().split(";")[0];
+      const mimeType = aliases[rawMimeType] || rawMimeType;
+      const supported = new Set(["audio/aac", "audio/flac", "audio/mp3", "audio/m4a", "audio/mpeg", "audio/mp4", "audio/ogg", "audio/opus", "audio/wav", "audio/webm"]);
+      if (!supported.has(mimeType)) throw new Error("El teléfono generó un formato de audio que Gemini no puede leer.");
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("No se pudo leer la grabación."));
+        reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+        reader.readAsDataURL(audioBlob);
+      });
+      const result = await generateJson({
+        instructions: [
+          "Transcribe fielmente esta nota de voz en español para que el usuario pueda revisarla antes de enviarla a su entrenador de TGTrain.",
+          "Conserva síntomas, fechas, horas, cantidades, ejercicios, cargas, nombres y negaciones. No respondas la pregunta, no aconsejes y no agregues información.",
+          "Corrige únicamente puntuación y muletillas evidentes para que el texto sea legible. Devuelve solo la transcripción en transcript."
+        ].join("\n"),
+        input: "Transcribe la nota de voz.",
+        parts: [{ inlineData: { data, mimeType } }],
+        schema: audioTranscriptionSchema,
+        maxOutputTokens: 1200
+      });
+      const transcript = String(result?.transcript || "").trim().slice(0, 2000);
+      if (!transcript) throw new Error("No pude reconocer palabras en la grabación. Inténtalo de nuevo hablando cerca del teléfono.");
+      return { transcript, model: MODEL_NAME };
     },
     async askCoach(question, context = {}) {
       const catalog = {

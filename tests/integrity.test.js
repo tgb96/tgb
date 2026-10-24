@@ -79,7 +79,8 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /Ajuste recomendado/);
   assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
-  assert.doesNotMatch(html, /id="coachVoiceButton"|coach-voice-button/);
+  assert.match(html, /id="coachVoiceButton"[^>]+type="button"/);
+  assert.match(html, /Gemini transcribe el audio para que lo revises/);
   assert.match(html, /id="coachHistoryToggle"/);
   assert.doesNotMatch(html, /Tus preguntas quedan guardadas hasta que las limpies/);
   assert.doesNotMatch(html, /Graba hasta 30 segundos/);
@@ -319,6 +320,7 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /firebase-app-check\.js/);
   assert.match(ai, /async estimateFoodNutrition\(name, context/);
   assert.match(ai, /async estimateMealDescription\(description, context/);
+  assert.match(ai, /async transcribeCoachAudio\(audioBlob\)/);
   assert.match(ai, /mealDescriptionSchema/);
   assert.match(ai, /combina una sola foto de comida|combinándola con userContext/);
   assert.match(ai, /plato chico.*23 cm.*plato grande.*27 cm/);
@@ -417,11 +419,17 @@ test("la guía no repite que su comentario ya está guardado", async () => {
   assert.doesNotMatch(app, /Comentario guardado en tu historial/);
 });
 
-test("la app deja el dictado al teclado y no muestra controles propios de micrófono", async () => {
+test("la app graba una nota de voz real y Gemini la transcribe antes de enviarla", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
-  assert.doesNotMatch(app, /MediaRecorder|coachVoiceButton|toggleCoachVoice|getUserMedia\(\{ audio: true \}\)/);
-  assert.doesNotMatch(ai, /inlineData: \{ data, mimeType \}|async transcribeAudio\(audioBlob\)/);
+  assert.match(app, /navigator\.mediaDevices\.getUserMedia/);
+  assert.match(app, /new MediaRecorder/);
+  assert.match(app, /coachAudioAutoStop = setTimeout\(stopCoachVoiceRecording, 60000\)/);
+  assert.match(app, /aiClient\.transcribeCoachAudio\(audioBlob\)/);
+  assert.match(app, /Transcripción lista\. Revísala y luego pulsa Preguntar/);
+  assert.match(ai, /inlineData: \{ data, mimeType \}/);
+  assert.match(ai, /audio\/webm/);
+  assert.match(ai, /No respondas la pregunta, no aconsejes/);
 });
 
 test("el importador compacta planes largos y reintenta respuestas JSON truncadas", async () => {
@@ -480,7 +488,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=128/);
+  assert.match(html, /assets\/js\/app\.js\?v=129/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
