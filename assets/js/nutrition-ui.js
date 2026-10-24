@@ -78,7 +78,6 @@ export function createNutritionUI(repository, {
     reset.hidden = !hasOverride;
     reset.classList.toggle("hidden", !hasOverride);
     setFoodFormMessage();
-    byId("nutritionFoodName").focus();
     form.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -456,7 +455,6 @@ export function createNutritionUI(repository, {
     byId("nutritionMacrosDetails").open = Boolean(estimate || (entry && ["caloriesKcal", "proteinG", "carbsG", "fatG"].some(key => entry[key] !== null)));
     byId("nutritionEstimateNote").textContent = estimateNote(selectedParts);
     dialog.showModal();
-    byId("nutritionIngredientSearch").focus();
   }
 
   function saveMeal(event) {

@@ -28,7 +28,7 @@ import {
 } from "./coach-plan.js?v=99";
 import { createRepository } from "./storage.js?v=113";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=114";
+import { createNutritionUI } from "./nutrition-ui.js?v=115";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=97";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
@@ -2337,7 +2337,6 @@ function createLocationPicker({ idPrefix, labelText, values, currentValue, place
     otherLabel.classList.toggle("hidden", !visible);
     otherInput.classList.toggle("hidden", !visible);
     otherInput.required = visible;
-    if (visible) otherInput.focus({ preventScroll: true });
   };
   select.addEventListener("change", updateOtherVisibility);
   updateOtherVisibility();
@@ -2951,7 +2950,6 @@ function toggleSensationSuggestion(suggestion) {
   else values.push(suggestion);
   $("sensations").value = values.join(" · ");
   syncSensationSuggestions();
-  $("sensations").focus({ preventScroll: true });
 }
 
 function syncSensationSuggestions() {

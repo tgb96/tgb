@@ -134,6 +134,8 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
   assert.ok(data.sensationSuggestions.cardio.length >= 20);
   assert.ok(data.sensationSuggestions.tennis.length >= 20);
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  assert.doesNotMatch(app, /if \(visible\) otherInput\.focus/);
+  assert.doesNotMatch(app, /syncSensationSuggestions\(\);\s*\$\("sensations"\)\.focus/);
   assert.match(app, /tgb-routine-settings-v1/);
   assert.match(app, /exercise-controls/);
   assert.match(app, /tgb-series-timer-v1/);
@@ -305,6 +307,7 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
   assert.match(ui, /configureFoodCatalog/);
+  assert.doesNotMatch(ui, /dialog\.showModal\(\);\s*byId\("nutritionIngredientSearch"\)\.focus/);
   assert.match(cloud, /nutritionFoodsCollectionReference/);
   assert.match(cloud, /observeCloudNutritionFoods/);
 });
@@ -477,7 +480,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=127/);
+  assert.match(html, /assets\/js\/app\.js\?v=128/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
