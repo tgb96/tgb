@@ -901,11 +901,20 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
 .nutrition-recent-meals strong, .nutrition-recent-meals small { display: block; }
 .nutrition-recent-meals strong { overflow: hidden; font-size: 12px; font-weight: 850; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .nutrition-recent-meals small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.nutrition-photo-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
 .nutrition-photo-button, #nutritionAnalyzePhoto { width: 100%; min-height: 43px; margin: 9px 0 0 !important; padding: 10px !important; border: 1px solid #cdd7ff !important; border-radius: 11px !important; background: white !important; color: var(--blue-dark) !important; font-size: 12px !important; font-weight: 900 !important; text-align: center; }
+.nutrition-photo-actions .nutrition-photo-button { display: flex; align-items: center; justify-content: center; margin-top: 0 !important; }
 #nutritionAnalyzePhoto:disabled { opacity: .45; }
 .nutrition-photo-status { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .nutrition-photo-status[data-state="ready"] { color: #426400; font-weight: 750; }
 .nutrition-photo-status[data-state="error"] { color: var(--danger); font-weight: 750; }
+.nutrition-ai-meal-entry { margin-top: 13px; padding-top: 12px; border-top: 1px solid #d6defc; }
+.nutrition-ai-meal-entry label strong, .nutrition-ai-meal-entry label small { display: block; }
+.nutrition-ai-meal-entry label strong { font-size: 12px; }
+.nutrition-ai-meal-entry label small { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.nutrition-ai-meal-entry textarea { width: 100%; min-height: 84px; margin-top: 8px; padding: 10px; border: 1px solid #cdd7ff; border-radius: 11px; background: white; color: var(--ink); font: inherit; font-size: 12px; line-height: 1.4; resize: vertical; }
+#nutritionEstimateMeal { width: 100%; min-height: 43px; margin-top: 8px; padding: 10px; border: 0; border-radius: 11px; background: var(--blue); color: white; font-size: 12px; font-weight: 900; }
+#nutritionEstimateMeal:disabled { opacity: .55; }
 
 #homeCoachFeedback { padding: 2px 0 8px; }
 #homeCoachFeedback + .coach-ask-card { margin-top: 0; }

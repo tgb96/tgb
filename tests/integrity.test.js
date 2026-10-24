@@ -96,7 +96,11 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="historyCategoryFilter"/);
   assert.match(html, /id="historyFourWeekSummary"/);
   assert.match(html, /id="nutritionMealPhoto"/);
+  assert.match(html, /id="nutritionMealCamera"[^>]+capture="environment"/);
+  assert.match(html, /id="nutritionMealPhoto"(?![^>]+capture=)/);
   assert.match(html, /id="nutritionAnalyzePhoto"/);
+  assert.match(html, /id="nutritionAiMealDescription"/);
+  assert.match(html, /id="nutritionEstimateMeal"/);
   assert.match(html, /<details class="exercise-progress-card"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
@@ -293,6 +297,7 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.match(html, /id="nutritionFoodAiEstimate"/);
   assert.match(ui, /saveNutritionFood/);
   assert.match(ui, /estimateFoodNutrition/);
+  assert.match(ui, /estimateMealDescription/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
@@ -307,6 +312,8 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /firebase-ai\.js/);
   assert.match(ai, /firebase-app-check\.js/);
   assert.match(ai, /async estimateFoodNutrition\(name, context/);
+  assert.match(ai, /async estimateMealDescription\(description, context/);
+  assert.match(ai, /mealDescriptionSchema/);
   assert.match(ai, /foodNutritionSchema/);
   assert.match(ai, /ReCaptchaEnterpriseProvider/);
   assert.match(ai, /6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9/);
@@ -464,7 +471,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=124/);
+  assert.match(html, /assets\/js\/app\.js\?v=125/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

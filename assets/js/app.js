@@ -26,13 +26,13 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=111";
+import { createRepository } from "./storage.js?v=112";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=111";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
+import { createNutritionUI } from "./nutrition-ui.js?v=112";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=96";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=103";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=104";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -100,6 +100,7 @@ const nutritionUI = createNutritionUI(repository, {
   analyzeNutritionDay: dateISO => requestNutritionAnalysis(dateISO),
   isNutritionAnalysisLoading: dateISO => nutritionAnalysisInFlight.has(dateISO),
   analyzeMealPhoto: (file, context) => aiClient.analyzeMealPhoto(file, context),
+  estimateMealDescription: (description, context) => aiClient.estimateMealDescription(description, context),
   estimateFoodNutrition: (name, context) => aiClient.estimateFoodNutrition(name, context)
 });
 const guidedUI = createGuidedUI(repository, {

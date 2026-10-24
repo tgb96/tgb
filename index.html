@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=105">
+  <link rel="stylesheet" href="assets/css/styles.css?v=106">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -513,10 +513,20 @@
       <section class="nutrition-fast-entry" aria-labelledby="nutritionFastEntryTitle">
         <div><strong id="nutritionFastEntryTitle">Registro rápido</strong><small>Reutiliza una comida o deja que la IA prepare un borrador desde una foto.</small></div>
         <div id="nutritionRecentMeals" class="nutrition-recent-meals"></div>
-        <label class="nutrition-photo-button" for="nutritionMealPhoto">Tomar o elegir foto</label>
-        <input id="nutritionMealPhoto" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+        <div class="nutrition-photo-actions">
+          <label class="nutrition-photo-button" for="nutritionMealCamera">Sacar foto</label>
+          <label class="nutrition-photo-button" for="nutritionMealPhoto">Elegir de galería</label>
+        </div>
+        <input id="nutritionMealCamera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+        <input id="nutritionMealPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden>
         <button id="nutritionAnalyzePhoto" type="button" disabled>Analizar foto con IA</button>
         <p id="nutritionPhotoStatus" class="nutrition-photo-status" role="status"></p>
+        <div class="nutrition-ai-meal-entry">
+          <label for="nutritionAiMealDescription"><strong>Estimar una comida con Gemini</strong><small>Describe el local, el plato, las salsas, el tamaño y cuánto comiste.</small></label>
+          <textarea id="nutritionAiMealDescription" rows="3" maxlength="1200" placeholder="Ej.: Piccola Italia: dos tipos de pasta con salsa y una milanesa de pollo; comí el plato completo."></textarea>
+          <button id="nutritionEstimateMeal" type="button">Estimar kcal y macros</button>
+          <p id="nutritionAiMealStatus" class="nutrition-photo-status" role="status"></p>
+        </div>
       </section>
       <label for="nutritionIngredientSearch">Ingredientes</label>
       <input id="nutritionIngredientSearch" type="search" placeholder="Buscar otro ingrediente, ej.: arroz o plátano">
@@ -605,6 +615,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=124"></script>
+<script type="module" src="assets/js/app.js?v=125"></script>
 </body>
 </html>

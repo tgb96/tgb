@@ -189,6 +189,12 @@ test("conserva el origen editable de una estimación preparada desde foto", () =
   assert.equal(normalized["photo-meal"].proteinG, 38);
 });
 
+test("conserva el origen editable de una comida puntual estimada por descripción", () => {
+  const normalized = normalizeNutritionEntries([{ id: "described-meal", dateISO: "2026-10-23", kind: "meal", slotId: "dinner", text: "Dos pastas con milanesa de pollo", caloriesKcal: 1180, proteinG: 54, estimateSource: "ai-description" }]);
+  assert.equal(normalized["described-meal"].estimateSource, "ai-description");
+  assert.equal(normalized["described-meal"].caloriesKcal, 1180);
+});
+
 test("nutrientes sin dato quedan desconocidos y no se inventan al sumar", () => {
   const entries = Object.values(normalizeNutritionEntries([
     { id: "a", dateISO: "2026-09-22", kind: "meal", text: "Huevo y pan", proteinG: 15 },

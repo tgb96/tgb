@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=95";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=96";
 import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=105";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
@@ -17,6 +17,7 @@ export function createNutritionUI(repository, {
   analyzeNutritionDay = () => {},
   isNutritionAnalysisLoading = () => false,
   analyzeMealPhoto = null,
+  estimateMealDescription = null,
   estimateFoodNutrition = null
 } = {}) {
   let selectedDate = getChileDateISO();
@@ -26,6 +27,7 @@ export function createNutritionUI(repository, {
   let estimateSource = "";
   let selectedPhotoFile = null;
   let photoAnalysisLoading = false;
+  let mealDescriptionLoading = false;
   let editingFoodId = "";
   let foodEstimateLoading = false;
   let foodDraftSource = "";
@@ -226,8 +228,14 @@ export function createNutritionUI(repository, {
     status.dataset.state = state;
   }
 
+  function setMealDescriptionStatus(message = "", state = "") {
+    const status = byId("nutritionAiMealStatus");
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
   function mealSourceLabel(source) {
-    return ({ label: "Etiqueta", generic: "Estimación promedio", manual: "Ajustado manualmente", "ai-photo": "Borrador estimado por foto" })[source] || "";
+    return ({ label: "Etiqueta", generic: "Estimación promedio", manual: "Ajustado manualmente", "ai-photo": "Borrador estimado por foto", "ai-description": "Borrador estimado por descripción" })[source] || "";
   }
 
   function applyMealDraft(entry) {
@@ -303,6 +311,50 @@ export function createNutritionUI(repository, {
     } finally {
       photoAnalysisLoading = false;
       button.disabled = !selectedPhotoFile;
+    }
+  }
+
+  async function estimateDescribedMeal() {
+    if (mealDescriptionLoading) return;
+    const description = byId("nutritionAiMealDescription").value.trim();
+    if (description.length < 8) {
+      setMealDescriptionStatus("Describe un poco más la comida antes de estimarla.", "error");
+      byId("nutritionAiMealDescription").focus();
+      return;
+    }
+    if (typeof estimateMealDescription !== "function") {
+      setMealDescriptionStatus("La estimación requiere iniciar sesión y tener Gemini configurado.", "error");
+      return;
+    }
+    const button = byId("nutritionEstimateMeal");
+    mealDescriptionLoading = true;
+    button.disabled = true;
+    button.textContent = "Estimando con Gemini…";
+    setMealDescriptionStatus("Preparando un borrador editable para esta comida…", "loading");
+    try {
+      const result = await estimateMealDescription(description, { dateISO: selectedDate, slotId: selectedSlot });
+      const analysis = result?.analysis || result;
+      const metrics = ["caloriesKcal", "proteinG", "carbsG", "fatG"];
+      if (!String(analysis?.summary || "").trim() || metrics.some(key => !Number.isFinite(Number(analysis?.[key])))) {
+        throw new Error("Gemini no devolvió una estimación completa. Agrega más detalles y vuelve a intentarlo.");
+      }
+      applyMealDraft({
+        parts: {},
+        note: [analysis.summary, analysis.portionNotes].filter(Boolean).join(". "),
+        caloriesKcal: Number(analysis.caloriesKcal),
+        proteinG: Number(analysis.proteinG),
+        carbsG: Number(analysis.carbsG),
+        fatG: Number(analysis.fatG),
+        estimateSource: "ai-description"
+      });
+      const confidence = ({ high: "alta", medium: "media", low: "baja" })[analysis.confidence] || "no indicada";
+      setMealDescriptionStatus(`Borrador listo · confianza ${confidence}. Revisa la descripción y las cifras antes de guardar.`, "ready");
+    } catch (error) {
+      setMealDescriptionStatus(error?.message || "No fue posible estimar esta comida.", "error");
+    } finally {
+      mealDescriptionLoading = false;
+      button.disabled = false;
+      button.textContent = "Volver a estimar kcal y macros";
     }
   }
 
@@ -382,9 +434,15 @@ export function createNutritionUI(repository, {
     byId("nutritionMealText").value = entry ? (entry.parts && Object.keys(entry.parts).length ? entry.note || "" : entry.text) : "";
     byId("nutritionIngredientSearch").value = "";
     selectedPhotoFile = null;
+    byId("nutritionMealCamera").value = "";
     byId("nutritionMealPhoto").value = "";
     byId("nutritionAnalyzePhoto").disabled = true;
     setPhotoStatus(typeof analyzeMealPhoto === "function" ? "Solo al pulsar Analizar se envía la foto a Gemini; TGTrain no guarda la imagen." : "El análisis por foto requiere iniciar sesión y tener la IA configurada.");
+    byId("nutritionAiMealDescription").value = "";
+    const descriptionButton = byId("nutritionEstimateMeal");
+    descriptionButton.disabled = false;
+    descriptionButton.textContent = "Estimar kcal y macros";
+    setMealDescriptionStatus(typeof estimateMealDescription === "function" ? "La descripción solo se envía a Gemini al pulsar Estimar." : "La estimación requiere iniciar sesión y tener Gemini configurado.");
     renderRecentMeals();
     renderIngredientChoices();
     renderSelectedParts({ updateEstimate: false });
@@ -453,7 +511,7 @@ export function createNutritionUI(repository, {
       const metricParts = [["caloriesKcal", "kcal"], ["proteinG", "g proteína"], ["carbsG", "g carbohidratos"], ["fatG", "g grasas"]]
         .filter(([key]) => metrics[key] !== null && metrics[key] !== undefined).map(([key, unit]) => `${metrics[key]} ${unit}`);
       const quick = document.createElement("small");
-      const approximate = ["generic", "ai-photo"].includes(metrics.estimateSource);
+      const approximate = ["generic", "ai-photo", "ai-description"].includes(metrics.estimateSource);
       quick.textContent = metricParts.length ? `${approximate ? "≈ " : ""}${metricParts.slice(0, 2).join(" · ")}` : "Sin kcal ni macros estimados";
       body.append(quick);
       if (hasParts || metricParts.length > 2) {
@@ -730,12 +788,17 @@ export function createNutritionUI(repository, {
     byId("nutritionFoodForm").addEventListener("submit", saveFood);
     byId("nutritionCoachButton").addEventListener("click", () => analyzeNutritionDay(selectedDate));
     byId("nutritionIngredientSearch").addEventListener("input", renderIngredientChoices);
-    byId("nutritionMealPhoto").addEventListener("change", event => {
+    const selectPhoto = event => {
       selectedPhotoFile = event.target.files?.[0] || null;
+      const otherInput = event.target.id === "nutritionMealCamera" ? byId("nutritionMealPhoto") : byId("nutritionMealCamera");
+      otherInput.value = "";
       byId("nutritionAnalyzePhoto").disabled = !selectedPhotoFile || typeof analyzeMealPhoto !== "function";
       setPhotoStatus(selectedPhotoFile ? `${selectedPhotoFile.name} · lista para analizar; aún no se ha enviado.` : "Solo al pulsar Analizar se envía la foto; TGTrain no guarda la imagen.");
-    });
+    };
+    byId("nutritionMealCamera").addEventListener("change", selectPhoto);
+    byId("nutritionMealPhoto").addEventListener("change", selectPhoto);
     byId("nutritionAnalyzePhoto").addEventListener("click", analyzeSelectedPhoto);
+    byId("nutritionEstimateMeal").addEventListener("click", estimateDescribedMeal);
     for (const id of ["nutritionMealCalories", "nutritionMealProtein", "nutritionMealCarbs", "nutritionMealFat"])
       byId(id).addEventListener("input", () => { estimateSource = "manual"; });
     byId("nutritionEntryClose").addEventListener("click", () => dialog.close());

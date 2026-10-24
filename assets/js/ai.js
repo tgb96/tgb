@@ -260,6 +260,20 @@ const foodNutritionSchema = {
   required: ["portion", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence", "notes"]
 };
 
+const mealDescriptionSchema = {
+  type: "object",
+  properties: {
+    summary: stringSchema,
+    portionNotes: stringSchema,
+    caloriesKcal: { type: "number" },
+    proteinG: { type: "number" },
+    carbsG: { type: "number" },
+    fatG: { type: "number" },
+    confidence: { type: "string", enum: ["low", "medium", "high"] }
+  },
+  required: ["summary", "portionNotes", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence"]
+};
+
 function friendlyError(error) {
   const code = String(error?.code || "").toLowerCase();
   const message = String(error?.message || "");
@@ -396,6 +410,46 @@ export function createAiClient() {
         maxOutputTokens: 1200
       });
       return { analysis, model: MODEL_NAME };
+    },
+    async estimateMealDescription(description, context = {}) {
+      const mealDescription = String(description || "").trim().slice(0, 1200);
+      if (mealDescription.length < 8) throw new Error("Describe un poco más la comida antes de consultar a Gemini.");
+      const instructions = [
+        "Eres el asistente de registro nutricional de TGTrain. Estima una comida puntual a partir de la descripción del usuario y prepara un borrador editable; no crees un alimento para el catálogo.",
+        "Calcula las calorías y macronutrientes para el total que la persona dice haber comido, nunca automáticamente para 100 g ni para una porción distinta.",
+        "Usa como contexto el restaurante, tipo de plato, ingredientes, salsas, tamaño y fracción consumida cuando estén descritos. Si se menciona un local, no afirmes haber consultado su menú ni conocer su receta exacta.",
+        "Cuando falten pesos o receta, usa una porción habitual razonable, elige el punto medio de un rango plausible y explica el principal supuesto en portionNotes.",
+        "summary debe ser una descripción breve y natural de lo registrado, conservando los componentes principales. No inventes guarniciones, bebidas ni ingredientes que el usuario no mencionó.",
+        "caloriesKcal, proteinG, carbsG y fatG deben ser números no negativos, coherentes entre sí y corresponder a toda la comida descrita. Redondea las kcal a una cifra práctica y los macros a una decimal.",
+        "Este resultado es orientativo, no una medición ni una indicación clínica. Responde en español claro y conciso."
+      ].join("\n");
+      const analysis = await generateJson({
+        instructions,
+        input: JSON.stringify({
+          description: mealDescription,
+          dateISO: String(context.dateISO || "").slice(0, 10),
+          mealSlot: String(context.slotId || "other").slice(0, 40)
+        }),
+        schema: mealDescriptionSchema,
+        maxOutputTokens: 800
+      });
+      const cleanMetric = (key, maximum) => {
+        const value = Number(analysis?.[key]);
+        if (!Number.isFinite(value) || value < 0 || value > maximum) throw new Error("Gemini devolvió cifras incompletas. Agrega más detalles y vuelve a intentarlo.");
+        return Math.round(value * 10) / 10;
+      };
+      return {
+        analysis: {
+          summary: String(analysis?.summary || "").trim().slice(0, 500),
+          portionNotes: String(analysis?.portionNotes || "").trim().slice(0, 500),
+          caloriesKcal: cleanMetric("caloriesKcal", 10000),
+          proteinG: cleanMetric("proteinG", 2000),
+          carbsG: cleanMetric("carbsG", 2000),
+          fatG: cleanMetric("fatG", 2000),
+          confidence: ["low", "medium", "high"].includes(analysis?.confidence) ? analysis.confidence : "low"
+        },
+        model: MODEL_NAME
+      };
     },
     async askCoach(question, context = {}) {
       const catalog = {
