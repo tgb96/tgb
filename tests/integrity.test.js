@@ -79,6 +79,10 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /Ajuste recomendado/);
   assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
+  assert.match(html, /Habla con TGTrain/);
+  assert.match(html, /Tu mensaje/);
+  assert.match(html, /Enviar a TGTrain/);
+  assert.doesNotMatch(html, /¿Qué quieres preguntarle\?|Preguntar a la guía/);
   assert.match(html, /id="coachVoiceButton"[^>]+type="button"/);
   assert.match(html, /Gemini transcribe el audio para que lo revises/);
   assert.match(html, /id="coachHistoryToggle"/);
@@ -426,7 +430,7 @@ test("la app graba una nota de voz real y Gemini la transcribe antes de enviarla
   assert.match(app, /new MediaRecorder/);
   assert.match(app, /coachAudioAutoStop = setTimeout\(stopCoachVoiceRecording, 60000\)/);
   assert.match(app, /aiClient\.transcribeCoachAudio\(audioBlob\)/);
-  assert.match(app, /Transcripción lista\. Revísala y luego pulsa Preguntar/);
+  assert.match(app, /Transcripción lista\. Revísala y luego pulsa Enviar a TGTrain/);
   assert.match(ai, /inlineData: \{ data, mimeType \}/);
   assert.match(ai, /audio\/webm/);
   assert.match(ai, /No respondas la pregunta, no aconsejes/);
@@ -488,7 +492,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=129/);
+  assert.match(html, /assets\/js\/app\.js\?v=130/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

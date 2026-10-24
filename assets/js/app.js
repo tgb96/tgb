@@ -1161,11 +1161,11 @@ function renderCoachQuestions() {
   const toggle = $("coachHistoryToggle");
   $("coachHistoryClear").classList.toggle("hidden", allQuestions.length === 0);
   toggle.classList.toggle("hidden", allQuestions.length <= 3);
-  toggle.textContent = coachHistoryExpanded ? "Mostrar solo las 3 más recientes" : `Ver todas las preguntas (${allQuestions.length})`;
+  toggle.textContent = coachHistoryExpanded ? "Mostrar solo los 3 mensajes más recientes" : `Ver toda la conversación (${allQuestions.length})`;
   if (!questions.length) {
     const hint = document.createElement("p");
     hint.className = "coach-question-hint";
-    hint.textContent = "Puedes preguntar sobre tu último entrenamiento, el plan de hoy o cómo adaptar una sesión según tus sensaciones.";
+    hint.textContent = "Cuéntale cómo estás, informa un cambio o pídele adaptar tu entrenamiento, recuperación o alimentación.";
     history.append(hint);
     return;
   }
@@ -1810,7 +1810,7 @@ async function transcribeCoachRecording(audioBlob) {
     coachQuestionDraftSource = "voice";
     $("coachQuestionStatus").textContent = transcript.length > available
       ? "Transcripción lista, pero se acortó al límite del campo. Revísala antes de enviarla."
-      : "Transcripción lista. Revísala y luego pulsa Preguntar a la guía.";
+      : "Transcripción lista. Revísala y luego pulsa Enviar a TGTrain.";
   } catch (error) {
     $("coachQuestionStatus").textContent = error?.message || "No fue posible transcribir la grabación.";
   } finally {
@@ -1948,7 +1948,7 @@ async function submitCoachQuestion(existing = null) {
   } finally {
     coachQuestionInFlight = false;
     $("coachAskButton").disabled = false;
-    $("coachAskButton").textContent = "Preguntar a la guía →";
+    $("coachAskButton").textContent = "Enviar a TGTrain →";
     resetCoachVoiceButton();
     renderCoachQuestions();
   }

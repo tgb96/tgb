@@ -98,17 +98,17 @@
       </div>
       <div id="homeCoachFeedback" aria-live="polite"></div>
       <section class="coach-ask-card" aria-labelledby="coachAskTitle">
-        <p class="eyebrow dark">Conversa con tu guía</p>
-        <h2 id="coachAskTitle">¿Qué quieres preguntarle?</h2>
-        <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Preguntas y respuestas recientes"></div>
+        <p class="eyebrow dark">Tu entrenador IA</p>
+        <h2 id="coachAskTitle">Habla con TGTrain</h2>
+        <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Conversación reciente con TGTrain"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
-        <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar preguntas y respuestas</button>
+        <button id="coachHistoryClear" class="coach-history-clear hidden" type="button">Limpiar conversación</button>
         <form id="coachQuestionForm">
-          <label for="coachQuestionText">Tu pregunta</label>
-          <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Por ejemplo: probablemente suspendan mi partido de mañana. ¿Lo cambio por un peloteo suave o por otra sesión?"></textarea>
+          <label for="coachQuestionText">Tu mensaje</label>
+          <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Cuéntale cómo estás, informa un cambio o pídele adaptar tu plan."></textarea>
           <div class="coach-ask-actions">
             <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-pressed="false">🎙 Hablar</button>
-            <button id="coachAskButton" class="coach-ask-button" type="submit">Preguntar a la guía →</button>
+            <button id="coachAskButton" class="coach-ask-button" type="submit">Enviar a TGTrain →</button>
           </div>
           <small class="coach-voice-help">Graba hasta 60 segundos. Gemini transcribe el audio para que lo revises; TGTrain no guarda la grabación.</small>
           <p id="coachQuestionStatus" class="coach-question-status" role="status"></p>
@@ -617,6 +617,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=129"></script>
+<script type="module" src="assets/js/app.js?v=130"></script>
 </body>
 </html>
