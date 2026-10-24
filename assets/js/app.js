@@ -32,7 +32,7 @@ import { createNutritionUI } from "./nutrition-ui.js?v=117";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=110";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=111";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -89,7 +89,6 @@ const cloudSync = createCloudSync({
     renderHistory();
     nutritionUI.render();
     renderCoachPlanDialog();
-    updateCoachProfileButton();
   }
 });
 const nutritionUI = createNutritionUI(repository, {
@@ -898,122 +897,12 @@ function updateCloudStatus(status) {
 
 function openCloudDialog() {
   updateCloudStatus(currentCloudStatus);
-  updateCoachProfileButton();
   if (!$("cloudDialog").open) $("cloudDialog").showModal();
 }
 
-function updateCoachProfileButton() {
-  const button = $("openCoachProfileButton");
-  if (!button) return;
-  button.textContent = repository.getCoachProfile()
-    ? "Perfil del entrenador IA · Configurado"
-    : "Configurar perfil del entrenador IA";
-}
-
-function setCoachProfileMessage(text = "", kind = "error") {
-  const message = $("coachProfileMessage");
-  message.textContent = text;
-  message.className = `form-message ${kind}${text ? "" : " hidden"}`;
-}
-
-function renderCoachEquipmentChoices() {
-  const container = $("coachEquipmentChoices");
-  const textarea = $("coachProfileEquipment");
-  if (!container || !textarea) return;
-  container.replaceChildren();
-  const selectedText = textarea.value;
-  COACH_EQUIPMENT_OPTIONS.forEach(option => {
-    const label = document.createElement("label");
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = option.value;
-    input.checked = selectedText.includes(option.value);
-    const copy = document.createElement("span");
-    copy.textContent = option.label;
-    input.addEventListener("change", () => {
-      const selected = [...container.querySelectorAll('input[type="checkbox"]:checked')].map(item => item.value);
-      const custom = textarea.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
-        .filter(line => !COACH_EQUIPMENT_OPTIONS.some(candidate => candidate.value === line));
-      textarea.value = [...selected, ...custom].join("\n");
-    });
-    label.append(input, copy);
-    container.append(label);
-  });
-}
-
 function coachProfilePrompt(profile = repository.getCoachProfile()) {
-  const base = String(profile?.profileText || "").trim();
   const memories = (profile?.memories || []).map(item => `- ${item.text}`);
-  return [base, memories.length ? `MEMORIA APROBADA POR EL USUARIO:\n${memories.join("\n")}` : ""].filter(Boolean).join("\n\n");
-}
-
-function renderCoachMemories() {
-  const container = $("coachMemoryList");
-  container.replaceChildren();
-  const profile = repository.getCoachProfile();
-  const memories = profile?.memories || [];
-  if (!memories.length) {
-    const empty = document.createElement("p");
-    empty.className = "coach-memory-empty";
-    empty.textContent = "Todavía no has aprobado recuerdos permanentes.";
-    container.append(empty);
-    return;
-  }
-  memories.forEach(memory => {
-    const row = document.createElement("div"); row.className = "coach-memory-item";
-    const copy = document.createElement("div");
-    const text = document.createElement("span"); text.textContent = memory.text;
-    const category = document.createElement("small"); category.textContent = memory.category;
-    copy.append(text, category);
-    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Olvidar";
-    remove.addEventListener("click", () => {
-      const current = repository.getCoachProfile();
-      repository.saveCoachProfile({ ...current, memories: (current.memories || []).filter(item => item.id !== memory.id), updatedAt: new Date().toISOString() });
-      renderCoachMemories();
-      showToast("TGTrain olvidó ese dato permanente.");
-    });
-    row.append(copy, remove); container.append(row);
-  });
-}
-
-function openCoachProfileDialog() {
-  const profile = repository.getCoachProfile();
-  $("coachProfileText").value = profile?.profileText || "";
-  $("coachProfileEquipment").value = profile?.equipment || DEFAULT_COACH_EQUIPMENT;
-  renderCoachEquipmentChoices();
-  renderCoachMemories();
-  setCoachProfileMessage();
-  if ($("cloudDialog").open) $("cloudDialog").close();
-  if (!$("coachProfileDialog").open) $("coachProfileDialog").showModal();
-}
-
-function saveCoachProfile(event) {
-  event.preventDefault();
-  const profileText = $("coachProfileText").value.trim();
-  const equipment = $("coachProfileEquipment").value.trim();
-  if (!profileText) {
-    setCoachProfileMessage("Pega las instrucciones de tu entrenador para activar recomendaciones personalizadas.");
-    $("coachProfileText").focus();
-    return;
-  }
-  try {
-    repository.saveCoachProfile({
-      profileText,
-      equipment: equipment || DEFAULT_COACH_EQUIPMENT,
-      memories: repository.getCoachProfile()?.memories || [],
-      version: COACH_PROFILE_VERSION,
-      updatedAt: new Date().toISOString()
-    });
-    updateCoachProfileButton();
-    setCoachProfileMessage(cloudSync.currentUser
-      ? "Perfil guardado y preparado para sincronizarse con tu cuenta."
-      : "Perfil guardado en este dispositivo. Inicia sesión para sincronizarlo.", "success");
-    automaticCoachChecksQueued = false;
-    queueMicrotask(maybeRunAutomaticCoachChecks);
-    showToast("Perfil privado del entrenador guardado.");
-  } catch (error) {
-    setCoachProfileMessage(error.message);
-  }
+  return [MASTER_COACH_PROFILE, memories.length ? `MEMORIA APROBADA POR EL USUARIO:\n${memories.join("\n")}` : ""].filter(Boolean).join("\n\n");
 }
 
 async function signInToCloud() {
@@ -1181,29 +1070,23 @@ function appendWeatherAdjustmentActions(proposal, item) {
   const context = document.createElement("small");
   context.className = "coach-equipment-context";
   context.textContent = `Para una alternativa cubierta, la guía considerará: ${coachEquipmentSummary()}`;
-  const actions = document.createElement("div");
-  actions.className = "coach-equipment-actions";
-  const edit = document.createElement("button");
-  edit.type = "button";
-  edit.className = "secondary";
-  edit.textContent = "Revisar implementos";
-  edit.addEventListener("click", openCoachProfileDialog);
-  actions.append(edit);
+  proposal.append(context);
   if (item.planAdjustment?.category === "rest") {
+    const actions = document.createElement("div");
+    actions.className = "coach-equipment-actions";
     const alternative = document.createElement("button");
     alternative.type = "button";
     alternative.textContent = "Proponer opción cubierta";
     alternative.addEventListener("click", () => requestCoveredPlanAlternative(item));
     actions.append(alternative);
+    proposal.append(actions);
   }
-  proposal.append(context, actions);
 }
 
 function resolveCoachMemorySuggestion(item, suggestion, status) {
   const timestamp = new Date().toISOString();
   if (status === "applied") {
-    const profile = repository.getCoachProfile();
-    if (!profile) return showToast("Configura primero el perfil del entrenador.");
+    const profile = repository.getCoachProfile() || { profileText: "", equipment: DEFAULT_COACH_EQUIPMENT, memories: [], version: COACH_PROFILE_VERSION };
     const normalized = suggestion.text.toLocaleLowerCase("es-CL");
     const memories = profile.memories || [];
     if (!memories.some(memory => memory.text.toLocaleLowerCase("es-CL") === normalized)) {
@@ -1226,7 +1109,6 @@ function resolveCoachMemorySuggestion(item, suggestion, status) {
     updatedAt: timestamp
   });
   renderCoachQuestions();
-  updateCoachProfileButton();
   showToast(status === "applied" ? "Dato guardado en la memoria de TGTrain." : "Ese dato no se guardará como memoria.");
 }
 
@@ -1530,12 +1412,6 @@ async function requestNutritionAnalysis(dateISO) {
     showToast("Inicia sesión con Google para recibir el comentario nutricional.");
     return;
   }
-  const profile = repository.getCoachProfile();
-  if (!profile?.profileText) {
-    openCoachProfileDialog();
-    showToast("Configura primero el perfil privado de tu entrenador IA.");
-    return;
-  }
   const allSourceEntries = repository.listNutritionEntries(dateISO)
     .filter(item => ["meal", "water", "plan", "supplement"].includes(item.kind));
   const sourceEntries = allSourceEntries.filter(item => !item.deleted);
@@ -1550,7 +1426,7 @@ async function requestNutritionAnalysis(dateISO) {
     const dayData = wearableData.days.find(day => day.dateISO === dateISO);
     const result = await aiClient.analyzeNutritionDay({
       dateISO,
-      privateCoachProfile: coachProfilePrompt(profile).slice(0, 16000),
+      privateCoachProfile: coachProfilePrompt().slice(0, 40000),
       nutrition: nutritionDayForCoach(dateISO),
       activities: activities.map(record => routineForAi(record)).slice(0, 8),
       wearable: dayData ? wearableDayForCoach(dayData) : null,
@@ -1638,7 +1514,7 @@ function monthlyCoachContext(startISO, endISO) {
 async function maybeGenerateMonthlySummary() {
   const todayISO = getChileDateISO();
   if (monthlySummaryAttempted || monthlySummaryInFlight || Number(todayISO.slice(8, 10)) > 5) return;
-  if (!cloudSync.currentUser || !repository.getCoachProfile()?.profileText) return;
+  if (!cloudSync.currentUser) return;
   const period = previousMonthPeriod(todayISO);
   const id = `monthly-summary-${period.key}`;
   if (repository.getNutritionEntry(id)) return;
@@ -1648,7 +1524,7 @@ async function maybeGenerateMonthlySummary() {
     const context = monthlyCoachContext(period.startISO, period.endISO);
     const result = await aiClient.analyzeMonthlySummary({
       ...context,
-      privateCoachProfile: coachProfilePrompt().slice(0, 16000)
+      privateCoachProfile: coachProfilePrompt().slice(0, 40000)
     });
     repository.saveNutritionEntry(coachInsightPayload(result, {
       id,
@@ -1903,7 +1779,7 @@ function coachQuestionContext() {
       const date = new Date(`${dateISO}T12:00:00Z`);
       return { offset, dateISO, weekday: new Intl.DateTimeFormat("es-CL", { timeZone: "UTC", weekday: "long" }).format(date) };
     }),
-    coachProfile: coachProfilePrompt().slice(0, 16000),
+    coachProfile: coachProfilePrompt().slice(0, 40000),
     approvedMemories: (repository.getCoachProfile()?.memories || []).map(item => ({ text: item.text, category: item.category })),
     equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
     recentActivities: records.filter(isMainDayRecord).slice(0, 6)
@@ -1953,11 +1829,6 @@ async function requestDailyCoachInsight({ interactive = true, force = true } = {
   if (dailyCoachInFlight || (!force && existing)) return existing;
   if (!cloudSync.currentUser) {
     if (interactive) { openCloudDialog(); showToast("Inicia sesión con Google para actualizar el chequeo diario."); }
-    return null;
-  }
-  const profile = repository.getCoachProfile();
-  if (!profile?.profileText) {
-    if (interactive) { openCoachProfileDialog(); showToast("Configura primero el perfil de tu entrenador IA."); }
     return null;
   }
   dailyCoachInFlight = true;
@@ -2035,10 +1906,6 @@ async function requestWeeklyCoachReview({ interactive = true, force = true } = {
     if (interactive) { openCloudDialog(); showToast("Inicia sesión con Google para revisar la semana."); }
     return null;
   }
-  if (!repository.getCoachProfile()?.profileText) {
-    if (interactive) { openCoachProfileDialog(); showToast("Configura primero el perfil de tu entrenador IA."); }
-    return null;
-  }
   weeklyCoachInFlight = true;
   const button = $("coachWeekReviewButton");
   button.disabled = true;
@@ -2095,7 +1962,7 @@ async function requestWeeklyCoachReview({ interactive = true, force = true } = {
 }
 
 async function maybeRunAutomaticCoachChecks() {
-  if (automaticCoachChecksQueued || !cloudSync.currentUser || !repository.getCoachProfile()?.profileText) return;
+  if (automaticCoachChecksQueued || !cloudSync.currentUser) return;
   automaticCoachChecksQueued = true;
   await requestDailyCoachInsight({ interactive: false, force: false });
   const todayISO = getChileDateISO();
@@ -2276,11 +2143,6 @@ async function submitCoachQuestion(existing = null) {
   if (!cloudSync.currentUser) {
     $("coachQuestionStatus").textContent = "Inicia sesión con Google para hablar con TGTrain.";
     openCloudDialog();
-    return;
-  }
-  if (!repository.getCoachProfile()?.profileText) {
-    $("coachQuestionStatus").textContent = "Configura primero el perfil de tu entrenador IA.";
-    openCoachProfileDialog();
     return;
   }
   coachQuestionInFlight = true;
@@ -4515,11 +4377,6 @@ async function requestRoutineAiAnalysis(recordId, planDetails = [], { interactiv
     return;
   }
   const context = routineAiContext(record);
-  if (!context.coachProfile?.profileText) {
-    if (interactive) openCoachProfileDialog();
-    showToast("Configura primero el perfil privado de tu entrenador IA.");
-    return;
-  }
   aiAnalysisInFlight.add(recordId);
   renderRoutines();
   renderHistory();
@@ -4597,7 +4454,7 @@ function maybeRequestRoutineAiAnalysis(recordId, planDetails = [], options = {})
   // La primera evaluación debe esperar a que la pulsera complete las
   // métricas. Así el comentario no se genera con duración/calorías vacías.
   if (record?.metricsPending && !record.wearableSessionId) return false;
-  if (!cloudSync.currentUser || !repository.getCoachProfile()) return false;
+  if (!cloudSync.currentUser) return false;
   requestRoutineAiAnalysis(recordId, planDetails, options);
   return true;
 }
@@ -5252,15 +5109,13 @@ function createRoutineAiCard(record, { compact = false } = {}) {
   const summary = document.createElement("p");
   summary.textContent = loading
     ? "La IA está leyendo tus comentarios y comparando esta actividad con el plan y tu historial. El registro ya quedó guardado."
-    : repository.getCoachProfile()
-      ? "La guía lee tus sensaciones y comentarios, compara esta actividad con el plan y tu historial y considera tus próximas 48 horas."
-      : "Configura el perfil privado de tu entrenador para recibir recomendaciones enfocadas en tenis y tus limitaciones.";
+    : "La guía usa tu perfil maestro, lee tus sensaciones y comentarios, compara esta actividad con el plan y tu historial y considera tus próximas 48 horas.";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "routine-ai-button";
   button.disabled = loading;
-  button.textContent = loading ? "Preparando análisis…" : !repository.getCoachProfile() ? "Configurar perfil" : cloudSync.currentUser ? "Analizar con IA" : "Iniciar sesión para analizar";
-  button.addEventListener("click", () => repository.getCoachProfile() ? requestRoutineAiAnalysis(record.id) : openCoachProfileDialog());
+  button.textContent = loading ? "Preparando análisis…" : cloudSync.currentUser ? "Analizar con IA" : "Iniciar sesión para analizar";
+  button.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
   card.append(heading, summary, button);
   return card;
 }
@@ -6928,9 +6783,6 @@ function bindEvents() {
   $("updateButton").addEventListener("click", () => waitingServiceWorker?.postMessage({ type: "SKIP_WAITING" }));
   $("cloudStatusButton").addEventListener("click", openCloudDialog);
   $("cloudDialogClose").addEventListener("click", () => $("cloudDialog").close());
-  $("openCoachProfileButton").addEventListener("click", openCoachProfileDialog);
-  $("coachProfileDialogClose").addEventListener("click", () => $("coachProfileDialog").close());
-  $("coachProfileForm").addEventListener("submit", saveCoachProfile);
   $("cloudSignInButton").addEventListener("click", signInToCloud);
   $("cloudSyncButton").addEventListener("click", syncCloudNow);
   $("wearableSyncButton").addEventListener("click", requestWearableBridgeSync);
@@ -6954,7 +6806,6 @@ function initialize() {
   renderHome();
   renderRoutines();
   renderHistory();
-  updateCoachProfileButton();
   const activeSession = loadRoutineSession();
   if (activeSession?.status === "active") {
     openRoutineId = activeSession.routineId;

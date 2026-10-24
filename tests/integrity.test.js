@@ -72,8 +72,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="cloudDialog"/);
   assert.match(html, /id="wearableSyncButton"/);
   assert.match(html, /id="syncMatchesButton"/);
-  assert.match(html, /id="coachProfileDialog"/);
-  assert.match(html, /id="coachProfileText"/);
+  assert.doesNotMatch(html, /id="openCoachProfileButton"|id="coachProfileDialog"|id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
   assert.match(html, /id="homeDailyBrief"/);
   assert.match(html, /Ajuste recomendado/);
@@ -217,7 +216,7 @@ test("hay cuatro rutinas físicas completas y configurables", async () => {
 test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   const home = html.slice(html.indexOf('id="viewHome"'), html.indexOf('id="viewRegister"'));
-  const cloud = html.slice(html.indexOf('id="cloudDialog"'), html.indexOf('id="coachProfileDialog"'));
+  const cloud = html.slice(html.indexOf('id="cloudDialog"'), html.indexOf('id="coachPlanDialog"'));
   assert.doesNotMatch(home, /coachBlockCard|openAiPlanButton|Plan activo/);
   assert.match(cloud, /id="openAiPlanButton"/);
   assert.match(cloud, /Importar planificación con IA/);
@@ -320,7 +319,10 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
 });
 
 test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => {
-  const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
+  const [ai, masterProfile] = await Promise.all([
+    readFile(resolve(root, "assets/js/ai.js"), "utf8"),
+    readFile(resolve(root, "assets/js/master-coach-profile.js"), "utf8")
+  ]);
   const firebase = JSON.parse(await readFile(resolve(root, "firebase.json"), "utf8"));
   assert.match(ai, /firebase-ai\.js/);
   assert.match(ai, /firebase-app-check\.js/);
@@ -345,6 +347,7 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /Kettlebell de 4,5 kg/);
   assert.match(ai, /privateCoachProfile/);
   assert.doesNotMatch(ai, /monoplegia|plexo braquial|menisco/i);
+  assert.match(masterProfile, /monoplejia.*miembro superior izquierdo.*plexo braquial/i);
   assert.doesNotMatch(ai, /OPENAI_API_KEY|httpsCallable|firebase-functions/);
   assert.equal(firebase.functions, undefined);
 });
@@ -373,6 +376,7 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /withCoachPlanAdjustments\(coordinated, repository\.listCoachQuestions\(\)\)/);
   assert.match(app, /Proponer opción cubierta/);
   assert.match(app, /COACH_EQUIPMENT_OPTIONS/);
+  assert.match(app, /MASTER_COACH_PROFILE/);
   assert.match(app, /sleepStagesMinutes/);
   assert.match(app, /strongestRecoveryImpact/);
   assert.match(app, /Contexto de recuperación guardado/);
@@ -380,13 +384,31 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /requestWeeklyCoachReview/);
   assert.match(app, /speechSynthesis\.speak/);
   assert.match(html, /wearableSleepDetails/);
-  assert.match(html, /coachEquipmentChoices/);
   assert.match(html, /dailyBriefAiAction/);
   assert.match(html, /coachWeekReviewButton/);
-  assert.match(html, /coachMemoryList/);
   assert.match(html, /coachFollowUp/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
   assert.match(bridge, /OxygenSaturationRecord/);
+});
+
+test("el perfil maestro de Tomás guía siempre al entrenador y no depende de un botón", async () => {
+  const [profile, app, html, worker] = await Promise.all([
+    readFile(resolve(root, "assets/js/master-coach-profile.js"), "utf8"),
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "index.html"), "utf8"),
+    readFile(resolve(root, "service-worker.js"), "utf8")
+  ]);
+  assert.ok(profile.length > 18000, "El perfil maestro no debe quedar reducido a un resumen breve");
+  assert.match(profile, /La preparación física está al servicio del tenis/);
+  assert.match(profile, /Día 3 — Potencia, pliometría y desplazamientos/);
+  assert.match(profile, /No aumentes demasiadas variables simultáneamente/);
+  assert.match(profile, /profesional, cercana, clara y exigente/);
+  assert.match(profile, /Mantener o mejorar la disponibilidad para entrenar y competir/);
+  assert.match(app, /return \[MASTER_COACH_PROFILE, memories\.length/);
+  assert.match(app, /coachProfilePrompt\(\)\.slice\(0, 40000\)/);
+  assert.doesNotMatch(app, /Configura primero el perfil|openCoachProfileDialog/);
+  assert.doesNotMatch(html, /Perfil del entrenador IA|coachProfileDialog|coachProfileText/);
+  assert.match(worker, /master-coach-profile\.js\?v=1/);
 });
 
 test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
@@ -542,7 +564,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=133/);
+  assert.match(html, /assets\/js\/app\.js\?v=134/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

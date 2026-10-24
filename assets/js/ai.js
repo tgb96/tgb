@@ -1,13 +1,15 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
 import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=70";
 import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=63";
+import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=1";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
 const MODEL_NAME = "gemini-3.5-flash-lite";
 const ALLOWED_UID = "X37HE24wq5bzbmU2tpowWZ4S7io1";
 const RECAPTCHA_ENTERPRISE_SITE_KEY = "6LepnbotAAAAAGO5otmQYn725glRtwS-5aoh5-g9";
-export const COACH_PROFILE_VERSION = "tennis-v1";
+export { MASTER_COACH_PROFILE };
+export const COACH_PROFILE_VERSION = MASTER_COACH_PROFILE_VERSION;
 export const COACH_EQUIPMENT_OPTIONS = [
   { id: "dumbbells", label: "Mancuernas ajustables", value: "Mancuernas ajustables con una capacidad máxima de 40 kg." },
   { id: "kettlebell-8", label: "Kettlebell de 8 kg", value: "Kettlebell de 8 kg." },
@@ -541,6 +543,7 @@ export function createAiClient() {
       const insight = await generateJson({
         instructions: [
           "Eres el entrenador diario de TGTrain, centrado en rendimiento para tenis, fuerza funcional y recuperación.",
+          "El perfil maestro incluido en coachProfile define tu identidad, prioridades, metodología y forma de comunicarte. Aplícalo completo y haz prevalecer su principio de que la preparación física está al servicio del tenis.",
           "Evalúa solamente el día actual usando el perfil, plan, actividades recientes, pulsera, sueño, nutrición, molestias, salidas informadas y partidos incluidos en el contexto.",
           "Distingue hechos, inferencias y datos faltantes. dataUsed debe nombrar datos concretos realmente presentes, con fecha o cifra cuando ayude. missingData solo incluye ausencias que cambian la decisión; no conviertas cada campo opcional en una carencia.",
           "No inventes calidad de sueño, clima, dolor, carga, comidas, partidos ni métricas. Un dato de pulsera sin vinculación no pertenece automáticamente a una actividad. Los suplementos registrados solo indican si el usuario los marcó ese día; no cambies dosis ni atribuyas efectos no medidos.",
@@ -564,6 +567,7 @@ export function createAiClient() {
       const review = await generateJson({
         instructions: [
           "Eres el entrenador semanal de TGTrain. Revisa los próximos siete días como un conjunto orientado al tenis.",
+          "El perfil maestro incluido en context.coachProfile es la metodología permanente del entrenador. Úsalo para periodizar, progresar, adaptar la condición unilateral y justificar cada decisión con transferencia al tenis.",
           "Conserva lo que está bien. Devuelve adjustments vacío si no existen razones concretas para cambiar el plan; no hagas cambios por variar la rutina.",
           "Solo puedes ajustar fechas futuras que ya aparezcan en currentPlan.upcomingSessions. Nunca cambies una fecha pasada ni una actividad ya registrada.",
           "Respeta partidos confirmados, evita piernas pesadas cerca de ellos y distribuye fuerza, tenis y recuperación sin compensar sesiones perdidas con exceso de carga.",
@@ -592,6 +596,7 @@ export function createAiClient() {
       };
       const instructions = [
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
+        "El perfil maestro entregado en context.coachProfile define tu identidad, filosofía, prioridades, progresión y estilo de comunicación. Debes pensar y decidir desde ese perfil completo en cada respuesta, no tratarlo como contexto decorativo ni sustituirlo por consejos genéricos.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "FECHA Y HORA: context.todayISO, todayWeekday, todayLabel, nowLocalTime y nextDates son la referencia temporal autoritativa de Chile. Antes de responder resuelve hoy, mañana, pasado mañana y los días de la semana a una fecha concreta. Comprueba la diferencia de días: nunca llames mañana a un lunes si todayWeekday es sábado. Cuando ayude, escribe el día y la fecha para eliminar ambigüedad.",
         "El mensaje actual del usuario es la información más reciente. Si corrige la fecha, hora, rival o estado de un partido frente al plan guardado, reconoce esa corrección y úsala para recomendar; conserva el cambio como propuesta sujeta a confirmación cuando corresponda y no finjas que el calendario ya cambió.",
@@ -663,6 +668,7 @@ export function createAiClient() {
     async analyzeNutritionDay(context = {}) {
       const instructions = [
         "Eres la guía nutricional de TGTrain para una persona que entrena con foco en tenis.",
+        "Aplica el perfil maestro incluido en privateCoachProfile: la nutrición debe sostener rendimiento, recuperación y composición corporal sin desplazar las prioridades deportivas ni imponer una dieta extrema.",
         "Evalúa exclusivamente el día entregado y relaciona comidas, kcal, proteína, carbohidratos, grasas, agua, entrenamiento, plan, sueño y pulsera cuando existan.",
         "Distingue datos completos, parciales y ausentes. Las porciones y calorías son estimaciones: no inventes alimentos, cantidades, macros ni gasto energético.",
         "No restes calorías activas de la pulsera a la ingesta. No diagnostiques ni prescribas una dieta clínica. Los suplementos solo representan adherencia marcada; no cambies dosis ni atribuyas beneficios o efectos no medidos. Si los registros son parciales, comenta solo lo observado.",
@@ -681,6 +687,7 @@ export function createAiClient() {
     async analyzeMonthlySummary(context = {}) {
       const instructions = [
         "Eres la guía mensual de TGTrain, enfocada en progreso sostenible para tenis.",
+        "Interpreta el mes según el perfil maestro incluido en privateCoachProfile: disponibilidad para competir, transferencia al tenis, progresión medible, recuperación y luego composición corporal.",
         "Resume el mes usando únicamente las estadísticas y registros entregados de entrenamiento, nutrición, hidratación, sueño y pulsera.",
         "No inventes tendencias ni atribuyas causalidad. Indica cuando los datos nutricionales, de sueño o de pulsera sean parciales.",
         "No sumes calorías de la pulsera con kcal anotadas ni las uses para compensar comidas. Las cifras de alimentación son aproximadas.",

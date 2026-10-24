@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=110">
+  <link rel="stylesheet" href="assets/css/styles.css?v=111">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -421,36 +421,11 @@
       </section>
     </div>
     <div class="cloud-actions cloud-secondary-actions">
-      <button id="openCoachProfileButton" type="button">Perfil del entrenador IA</button>
       <button id="openAiPlanButton" type="button"><span aria-hidden="true">✦</span> Importar planificación con IA</button>
       <a class="wearable-download" href="downloads/tgtrain-sync-0.6.6.apk" download>Descargar TGTrain Sync para Android</a>
       <button id="cloudSignOutButton" class="hidden" type="button">Cerrar sesión</button>
     </div>
     <small>La copia local se conserva para que TGTrain funcione sin conexión. En la nube, cada cuenta solo puede acceder a sus propios registros.</small>
-  </dialog>
-
-  <dialog id="coachProfileDialog" class="coach-plan-dialog coach-profile-dialog" aria-labelledby="coachProfileDialogTitle">
-    <div class="coach-dialog-heading">
-      <div>
-        <p class="eyebrow dark">Contexto privado</p>
-        <h2 id="coachProfileDialogTitle">Perfil del entrenador IA</h2>
-        <p>Estas instrucciones guían cada recomendación de progresión y se sincronizan únicamente con tu cuenta.</p>
-      </div>
-      <button id="coachProfileDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
-    </div>
-    <form id="coachProfileForm" class="coach-profile-form">
-      <label for="coachProfileText">Perfil, objetivo, limitaciones y reglas del entrenador</label>
-      <textarea id="coachProfileText" rows="13" maxlength="40000" placeholder="Pega aquí la instrucción maestra que preparó tu entrenador."></textarea>
-      <label>Implementos disponibles</label>
-      <div id="coachEquipmentChoices" class="coach-equipment-choices" aria-label="Implementos disponibles para adaptar entrenamientos"></div>
-      <label for="coachProfileEquipment">Detalle editable y otros implementos</label>
-      <textarea id="coachProfileEquipment" rows="6" maxlength="5000"></textarea>
-      <div class="coach-memory-heading"><strong>Memoria aprobada</strong><small>Solo se guarda lo que confirmes desde Habla con TGTrain.</small></div>
-      <div id="coachMemoryList" class="coach-memory-list"></div>
-      <p class="ai-privacy-note"><span aria-hidden="true">●</span> Al analizar una rutina, este perfil privado se envía a Gemini junto con tus datos de entrenamiento. No se incluye en el código público de TGTrain.</p>
-      <div id="coachProfileMessage" class="form-message hidden" role="status" aria-live="polite"></div>
-      <button id="saveCoachProfileButton" class="save-button ai-action-button" type="submit">Guardar perfil privado</button>
-    </form>
   </dialog>
 
   <dialog id="coachPlanDialog" class="coach-plan-dialog" aria-labelledby="coachPlanDialogTitle">
@@ -630,6 +605,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=133"></script>
+<script type="module" src="assets/js/app.js?v=134"></script>
 </body>
 </html>

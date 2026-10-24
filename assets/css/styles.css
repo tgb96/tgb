@@ -720,24 +720,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .ai-preview-day span { color: var(--muted); }
 .ai-preview-day b { font-weight: 850; }
 .ai-confirm-note { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; text-align: center; }
-.coach-profile-dialog { background: white; }
-.coach-profile-form { display: grid; gap: 7px; }
-.coach-profile-form label { margin-top: 7px; font-size: 11px; font-weight: 900; }
-.coach-profile-form textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); color: var(--ink); font-size: 11px; line-height: 1.45; }
-.coach-equipment-choices { display: flex; flex-wrap: wrap; gap: 7px; }
-.coach-equipment-choices label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); cursor: pointer; }
-.coach-equipment-choices label:has(input:checked) { border-color: #9ec832; background: #efffc9; color: #345300; }
-.coach-equipment-choices input { width: 15px; height: 15px; margin: 0; accent-color: #3157ff; }
-.coach-memory-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-top: 10px; }
-.coach-memory-heading strong { font-size: 12px; }
-.coach-memory-heading small { max-width: 230px; color: var(--muted); font-size: 9px; text-align: right; }
-.coach-memory-list { display: grid; gap: 7px; }
-.coach-memory-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
-.coach-memory-item span, .coach-memory-item small { display: block; }
-.coach-memory-item span { font-size: 11px; line-height: 1.4; }
-.coach-memory-item small { margin-top: 2px; color: var(--muted); font-size: 9px; text-transform: capitalize; }
-.coach-memory-item button { min-height: 32px; border: 1px solid #e0caca; border-radius: 9px; background: white; color: #9a3030; font-size: 9px; font-weight: 850; }
-.coach-memory-empty { margin: 0; color: var(--muted); font-size: 10px; }
 
 @media (max-width: 430px) {
   .coach-plan-actions { grid-template-columns: 1fr; }
