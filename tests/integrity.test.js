@@ -84,6 +84,8 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /Enviar a TGTrain/);
   assert.doesNotMatch(html, /¿Qué quieres preguntarle\?|Preguntar a la guía/);
   assert.match(html, /id="coachVoiceButton"[^>]+type="button"/);
+  assert.match(html, /id="coachVoiceFallbackButton"[^>]+type="button"/);
+  assert.match(html, /id="coachAudioFile"[^>]+type="file"[^>]+accept="audio\/\*"[^>]+capture/);
   assert.match(html, /Gemini transcribe el audio para que lo revises/);
   assert.match(html, /id="coachHistoryToggle"/);
   assert.doesNotMatch(html, /Tus preguntas quedan guardadas hasta que las limpies/);
@@ -439,10 +441,31 @@ test("la app graba una nota de voz real y Gemini la transcribe antes de enviarla
   assert.match(app, /new MediaRecorder/);
   assert.match(app, /coachAudioAutoStop = setTimeout\(stopCoachVoiceRecording, 60000\)/);
   assert.match(app, /aiClient\.transcribeCoachAudio\(audioBlob\)/);
+  assert.match(app, /navigator\.permissions\?\.query\(\{ name: "microphone" \}\)/);
+  assert.match(app, /coachAudioFile"\)\.addEventListener\("change", importCoachAudioFile\)/);
+  assert.match(app, /transcribeCoachRecording\(file\)/);
+  assert.match(app, /permiso está concedido, pero no pudo abrir el micrófono/);
   assert.match(app, /Transcripción lista\. Revísala y luego pulsa Enviar a TGTrain/);
   assert.match(ai, /inlineData: \{ data, mimeType \}/);
   assert.match(ai, /audio\/webm/);
   assert.match(ai, /No respondas la pregunta, no aconsejes/);
+});
+
+test("TGTrain resuelve fechas chilenas y exige sesiones completas al responder", async () => {
+  const [app, ai] = await Promise.all([
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "assets/js/ai.js"), "utf8")
+  ]);
+  assert.match(app, /timeZone: "America\/Santiago"/);
+  assert.match(app, /todayWeekday/);
+  assert.match(app, /nextDates: Array\.from\(\{ length: 8 \}/);
+  assert.match(ai, /referencia temporal autoritativa de Chile/);
+  assert.match(ai, /nunca llames mañana a un lunes si todayWeekday es sábado/);
+  assert.match(ai, /sesión completa y directamente ejecutable/);
+  assert.match(ai, /duración total, calentamiento, ejercicios en orden/);
+  assert.match(ai, /CORRECCIÓN OBLIGATORIA ANTES DE RESPONDER/);
+  assert.match(ai, /answerNeedsTemporalCorrection/);
+  assert.match(ai, /answerNeedsSessionCorrection/);
 });
 
 test("Gemini propone memoria aprobable y TGTrain registra suplementos diarios", async () => {
@@ -519,7 +542,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=132/);
+  assert.match(html, /assets\/js\/app\.js\?v=133/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

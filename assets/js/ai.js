@@ -593,6 +593,8 @@ export function createAiClient() {
       const instructions = [
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
+        "FECHA Y HORA: context.todayISO, todayWeekday, todayLabel, nowLocalTime y nextDates son la referencia temporal autoritativa de Chile. Antes de responder resuelve hoy, mañana, pasado mañana y los días de la semana a una fecha concreta. Comprueba la diferencia de días: nunca llames mañana a un lunes si todayWeekday es sábado. Cuando ayude, escribe el día y la fecha para eliminar ambigüedad.",
+        "El mensaje actual del usuario es la información más reciente. Si corrige la fecha, hora, rival o estado de un partido frente al plan guardado, reconoce esa corrección y úsala para recomendar; conserva el cambio como propuesta sujeta a confirmación cuando corresponda y no finjas que el calendario ya cambió.",
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
         "Integra entrenamiento, comidas registradas, hidratación, suplementos marcados, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los suplementos solo acreditan que el usuario los marcó ese día: no cambies sus dosis ni atribuyas efectos no medidos. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
         "Si el usuario informa que bebió alcohol o salió de noche, devuelve hasRecoveryContext=true y recoveryContext. Resuelve expresiones relativas usando todayISO: eventDateISO es el día en que comenzó la salida y endDateISO/endTime indican cuándo terminó; por ejemplo, sábado hasta las 05:00 termina el domingo. alcoholAmount solo puede reflejar lo que el usuario dijo: poco=low, moderado=moderate, harto/mucho=high y sin cantidad=unknown. symptoms también debe basarse en lo informado, sin inventarlos. La app calculará una influencia de 24 a 48 horas según cantidad y horario.",
@@ -601,20 +603,52 @@ export function createAiClient() {
         "No modifiques registros ni planificación por tu cuenta. La aplicación siempre pedirá confirmación.",
         "Usa memorySuggestions solo para hechos duraderos que el usuario declaró explícitamente y que mejorarían recomendaciones futuras: preferencias estables, horarios habituales, objetivos, equipamiento o molestias recurrentes. No guardes sucesos de un solo día, comidas puntuales, clima, una sesión aislada, inferencias ni diagnósticos. No repitas approvedMemories. Cada memoria debe entenderse sin releer la conversación y siempre quedará pendiente de aprobación del usuario.",
         "Si el usuario corrige o completa un hecho de una actividad ya registrada, devuelve hasRecordAdjustment=true y una sola recordAdjustment. Usa exclusivamente el recordId, dateISO y recordUpdatedAt exactos de recentActivities. Solo completa los campos que realmente cambian y deja los demás como cadena vacía. No cambies el tipo de actividad ni inventes otro registro. Para lluvia u otra imposibilidad climática en un descanso usa restTypeId weather y explica el motivo en restDetail. sensationsAppend agrega contexto sin borrar las sensaciones existentes. routineEffort admite 1–10, routinePain 0–10 y activityStartTime HH:MM.",
-        "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
+        "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido reprogramado o suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola actividad principal coherente para una fecha y su nutritionMode. Si hay que corregir primero el partido en el calendario, prioriza esa corrección como propuesta y explica las demás recomendaciones en answer. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
         "Un recoveryContext no modifica por sí solo el calendario. Si afecta una sesión prevista dentro de las siguientes 48 horas, puedes proponer un planAdjustment más suave para una sola fecha, siempre sujeto a confirmación. Si no hay fecha planificada relevante, explica cómo regular la sesión y no inventes un cambio.",
         "El calendario competitivo incluido en el contexto es la fuente común para entrenamiento y nutrición. Un evento calendarStatus=scheduled es un partido confirmado para planificar; likely-suspended, suspended y pending no deben contarse como carga competitiva hasta que Open Tennis o el usuario confirme que se jugará. Mantén una alternativa suave o descanso y no compenses una suspensión con carga excesiva.",
         "Si la lluvia impide el tenis, no propongas descanso automáticamente. Revisa primero equipment, lo realizado en las últimas 24–48 horas, sueño, molestias y el próximo partido. Si la recuperación lo permite, prioriza una alternativa suave bajo techo usando solo implementos disponibles: físico reducido, bicicleta estática, core, movilidad o técnica sin cancha. Evita repetir el grupo muscular trabajado el día anterior y evita piernas pesadas o pliometría cerca de un partido. Propón descanso solo si los datos de recuperación, dolor o carga realmente lo justifican, y explica por qué.",
         "Cuando propongas una rutina física adaptada, usa exerciseSettings para bajar series, carga o repeticiones y para omitir ejercicios incompatibles con el objetivo del día. No incluyas ejercicios ajenos a la rutina elegida ni implementos que no figuren en equipment. Si la disponibilidad no está clara, dilo en la respuesta y pide actualizar los implementos antes de confirmar.",
+        "Si el usuario dice que todavía puede o quiere entrenar hoy, no descartes automáticamente la sesión solo porque sea de tarde o noche. Evalúa hora, sueño, dolor, carga reciente, equipamiento y proximidad del partido; si no hay una contraindicación informada, ofrece una opción segura y ajustada.",
+        "Cuando pida entrenar en casa o solicite qué hacer hoy, entrega una sesión completa y directamente ejecutable, no solo consejos generales: duración total, calentamiento, ejercicios en orden, series y repeticiones o segundos, intensidad/RPE, descansos y vuelta a la calma. Usa únicamente ejercicios del catálogo y el equipamiento declarado. Si faltan datos para prescribirla con seguridad, dilo y formula una alternativa conservadora concreta.",
+        "Si la solicitud cubre varios días, organiza answer como un microplan separado por día y fecha. Para hoy, mañana y el día del partido indica el objetivo y la carga de cada bloque. La movilidad o activación del día del partido es complementaria: no debe sustituir ni borrar el partido confirmado. Evita carga pesada de piernas y fatiga residual cerca del encuentro.",
         "Para un ajuste usa exclusivamente los identificadores del CATÁLOGO. Un peloteo amistoso es tennisTypeId friendly-hitting; un descanso normal es restTypeId planned. Conserva el objetivo semanal, considera lo ya realizado y evita compensar con exceso de carga. No propongas dos actividades principales para el mismo día.",
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
       ].join("\n");
-      const response = await generateJson({
+      const questionText = String(question || "").trim().slice(0, 1000);
+      const request = {
         instructions,
-        input: JSON.stringify({ question: String(question || "").trim().slice(0, 1000), catalog, context }),
+        input: JSON.stringify({ question: questionText, catalog, context }),
         schema: coachQuestionSchema,
-        maxOutputTokens: 1800
-      });
+        maxOutputTokens: 2600
+      };
+      let response = await generateJson(request);
+      const normalized = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const questionNormalized = normalized(questionText);
+      const answerNeedsTemporalCorrection = () => {
+        const answerNormalized = normalized(response?.answer);
+        if (!/\b(?:partido|encuentro)\b/.test(questionNormalized) || !/\bmanana\b/.test(answerNormalized)) return false;
+        const mentionedMatchDate = (context.nextDates || []).find(item => {
+          if (!item?.offset || item.offset === 1) return false;
+          const weekday = normalized(item.weekday);
+          return new RegExp(`(?:partido|encuentro)[\\s\\S]{0,100}\\b${weekday}\\b|\\b${weekday}\\b[\\s\\S]{0,100}(?:partido|encuentro)`).test(questionNormalized);
+        });
+        return Boolean(mentionedMatchDate && /(?:partido|encuentro)[\s\S]{0,80}\bmanana\b|\bmanana\b[\s\S]{0,80}(?:partido|encuentro)/.test(answerNormalized));
+      };
+      const answerNeedsSessionCorrection = () => {
+        const asksForHomeTraining = /(?:entren|rutina)[\s\S]{0,100}(?:casa|hogar)|(?:casa|hogar)[\s\S]{0,100}(?:entren|rutina)/.test(questionNormalized);
+        const saysCanTrain = /(?:alcanz|pued|quier|tendria que|necesit)[\s\S]{0,60}entren/.test(questionNormalized);
+        const hasPrescription = /\b\d+\s*(?:min|minutos|series|repeticiones|segundos)\b|\b\d+\s*[x×]\s*\d+/.test(normalized(response?.answer));
+        return asksForHomeTraining && saysCanTrain && !hasPrescription;
+      };
+      const corrections = [];
+      if (answerNeedsTemporalCorrection()) corrections.push("La respuesta confundió la distancia temporal al partido. Recalcula cada referencia relativa con nextDates y no llames mañana a una fecha con offset distinto de 1.");
+      if (answerNeedsSessionCorrection()) corrections.push("La persona pidió entrenar en casa y la respuesta no contiene una sesión ejecutable. Incluye duración, calentamiento, ejercicios ordenados, series/repeticiones o segundos, RPE, descansos y vuelta a la calma, respetando equipo y cercanía del partido.");
+      if (corrections.length) {
+        response = await generateJson({
+          ...request,
+          instructions: `${instructions}\nCORRECCIÓN OBLIGATORIA ANTES DE RESPONDER:\n${corrections.join("\n")}`
+        });
+      }
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
       return {

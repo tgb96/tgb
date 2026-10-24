@@ -32,7 +32,7 @@ import { createNutritionUI } from "./nutrition-ui.js?v=117";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=109";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=110";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -1883,6 +1883,9 @@ function coachQuestionContext() {
   const records = repository.list();
   const block = activeTrainingBlock();
   const todayISO = getChileDateISO();
+  const chileNow = new Date();
+  const chileDayFormatter = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const chileTimeFormatter = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false });
   const todaySession = coachSessionForDate(todayISO, block);
   const upcomingSessions = (block.weeks || []).flatMap(week => week.sessions || [])
     .filter(session => session.dateISO >= todayISO && session.dateISO <= addDaysISO(todayISO, 7));
@@ -1892,6 +1895,14 @@ function coachQuestionContext() {
   const recoveryContexts = recoveryContextsFromQuestions(repository.listCoachQuestions());
   return {
     todayISO,
+    todayWeekday: new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", weekday: "long" }).format(chileNow),
+    todayLabel: chileDayFormatter.format(chileNow),
+    nowLocalTime: chileTimeFormatter.format(chileNow),
+    nextDates: Array.from({ length: 8 }, (_, offset) => {
+      const dateISO = addDaysISO(todayISO, offset);
+      const date = new Date(`${dateISO}T12:00:00Z`);
+      return { offset, dateISO, weekday: new Intl.DateTimeFormat("es-CL", { timeZone: "UTC", weekday: "long" }).format(date) };
+    }),
     coachProfile: coachProfilePrompt().slice(0, 16000),
     approvedMemories: (repository.getCoachProfile()?.memories || []).map(item => ({ text: item.text, category: item.category })),
     equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
@@ -2111,12 +2122,26 @@ function resetCoachVoiceButton() {
   button.classList.remove("recording");
   button.setAttribute("aria-pressed", "false");
   button.textContent = "🎙 Hablar";
+  $("coachVoiceFallbackButton").disabled = coachQuestionInFlight || coachAudioTranscriptionInFlight;
   $("coachAskButton").disabled = coachQuestionInFlight || coachAudioTranscriptionInFlight;
 }
 
-function coachMicrophoneError(error) {
+async function microphonePermissionState() {
+  try {
+    return (await navigator.permissions?.query({ name: "microphone" }))?.state || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+async function coachMicrophoneError(error) {
   const name = String(error?.name || "");
-  if (["NotAllowedError", "PermissionDeniedError"].includes(name)) return "El micrófono está bloqueado. En Android abre Información de la app de TGTrain o Chrome → Permisos → Micrófono → Permitir.";
+  if (["NotAllowedError", "PermissionDeniedError"].includes(name)) {
+    const permission = await microphonePermissionState();
+    if (permission === "granted") return "Chrome indica que el permiso está concedido, pero no pudo abrir el micrófono. Usa la grabadora del teléfono o cierra y vuelve a abrir TGTrain.";
+    if (permission === "denied") return "El permiso del micrófono está bloqueado. En Android abre Chrome o TGTrain → Permisos → Micrófono → Permitir; también puedes usar la grabadora del teléfono.";
+    return "Chrome no pudo abrir el micrófono. Revisa el permiso del sitio o usa la grabadora del teléfono.";
+  }
   if (name === "NotFoundError") return "No encontré un micrófono disponible en este dispositivo.";
   if (["NotReadableError", "AbortError"].includes(name)) return "Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentarlo.";
   if (name === "SecurityError") return "Android no permitió usar el micrófono desde esta instalación de TGTrain.";
@@ -2166,7 +2191,7 @@ async function toggleCoachVoice() {
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia || !("MediaRecorder" in window)) {
-    $("coachQuestionStatus").textContent = "Este navegador no permite grabar audio. Actualiza Chrome o abre TGTrain desde Chrome.";
+    $("coachQuestionStatus").textContent = "Este navegador no puede grabar directamente. Usa la grabadora del teléfono y TGTrain transcribirá el archivo.";
     return;
   }
   const button = $("coachVoiceButton");
@@ -2184,9 +2209,9 @@ async function toggleCoachVoice() {
     coachAudioRecorder = recorder;
     coachAudioChunks = [];
     recorder.addEventListener("dataavailable", event => { if (event.data?.size) coachAudioChunks.push(event.data); });
-    recorder.addEventListener("error", event => {
+    recorder.addEventListener("error", async event => {
       recordingFailed = true;
-      $("coachQuestionStatus").textContent = coachMicrophoneError(event.error);
+      $("coachQuestionStatus").textContent = await coachMicrophoneError(event.error);
       clearCoachAudioTimers();
       releaseCoachAudioStream();
       coachAudioRecorder = null;
@@ -2221,9 +2246,26 @@ async function toggleCoachVoice() {
     clearCoachAudioTimers();
     releaseCoachAudioStream();
     coachAudioRecorder = null;
-    $("coachQuestionStatus").textContent = coachMicrophoneError(error);
+    $("coachQuestionStatus").textContent = await coachMicrophoneError(error);
     resetCoachVoiceButton();
   }
+}
+
+function chooseCoachAudioFile() {
+  if (coachQuestionInFlight || coachAudioTranscriptionInFlight) return;
+  if (!cloudSync.currentUser) {
+    $("coachQuestionStatus").textContent = "Inicia sesión con Google para transcribir una nota de voz con Gemini.";
+    openCloudDialog();
+    return;
+  }
+  $("coachAudioFile").click();
+}
+
+function importCoachAudioFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  transcribeCoachRecording(file);
 }
 
 async function submitCoachQuestion(existing = null) {
@@ -2244,6 +2286,7 @@ async function submitCoachQuestion(existing = null) {
   coachQuestionInFlight = true;
   $("coachAskButton").disabled = true;
   $("coachVoiceButton").disabled = true;
+  $("coachVoiceFallbackButton").disabled = true;
   $("coachAskButton").textContent = "Consultando…";
   $("coachQuestionStatus").textContent = "TGTrain está revisando tus registros y tu plan.";
   const timestamp = new Date().toISOString();
@@ -6821,6 +6864,8 @@ function bindEvents() {
     submitCoachQuestion();
   });
   $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
+  $("coachVoiceFallbackButton").addEventListener("click", chooseCoachAudioFile);
+  $("coachAudioFile").addEventListener("change", importCoachAudioFile);
   $("coachAutoSpeak").addEventListener("change", event => {
     window.localStorage.setItem(COACH_AUTO_SPEAK_KEY, String(event.target.checked));
     if (!event.target.checked) window.speechSynthesis?.cancel();
