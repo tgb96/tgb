@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=97";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isHalfPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=105";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=105";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
 
@@ -293,16 +293,10 @@ export function createNutritionUI(repository, {
     setPhotoStatus("Analizando la foto y preparando un borrador…", "loading");
     try {
       const userContext = byId("nutritionAiMealDescription").value.trim();
-      const catalog = Object.values(foodCatalog).filter(item => isSelectableFood(item.id))
-        .map(item => ({ id: item.id, name: item.name, portion: item.portion }));
-      const result = await analyzeMealPhoto(selectedPhotoFile, { dateISO: selectedDate, slotId: selectedSlot, userContext, catalog });
+      const result = await analyzeMealPhoto(selectedPhotoFile, { dateISO: selectedDate, slotId: selectedSlot, userContext });
       const analysis = result?.analysis || result;
-      const parts = {};
-      for (const item of analysis?.catalogParts || []) {
-        if (foodCatalog[item.foodId] && isHalfPortionCount(item.count) && item.count <= 20) parts[item.foodId] = Number(item.count);
-      }
       applyMealDraft({
-        parts,
+        parts: {},
         note: [analysis?.summary, analysis?.portionNotes].filter(Boolean).join(". "),
         caloriesKcal: analysis?.caloriesKcal ?? null,
         proteinG: analysis?.proteinG ?? null,

@@ -520,7 +520,7 @@
         <input id="nutritionMealCamera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
         <input id="nutritionMealPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden>
         <div class="nutrition-ai-meal-entry">
-          <label for="nutritionAiMealDescription"><strong>Descripción para Gemini</strong><small>Puedes usarla sola o junto con la foto. Indica el local, el plato, las salsas, el tamaño y cuánto comiste.</small></label>
+          <label for="nutritionAiMealDescription"><strong>Descripción para Gemini</strong><small>Puedes usarla sola o junto con la foto. Indica el local, los alimentos, las salsas, cuánto comiste y si usaste el plato chico (23 cm) o grande (27 cm).</small></label>
           <textarea id="nutritionAiMealDescription" rows="3" maxlength="1200" placeholder="Ej.: Piccola Italia: dos tipos de pasta con salsa y una milanesa de pollo; comí el plato completo."></textarea>
           <button id="nutritionAnalyzePhoto" type="button" disabled>Analizar foto con Gemini</button>
           <p id="nutritionPhotoStatus" class="nutrition-photo-status" role="status"></p>
@@ -615,6 +615,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=126"></script>
+<script type="module" src="assets/js/app.js?v=127"></script>
 </body>
 </html>
