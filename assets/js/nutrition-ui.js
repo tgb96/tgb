@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=98";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=105";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=73";
@@ -8,6 +8,11 @@ const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.
 const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
+const DAILY_SUPPLEMENTS = [
+  { id: "creatine", name: "Creatina", dose: "5 g diarios" },
+  { id: "centrum-men", name: "Centrum Hombre", dose: "Dosis diaria indicada en el envase" },
+  { id: "omega-3", name: "Omega-3", dose: "Dosis diaria indicada en el envase" }
+];
 
 export function createNutritionUI(repository, {
   showToast = () => {},
@@ -490,6 +495,26 @@ export function createNutritionUI(repository, {
     render();
   }
 
+  function toggleSupplement(supplement) {
+    const id = `supplement-${selectedDate}-${supplement.id}`;
+    const previous = repository.getNutritionEntry(id);
+    const now = new Date().toISOString();
+    repository.saveNutritionEntry({
+      id,
+      dateISO: selectedDate,
+      kind: "supplement",
+      supplementId: supplement.id,
+      supplementName: supplement.name,
+      doseLabel: supplement.dose,
+      time: previous && !previous.deleted ? previous.time : localTime(),
+      deleted: Boolean(previous && !previous.deleted),
+      createdAt: previous?.createdAt || now,
+      updatedAt: now
+    });
+    render();
+    showToast(previous && !previous.deleted ? `${supplement.name} quedó sin marcar.` : `${supplement.name} registrada para el día seleccionado.`);
+  }
+
   function deleteEntry(entry) {
     if (!window.confirm(`¿Quitar este ${entry.kind === "water" ? "vaso de agua" : "registro de comida"}?`)) return;
     repository.saveNutritionEntry({ ...entry, deleted: true, updatedAt: new Date().toISOString() });
@@ -723,7 +748,31 @@ export function createNutritionUI(repository, {
         ? "Ya alcanzaste el mínimo orientativo de hidratación del día."
         : "Superaste el rango orientativo; ajusta el resto según sed, entrenamiento y temperatura.";
     waterProgress.append(waterTitle, waterBar, waterNote);
-    renderCoachInsight(repository.listNutritionEntries(selectedDate).filter(entry => ["meal", "water", "plan"].includes(entry.kind)));
+    const supplementTracker = byId("nutritionSupplements");
+    supplementTracker.replaceChildren();
+    const supplementTitle = document.createElement("strong");
+    supplementTitle.textContent = "Suplementos de este día";
+    const supplementHelp = document.createElement("small");
+    supplementHelp.textContent = "Márcalos después de tomarlos. No modifican las kcal ni los macronutrientes registrados.";
+    const supplementOptions = document.createElement("div");
+    supplementOptions.className = "nutrition-supplement-options";
+    const takenSupplements = new Set(allEntries.filter(entry => entry.kind === "supplement").map(entry => entry.supplementId));
+    DAILY_SUPPLEMENTS.forEach(supplement => {
+      const taken = takenSupplements.has(supplement.id);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `nutrition-supplement-button${taken ? " taken" : ""}`;
+      button.setAttribute("aria-pressed", String(taken));
+      const check = document.createElement("span"); check.textContent = "✓";
+      const copy = document.createElement("div");
+      const name = document.createElement("strong"); name.textContent = supplement.name;
+      const dose = document.createElement("small"); dose.textContent = `${supplement.dose} · ${taken ? "tomado" : "pendiente"}`;
+      copy.append(name, dose); button.append(check, copy);
+      button.addEventListener("click", () => toggleSupplement(supplement));
+      supplementOptions.append(button);
+    });
+    supplementTracker.append(supplementTitle, supplementHelp, supplementOptions);
+    renderCoachInsight(repository.listNutritionEntries(selectedDate).filter(entry => ["meal", "water", "plan", "supplement"].includes(entry.kind)));
     const slots = byId("nutritionSlots"); slots.replaceChildren();
     plan.slots.forEach(item => {
       const card = document.createElement("article"); card.className = "nutrition-slot";

@@ -148,17 +148,20 @@ export function nutritionPlanForDate(dateISO, mode = "default") {
 export function normalizeNutritionEntries(value) {
   const entries = Array.isArray(value) ? value : Object.values(value || {});
   const insightKinds = ["nutrition-analysis", "monthly-summary", "daily-coach", "weekly-review"];
+  const supplementIds = ["creatine", "centrum-men", "omega-3"];
   return Object.fromEntries(entries.flatMap(item => {
     const id = String(item?.id || "").slice(0, 120);
     const dateISO = String(item?.dateISO || "");
     if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) return [];
     const parsedDate = new Date(`${dateISO}T12:00:00Z`);
     if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dateISO) return [];
-    const kind = ["meal", "water", "plan", ...insightKinds].includes(item?.kind) ? item.kind : "meal";
+    const kind = ["meal", "water", "plan", "supplement", ...insightKinds].includes(item?.kind) ? item.kind : "meal";
     const planMode = kind === "plan" ? String(item?.planMode || "default") : "";
     if (kind === "plan" && !nutritionModes.includes(planMode)) return [];
     const amountMl = kind === "water" ? Number(item?.amountMl) : 0;
     if (kind === "water" && (!Number.isInteger(amountMl) || amountMl < 1 || amountMl > 3000)) return [];
+    const supplementId = kind === "supplement" && supplementIds.includes(item?.supplementId) ? item.supplementId : "";
+    if (kind === "supplement" && !supplementId) return [];
     const text = String(item?.text || "").trim().slice(0, 1000);
     if (kind === "meal" && !text) return [];
     if (insightKinds.includes(kind) && !String(item?.summary || "").trim()) return [];
@@ -187,6 +190,9 @@ export function normalizeNutritionEntries(value) {
       time: String(item?.time || "").slice(0, 5), text, note: kind === "meal" ? String(item?.note || "").trim().slice(0, 1000) : "",
       parts: kind === "meal" ? parts : {}, estimateSource: kind === "meal" && ["label", "generic", "manual", "ai-photo", "ai-description", "ai-photo-description"].includes(item?.estimateSource) ? item.estimateSource : "",
       amountMl, planMode, ...metrics,
+      supplementId,
+      supplementName: kind === "supplement" ? String(item?.supplementName || "").trim().slice(0, 100) : "",
+      doseLabel: kind === "supplement" ? String(item?.doseLabel || "").trim().slice(0, 100) : "",
       title: insightKinds.includes(kind) ? String(item?.title || "Comentario del entrenador").trim().slice(0, 200) : "",
       summary: insightKinds.includes(kind) ? String(item?.summary || "").trim().slice(0, 3000) : "",
       sections,

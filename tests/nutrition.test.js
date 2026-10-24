@@ -250,6 +250,17 @@ test("conserva chequeos y balances del entrenador sin sumarlos como comidas", ()
   assert.equal(nutritionDayTotals(entries).meals, 0);
 });
 
+test("los suplementos diarios se conservan sin alterar kcal, macros ni agua", () => {
+  const entries = Object.values(normalizeNutritionEntries([
+    { id: "creatine", dateISO: "2026-10-24", kind: "supplement", supplementId: "creatine", supplementName: "Creatina", doseLabel: "5 g diarios", time: "09:00" },
+    { id: "centrum", dateISO: "2026-10-24", kind: "supplement", supplementId: "centrum-men", supplementName: "Centrum Hombre", doseLabel: "Dosis diaria indicada", time: "09:00" },
+    { id: "omega", dateISO: "2026-10-24", kind: "supplement", supplementId: "omega-3", supplementName: "Omega-3", doseLabel: "Dosis diaria indicada", time: "13:00" }
+  ]));
+  assert.equal(entries.length, 3);
+  assert.equal(entries[0].doseLabel, "5 g diarios");
+  assert.deepEqual(nutritionDayTotals(entries), { meals: 0, waterMl: 0, caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0, caloriesKnownMeals: 0, proteinKnownMeals: 0, mealsWithMacros: 0 });
+});
+
 test("comidas, agua, cambio de plan y eliminaciones viajan en respaldo", () => {
   const repository = createRepository(memoryStorage());
   const dateISO = "2026-09-23";

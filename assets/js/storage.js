@@ -1,13 +1,13 @@
 import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=73";
 import { normalizeTrainingBlocks } from "./training-plan.js?v=99";
-import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=98";
+import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=99";
 import { describeParts, normalizeNutritionFoods, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { normalizeRecoveryContext } from "./recovery-context.js?v=100";
 
 export const DATA_KEY = "tgb-data-v3";
 export const PREVIOUS_DATA_KEY = "tgb-data-v2";
 export const LEGACY_HISTORY_KEY = "history";
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 function parseJSON(value, fallback) {
   try {
@@ -53,11 +53,23 @@ export function normalizeCoachProfile(value) {
   if (!value || typeof value !== "object") return null;
   const profileText = String(value.profileText || "").trim().slice(0, 40000);
   const equipment = String(value.equipment || "").trim().slice(0, 5000);
-  if (!profileText && !equipment) return null;
+  const memories = (Array.isArray(value.memories) ? value.memories : []).slice(0, 80).flatMap((item, index) => {
+    const text = String(item?.text || "").trim().slice(0, 500);
+    if (!text) return [];
+    return [{
+      id: String(item?.id || `memory-${index}`).slice(0, 120),
+      text,
+      category: ["preference", "symptom", "schedule", "equipment", "recovery", "goal", "other"].includes(item?.category) ? item.category : "other",
+      sourceQuestionId: String(item?.sourceQuestionId || "").slice(0, 120),
+      createdAt: String(item?.createdAt || "")
+    }];
+  });
+  if (!profileText && !equipment && !memories.length) return null;
   return {
     id: "coach-profile",
     profileText,
     equipment,
+    memories,
     version: String(value.version || "tennis-v1").slice(0, 40),
     updatedAt: String(value.updatedAt || "")
   };
@@ -140,6 +152,17 @@ export function normalizeCoachQuestions(value) {
         ? String(rawOriginal.activityStartTime) : "",
       routineAiAnalysis: normalizeRecord({ dateISO: recordDateISO, routineAiAnalysis: rawOriginal.routineAiAnalysis }).routineAiAnalysis
     } : null;
+    const memorySuggestions = (Array.isArray(item?.memorySuggestions) ? item.memorySuggestions : []).slice(0, 3).flatMap((suggestion, index) => {
+      const text = String(suggestion?.text || "").trim().slice(0, 500);
+      if (!text) return [];
+      return [{
+        id: String(suggestion?.id || `memory-${index}`).slice(0, 120),
+        text,
+        reason: String(suggestion?.reason || "").trim().slice(0, 500),
+        category: ["preference", "symptom", "schedule", "equipment", "recovery", "goal", "other"].includes(suggestion?.category) ? suggestion.category : "other",
+        status: ["pending", "applied", "dismissed"].includes(suggestion?.status) ? suggestion.status : "pending"
+      }];
+    });
     return [[id, {
       id,
       question,
@@ -149,6 +172,7 @@ export function normalizeCoachQuestions(value) {
       recoveryContext: normalizeRecoveryContext(item?.recoveryContext),
       planAdjustment,
       recordAdjustment,
+      memorySuggestions,
       adjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.adjustmentStatus)
         ? item.adjustmentStatus : planAdjustment ? "pending" : "",
       recordAdjustmentStatus: ["pending", "applied", "reverted", "dismissed"].includes(item?.recordAdjustmentStatus)

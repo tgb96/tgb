@@ -381,6 +381,8 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(html, /coachEquipmentChoices/);
   assert.match(html, /dailyBriefAiAction/);
   assert.match(html, /coachWeekReviewButton/);
+  assert.match(html, /coachMemoryList/);
+  assert.match(html, /coachFollowUp/);
   assert.match(bridge, /STAGE_TYPE_DEEP/);
   assert.match(bridge, /OxygenSaturationRecord/);
 });
@@ -443,6 +445,24 @@ test("la app graba una nota de voz real y Gemini la transcribe antes de enviarla
   assert.match(ai, /No respondas la pregunta, no aconsejes/);
 });
 
+test("Gemini propone memoria aprobable y TGTrain registra suplementos diarios", async () => {
+  const [ai, app, nutrition, html] = await Promise.all([
+    readFile(resolve(root, "assets/js/ai.js"), "utf8"),
+    readFile(resolve(root, "assets/js/app.js"), "utf8"),
+    readFile(resolve(root, "assets/js/nutrition-ui.js"), "utf8"),
+    readFile(resolve(root, "index.html"), "utf8")
+  ]);
+  assert.match(ai, /memorySuggestions/);
+  assert.match(ai, /No repitas approvedMemories/);
+  assert.match(app, /Guardar en memoria/);
+  assert.match(app, /renderCoachFollowUp/);
+  assert.match(nutrition, /5 g diarios/);
+  assert.match(nutrition, /Centrum Hombre/);
+  assert.match(nutrition, /Omega-3/);
+  assert.match(html, /nutritionSupplements/);
+  assert.match(html, /coachAutoSpeak/);
+});
+
 test("el importador compacta planes largos y reintenta respuestas JSON truncadas", async () => {
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
   assert.match(ai, /error\.code !== "invalid-json"/);
@@ -499,7 +519,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=131/);
+  assert.match(html, /assets\/js\/app\.js\?v=132/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

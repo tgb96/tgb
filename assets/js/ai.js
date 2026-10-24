@@ -144,6 +144,19 @@ const coachQuestionSchema = {
     hasPlanAdjustment: { type: "boolean" },
     hasRecordAdjustment: { type: "boolean" },
     hasRecoveryContext: { type: "boolean" },
+    memorySuggestions: {
+      type: "array",
+      maxItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          text: stringSchema,
+          reason: stringSchema,
+          category: { type: "string", enum: ["preference", "symptom", "schedule", "equipment", "recovery", "goal", "other"] }
+        },
+        required: ["text", "reason", "category"]
+      }
+    },
     recoveryContext: {
       type: "object",
       properties: {
@@ -195,7 +208,7 @@ const coachQuestionSchema = {
       required: ["targetRecordId", "targetDateISO", "expectedUpdatedAt", "title", "reason", "restTypeId", "restDetail", "sensationsAppend", "routineEffort", "routinePain", "routinePainDetail", "activityStartTime"]
     }
   },
-  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment", "hasRecoveryContext"]
+  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment", "hasRecoveryContext", "memorySuggestions"]
 };
 
 const coachInsightSchema = {
@@ -530,7 +543,7 @@ export function createAiClient() {
           "Eres el entrenador diario de TGTrain, centrado en rendimiento para tenis, fuerza funcional y recuperación.",
           "Evalúa solamente el día actual usando el perfil, plan, actividades recientes, pulsera, sueño, nutrición, molestias, salidas informadas y partidos incluidos en el contexto.",
           "Distingue hechos, inferencias y datos faltantes. dataUsed debe nombrar datos concretos realmente presentes, con fecha o cifra cuando ayude. missingData solo incluye ausencias que cambian la decisión; no conviertas cada campo opcional en una carencia.",
-          "No inventes calidad de sueño, clima, dolor, carga, comidas, partidos ni métricas. Un dato de pulsera sin vinculación no pertenece automáticamente a una actividad.",
+          "No inventes calidad de sueño, clima, dolor, carga, comidas, partidos ni métricas. Un dato de pulsera sin vinculación no pertenece automáticamente a una actividad. Los suplementos registrados solo indican si el usuario los marcó ese día; no cambies dosis ni atribuyas efectos no medidos.",
           "Elige train si corresponde mantener el plan, adapt si conviene regularlo, recover si los datos justifican recuperación y waiting-data si falta un dato decisivo. No modifiques la planificación ni propongas cambios guardables en esta respuesta.",
           "La recomendación debe ser concreta para hoy y coherente con las próximas 48 horas. Si hay dolor relevante o persistente, evita entrenar con dolor y recomienda evaluación profesional sin diagnosticar.",
           "Sé breve, claro y prudente. No prescribas dietas ni afirmes que una pulsera diagnostica recuperación."
@@ -581,11 +594,12 @@ export function createAiClient() {
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "Considera las sensaciones, molestias, recuperación y carga. Si hay dolor, no animes a entrenar con dolor ni prometas curarlo. No diagnostiques lesiones; recomienda consultar a un profesional si el dolor es importante, persiste o empeora.",
-        "Integra entrenamiento, comidas registradas, hidratación, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
+        "Integra entrenamiento, comidas registradas, hidratación, suplementos marcados, objetivos nutricionales, sueño, pasos y pulsera como un conjunto. Los suplementos solo acreditan que el usuario los marcó ese día: no cambies sus dosis ni atribuyas efectos no medidos. Los datos wearable solo corresponden a una actividad si aparece wearable vinculada a ella. Las kcal activas y LPM de pulsera son estimaciones; no las sumes a las kcal manuales ni deduzcas mejora o lesión por una sola lectura. Las fases de sueño y oxígeno de una pulsera son estimaciones y pueden faltar si Mi Fitness no las comparte.",
         "Si el usuario informa que bebió alcohol o salió de noche, devuelve hasRecoveryContext=true y recoveryContext. Resuelve expresiones relativas usando todayISO: eventDateISO es el día en que comenzó la salida y endDateISO/endTime indican cuándo terminó; por ejemplo, sábado hasta las 05:00 termina el domingo. alcoholAmount solo puede reflejar lo que el usuario dijo: poco=low, moderado=moderate, harto/mucho=high y sin cantidad=unknown. symptoms también debe basarse en lo informado, sin inventarlos. La app calculará una influencia de 24 a 48 horas según cantidad y horario.",
         "Durante una ventana de recuperación por alcohol evita progresiones y relaciona prudentemente hidratación, sueño, coordinación y recuperación. No sugieras sudar, café ni más alcohol como forma de acelerar la recuperación. Si hay mareos, vómitos, palpitaciones, confusión, dolor importante o incapacidad para hidratarse, recomienda no entrenar y buscar orientación médica según la gravedad. Mantén un tono neutral, sin moralizar.",
         "No inventes una calidad de sueño ni un diagnóstico nutricional. Indica cuando las comidas o los macros estén incompletos y usa los rangos del plan como orientación, no como prescripción clínica.",
         "No modifiques registros ni planificación por tu cuenta. La aplicación siempre pedirá confirmación.",
+        "Usa memorySuggestions solo para hechos duraderos que el usuario declaró explícitamente y que mejorarían recomendaciones futuras: preferencias estables, horarios habituales, objetivos, equipamiento o molestias recurrentes. No guardes sucesos de un solo día, comidas puntuales, clima, una sesión aislada, inferencias ni diagnósticos. No repitas approvedMemories. Cada memoria debe entenderse sin releer la conversación y siempre quedará pendiente de aprobación del usuario.",
         "Si el usuario corrige o completa un hecho de una actividad ya registrada, devuelve hasRecordAdjustment=true y una sola recordAdjustment. Usa exclusivamente el recordId, dateISO y recordUpdatedAt exactos de recentActivities. Solo completa los campos que realmente cambian y deja los demás como cadena vacía. No cambies el tipo de actividad ni inventes otro registro. Para lluvia u otra imposibilidad climática en un descanso usa restTypeId weather y explica el motivo en restDetail. sensationsAppend agrega contexto sin borrar las sensaciones existentes. routineEffort admite 1–10, routinePain 0–10 y activityStartTime HH:MM.",
         "Si el usuario comunica una novedad actual o futura que requiere adaptar una fecha planificada (por ejemplo partido suspendido, dolor, lluvia o falta de tiempo), devuelve hasPlanAdjustment=true con una sola alternativa coherente para esa fecha y su nutritionMode. No cambies el plan por una aclaración meramente histórica, salvo que el usuario también pida ajustar lo que viene. Si no corresponde corregir un registro, devuelve hasRecordAdjustment=false y omite recordAdjustment. Si no corresponde adaptar el plan, devuelve hasPlanAdjustment=false y omite planAdjustment.",
         "Un recoveryContext no modifica por sí solo el calendario. Si afecta una sesión prevista dentro de las siguientes 48 horas, puedes proponer un planAdjustment más suave para una sola fecha, siempre sujeto a confirmación. Si no hay fecha planificada relevante, explica cómo regular la sesión y no inventes un cambio.",
@@ -608,6 +622,7 @@ export function createAiClient() {
         planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null,
         recordAdjustment: response.hasRecordAdjustment ? response.recordAdjustment : null,
         recoveryContext: response.hasRecoveryContext ? response.recoveryContext : null,
+        memorySuggestions: Array.isArray(response.memorySuggestions) ? response.memorySuggestions.slice(0, 3) : [],
         model: MODEL_NAME
       };
     },
@@ -616,7 +631,7 @@ export function createAiClient() {
         "Eres la guía nutricional de TGTrain para una persona que entrena con foco en tenis.",
         "Evalúa exclusivamente el día entregado y relaciona comidas, kcal, proteína, carbohidratos, grasas, agua, entrenamiento, plan, sueño y pulsera cuando existan.",
         "Distingue datos completos, parciales y ausentes. Las porciones y calorías son estimaciones: no inventes alimentos, cantidades, macros ni gasto energético.",
-        "No restes calorías activas de la pulsera a la ingesta. No diagnostiques ni prescribas una dieta clínica. Si los registros son parciales, comenta solo lo observado.",
+        "No restes calorías activas de la pulsera a la ingesta. No diagnostiques ni prescribas una dieta clínica. Los suplementos solo representan adherencia marcada; no cambies dosis ni atribuyas beneficios o efectos no medidos. Si los registros son parciales, comenta solo lo observado.",
         "Si recoveryContext está activo, considéralo para recuperación, hidratación y regularidad de comidas sin moralizar, sin inventar síntomas y sin afirmar que una comida, café o suplemento acelera la eliminación del alcohol.",
         "Usa 2 o 3 secciones breves: Lo positivo, Ajustes prácticos y Próximo paso. Da sugerencias realistas para energía, recuperación y tenis.",
         "Termina con una frase positiva sobria, sin exagerar ni culpabilizar. Responde en español claro."

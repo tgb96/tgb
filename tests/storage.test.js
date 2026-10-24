@@ -52,7 +52,7 @@ test("crea, actualiza, elimina y respalda entrenamientos", () => {
   repository.upsert({ ...record(1), durationMinutes: 75 });
   assert.equal(repository.list().length, 1);
   assert.equal(repository.get("record-1").durationMinutes, 75);
-  assert.match(repository.backup(), /"schemaVersion": 17/);
+  assert.match(repository.backup(), /"schemaVersion": 18/);
   assert.equal(repository.remove("record-1"), true);
   assert.equal(repository.list().length, 0);
 });
@@ -157,10 +157,12 @@ test("guarda, respalda y sincroniza el perfil privado del entrenador", () => {
   repository.saveCoachProfile({
     profileText: "Objetivo: rendimiento para tenis.",
     equipment: "Mancuernas ajustables hasta 40 kg.\nKettlebell de 4,5 kg.",
+    memories: [{ id: "memory-1", text: "Prefiere entrenar fuerza lunes, miércoles y viernes.", category: "schedule", createdAt: "2026-09-14T17:00:00.000Z" }],
     version: "tennis-v1",
     updatedAt: "2026-09-14T18:00:00.000Z"
   });
   assert.match(repository.getCoachProfile().equipment, /4,5 kg/);
+  assert.equal(repository.getCoachProfile().memories[0].category, "schedule");
   assert.equal(changes.at(-1).type, "coach-profile-upsert");
   assert.match(repository.backup(), /Objetivo: rendimiento para tenis/);
   assert.equal(repository.applyCloudCoachProfile({
@@ -180,10 +182,13 @@ test("guarda preguntas de la guía, permite reintentar y las incluye en el respa
   repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Cambia el partido por un peloteo suave.",
     planAdjustment: { targetDateISO: "2026-09-26", title: "Peloteo amistoso suave", reason: "Cancha de partido no disponible", category: "tennis",
       summary: "Mantener contacto con la pelota sin carga de partido", details: ["Intensidad suave"], tennisTypeId: "friendly-hitting", nutritionMode: "tennisLight", nutritionReason: "Menor exigencia que un partido" },
-    adjustmentStatus: "pending", createdAt, updatedAt: "2026-09-23T12:01:00.000Z" });
+    adjustmentStatus: "pending",
+    memorySuggestions: [{ id: "memory-q1", text: "Prefiere alternativas bajo techo cuando llueve.", reason: "Preferencia declarada.", category: "preference", status: "pending" }],
+    createdAt, updatedAt: "2026-09-23T12:01:00.000Z" });
   assert.equal(repository.listCoachQuestions().length, 1);
   assert.match(repository.backup(), /Peloteo amistoso suave/);
   assert.equal(createRepository(storage).listCoachQuestions()[0].planAdjustment.tennisTypeId, "friendly-hitting");
+  assert.equal(createRepository(storage).listCoachQuestions()[0].memorySuggestions[0].status, "pending");
   assert.equal(repository.applyCloudCoachQuestion({ id: "q-1", question: "¿Cómo ajusto mañana?", answer: "Respuesta anterior", createdAt, updatedAt: createdAt }), false);
   const restored = createRepository(new FakeStorage());
   restored.importMerge(repository.backup());

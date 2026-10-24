@@ -26,13 +26,13 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=114";
+import { createRepository } from "./storage.js?v=115";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=116";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=98";
+import { createNutritionUI } from "./nutrition-ui.js?v=117";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=108";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, createAiClient } from "./ai.js?v=109";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -162,6 +162,7 @@ const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
 const ROUTINE_SESSION_KEY = "tgb-routine-session-v1";
 const PLANNED_ROUTINE_CONTEXT_KEY = "tgb-planned-routine-v1";
 const PLANNED_ACTIVITY_KEY = "tgb-planned-activity-v1";
+const COACH_AUTO_SPEAK_KEY = "tgb-coach-auto-speak-v1";
 const MATCH_SYNC_CHECK_KEY = "tgb-open-tennis-auto-check-v1";
 const TIMER_SETTINGS_KEY = "tgb-series-timer-v1";
 const TIMER_WORK_OPTIONS = [20, 25, 30, 35, 40, 45];
@@ -940,11 +941,47 @@ function renderCoachEquipmentChoices() {
   });
 }
 
+function coachProfilePrompt(profile = repository.getCoachProfile()) {
+  const base = String(profile?.profileText || "").trim();
+  const memories = (profile?.memories || []).map(item => `- ${item.text}`);
+  return [base, memories.length ? `MEMORIA APROBADA POR EL USUARIO:\n${memories.join("\n")}` : ""].filter(Boolean).join("\n\n");
+}
+
+function renderCoachMemories() {
+  const container = $("coachMemoryList");
+  container.replaceChildren();
+  const profile = repository.getCoachProfile();
+  const memories = profile?.memories || [];
+  if (!memories.length) {
+    const empty = document.createElement("p");
+    empty.className = "coach-memory-empty";
+    empty.textContent = "Todavía no has aprobado recuerdos permanentes.";
+    container.append(empty);
+    return;
+  }
+  memories.forEach(memory => {
+    const row = document.createElement("div"); row.className = "coach-memory-item";
+    const copy = document.createElement("div");
+    const text = document.createElement("span"); text.textContent = memory.text;
+    const category = document.createElement("small"); category.textContent = memory.category;
+    copy.append(text, category);
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Olvidar";
+    remove.addEventListener("click", () => {
+      const current = repository.getCoachProfile();
+      repository.saveCoachProfile({ ...current, memories: (current.memories || []).filter(item => item.id !== memory.id), updatedAt: new Date().toISOString() });
+      renderCoachMemories();
+      showToast("TGTrain olvidó ese dato permanente.");
+    });
+    row.append(copy, remove); container.append(row);
+  });
+}
+
 function openCoachProfileDialog() {
   const profile = repository.getCoachProfile();
   $("coachProfileText").value = profile?.profileText || "";
   $("coachProfileEquipment").value = profile?.equipment || DEFAULT_COACH_EQUIPMENT;
   renderCoachEquipmentChoices();
+  renderCoachMemories();
   setCoachProfileMessage();
   if ($("cloudDialog").open) $("cloudDialog").close();
   if (!$("coachProfileDialog").open) $("coachProfileDialog").showModal();
@@ -963,6 +1000,7 @@ function saveCoachProfile(event) {
     repository.saveCoachProfile({
       profileText,
       equipment: equipment || DEFAULT_COACH_EQUIPMENT,
+      memories: repository.getCoachProfile()?.memories || [],
       version: COACH_PROFILE_VERSION,
       updatedAt: new Date().toISOString()
     });
@@ -1161,10 +1199,80 @@ function appendWeatherAdjustmentActions(proposal, item) {
   proposal.append(context, actions);
 }
 
+function resolveCoachMemorySuggestion(item, suggestion, status) {
+  const timestamp = new Date().toISOString();
+  if (status === "applied") {
+    const profile = repository.getCoachProfile();
+    if (!profile) return showToast("Configura primero el perfil del entrenador.");
+    const normalized = suggestion.text.toLocaleLowerCase("es-CL");
+    const memories = profile.memories || [];
+    if (!memories.some(memory => memory.text.toLocaleLowerCase("es-CL") === normalized)) {
+      repository.saveCoachProfile({
+        ...profile,
+        memories: [...memories, {
+          id: suggestion.id,
+          text: suggestion.text,
+          category: suggestion.category,
+          sourceQuestionId: item.id,
+          createdAt: timestamp
+        }],
+        updatedAt: timestamp
+      });
+    }
+  }
+  repository.saveCoachQuestion({
+    ...item,
+    memorySuggestions: (item.memorySuggestions || []).map(memory => memory.id === suggestion.id ? { ...memory, status } : memory),
+    updatedAt: timestamp
+  });
+  renderCoachQuestions();
+  updateCoachProfileButton();
+  showToast(status === "applied" ? "Dato guardado en la memoria de TGTrain." : "Ese dato no se guardará como memoria.");
+}
+
+function renderCoachFollowUp(allQuestions) {
+  const container = $("coachFollowUp");
+  container.replaceChildren();
+  const todayISO = getChileDateISO();
+  const recentLimit = addDaysISO(todayISO, -3);
+  const candidate = allQuestions.find(item => item.adjustmentStatus === "applied"
+    && item.planAdjustment?.targetDateISO >= recentLimit
+    && item.planAdjustment.targetDateISO <= todayISO
+    && (item.planAdjustment.targetDateISO < todayISO || repository.list().some(record => record.dateISO === item.planAdjustment.targetDateISO && isMainDayRecord(record)))
+    && !allQuestions.some(other => !other.planAdjustment && other.answer && String(other.createdAt) > String(item.appliedAt || item.updatedAt)));
+  container.classList.toggle("hidden", !candidate);
+  if (!candidate) return;
+  const heading = document.createElement("strong"); heading.textContent = "Seguimiento pendiente";
+  const text = document.createElement("span");
+  text.textContent = `¿Cómo resultó el ajuste del ${formatShortDate(candidate.planAdjustment.targetDateISO)}? Cuéntame si lo realizaste, tu energía, esfuerzo y cualquier molestia.`;
+  const respond = document.createElement("button"); respond.type = "button"; respond.textContent = "Contárselo a TGTrain";
+  respond.addEventListener("click", () => {
+    $("coachQuestionText").value = `Sobre el ajuste del ${candidate.planAdjustment.targetDateISO}: `;
+    coachQuestionDraftSource = "text";
+    $("coachQuestionText").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  container.append(heading, text, respond);
+}
+
+function speakCoachAnswer(text, button = null) {
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window) || !text) return false;
+  window.speechSynthesis.cancel();
+  const utterance = new window.SpeechSynthesisUtterance(text);
+  utterance.lang = "es-CL";
+  utterance.rate = 1;
+  if (button) {
+    button.textContent = "■ Detener audio";
+    utterance.onend = utterance.onerror = () => { button.textContent = "🔊 Escuchar respuesta"; };
+  }
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
+
 function renderCoachQuestions() {
   const history = $("coachQuestionHistory");
   history.replaceChildren();
   const allQuestions = repository.listCoachQuestions();
+  renderCoachFollowUp(allQuestions);
   if (!weeklyCoachInFlight) {
     const weekReview = repository.getNutritionEntry(`weekly-review-${isoWeekInfo(getChileDateISO()).startISO}`);
     const count = Number(weekReview?.stats?.proposedAdjustments || 0);
@@ -1206,12 +1314,7 @@ function renderCoachQuestions() {
           speak.textContent = "🔊 Escuchar respuesta";
           return;
         }
-        const utterance = new SpeechSynthesisUtterance(item.answer);
-        utterance.lang = "es-CL";
-        utterance.rate = 1;
-        utterance.onend = utterance.onerror = () => { speak.textContent = "🔊 Escuchar respuesta"; };
-        speak.textContent = "■ Detener audio";
-        window.speechSynthesis.speak(utterance);
+        speakCoachAnswer(item.answer, speak);
       });
       exchange.append(speak);
     }
@@ -1227,6 +1330,24 @@ function renderCoachQuestions() {
       recovery.append(heading, detail, note);
       exchange.append(recovery);
     }
+    (item.memorySuggestions || []).forEach(memory => {
+      const proposal = document.createElement("div");
+      proposal.className = `coach-plan-proposal coach-memory-proposal ${memory.status || "pending"}`;
+      const heading = document.createElement("strong");
+      heading.textContent = memory.status === "applied" ? "Memoria guardada" : memory.status === "dismissed" ? "Memoria descartada" : "¿Recordar para el futuro?";
+      const text = document.createElement("span"); text.textContent = memory.text;
+      const reason = document.createElement("small"); reason.textContent = memory.reason;
+      proposal.append(heading, text, reason);
+      if ((memory.status || "pending") === "pending") {
+        const actions = document.createElement("div");
+        const remember = document.createElement("button"); remember.type = "button"; remember.textContent = "Guardar en memoria";
+        remember.addEventListener("click", () => resolveCoachMemorySuggestion(item, memory, "applied"));
+        const dismiss = document.createElement("button"); dismiss.type = "button"; dismiss.className = "secondary"; dismiss.textContent = "No guardar";
+        dismiss.addEventListener("click", () => resolveCoachMemorySuggestion(item, memory, "dismissed"));
+        actions.append(remember, dismiss); proposal.append(actions);
+      }
+      exchange.append(proposal);
+    });
     if (item.recordAdjustment) {
       const proposal = document.createElement("div");
       proposal.className = `coach-plan-proposal coach-record-proposal ${item.recordAdjustmentStatus || "pending"}`;
@@ -1367,6 +1488,8 @@ function wearableDayForCoach(day) {
 function nutritionDayForCoach(dateISO, block = activeTrainingBlock(dateISO)) {
   const entries = repository.listNutritionEntries(dateISO).filter(item => !item.deleted);
   const meals = entries.filter(item => item.kind === "meal").map(nutritionEntryWithEstimate);
+  const supplements = entries.filter(item => item.kind === "supplement")
+    .map(item => ({ id: item.supplementId, name: item.supplementName, dose: item.doseLabel, time: item.time }));
   const totals = nutritionDayTotals(entries.filter(item => item.kind !== "plan").map(nutritionEntryWithEstimate));
   const override = entries.find(item => item.kind === "plan")?.planMode || "default";
   const planned = plannedNutritionContext(coachSessionForDate(dateISO, block));
@@ -1376,7 +1499,8 @@ function nutritionDayForCoach(dateISO, block = activeTrainingBlock(dateISO)) {
     dateISO, mode, plannedActivity: planned,
     totals,
     target: target ? { caloriesMinKcal: target.caloriesMinKcal, caloriesMaxKcal: target.caloriesMaxKcal, proteinMinG: 110, proteinMaxG: 125, waterMinMl: target.waterMinMl, waterMaxMl: target.waterMaxMl } : null,
-    meals: meals.map(item => ({ time: item.time, slotId: item.slotId, summary: item.text, caloriesKcal: item.caloriesKcal, proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG })).slice(0, 12)
+    meals: meals.map(item => ({ time: item.time, slotId: item.slotId, summary: item.text, caloriesKcal: item.caloriesKcal, proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG })).slice(0, 12),
+    supplements
   };
 }
 
@@ -1413,7 +1537,7 @@ async function requestNutritionAnalysis(dateISO) {
     return;
   }
   const allSourceEntries = repository.listNutritionEntries(dateISO)
-    .filter(item => ["meal", "water", "plan"].includes(item.kind));
+    .filter(item => ["meal", "water", "plan", "supplement"].includes(item.kind));
   const sourceEntries = allSourceEntries.filter(item => !item.deleted);
   const activities = repository.list().filter(item => item.dateISO === dateISO);
   if (!sourceEntries.some(item => item.kind === "meal")) {
@@ -1426,7 +1550,7 @@ async function requestNutritionAnalysis(dateISO) {
     const dayData = wearableData.days.find(day => day.dateISO === dateISO);
     const result = await aiClient.analyzeNutritionDay({
       dateISO,
-      privateCoachProfile: String(profile.profileText || "").slice(0, 14000),
+      privateCoachProfile: coachProfilePrompt(profile).slice(0, 16000),
       nutrition: nutritionDayForCoach(dateISO),
       activities: activities.map(record => routineForAi(record)).slice(0, 8),
       wearable: dayData ? wearableDayForCoach(dayData) : null,
@@ -1524,7 +1648,7 @@ async function maybeGenerateMonthlySummary() {
     const context = monthlyCoachContext(period.startISO, period.endISO);
     const result = await aiClient.analyzeMonthlySummary({
       ...context,
-      privateCoachProfile: String(repository.getCoachProfile().profileText || "").slice(0, 14000)
+      privateCoachProfile: coachProfilePrompt().slice(0, 16000)
     });
     repository.saveNutritionEntry(coachInsightPayload(result, {
       id,
@@ -1768,7 +1892,8 @@ function coachQuestionContext() {
   const recoveryContexts = recoveryContextsFromQuestions(repository.listCoachQuestions());
   return {
     todayISO,
-    coachProfile: String(repository.getCoachProfile()?.profileText || "").slice(0, 14000),
+    coachProfile: coachProfilePrompt().slice(0, 16000),
+    approvedMemories: (repository.getCoachProfile()?.memories || []).map(item => ({ text: item.text, category: item.category })),
     equipment: String(repository.getCoachProfile()?.equipment || DEFAULT_COACH_EQUIPMENT).slice(0, 3000),
     recentActivities: records.filter(isMainDayRecord).slice(0, 6)
       .map(record => ({ ...routineForAi(record), exercises: record.routineExercises.slice(0, 15) })),
@@ -2139,8 +2264,14 @@ async function submitCoachQuestion(existing = null) {
       recordAdjustment: result.recordAdjustment,
       recordAdjustmentStatus: result.recordAdjustment ? "pending" : "",
       recoveryContext: result.recoveryContext,
+      memorySuggestions: (result.memorySuggestions || []).map((memory, index) => ({
+        ...memory,
+        id: `memory-${Date.now()}-${index}`,
+        status: "pending"
+      })),
       updatedAt: new Date().toISOString()
     });
+    if ($("coachAutoSpeak").checked) speakCoachAnswer(result.answer);
     if (result.recoveryContext) renderHome();
     if (!existing) {
       input.value = "";
@@ -4317,7 +4448,7 @@ function routineAiContext(record) {
   const lastNight = wearableData.days.find(day => day.dateISO === record.dateISO && Number(day.sleepMinutes) > 0);
   const recoveryContext = strongestRecoveryImpact(recoveryContextsFromQuestions(repository.listCoachQuestions()), record.dateISO);
   return {
-    coachProfile: repository.getCoachProfile(), recentTrainingLoad, next48Hours, currentPlan, progressionEvidence, progressionFollowUp: appliedProgressionFollowUp,
+    coachProfile: { ...repository.getCoachProfile(), profileText: coachProfilePrompt() }, recentTrainingLoad, next48Hours, currentPlan, progressionEvidence, progressionFollowUp: appliedProgressionFollowUp,
     recoveryContext,
     nutritionContext: {
       activityDay: nutritionDayForCoach(record.dateISO, block),
@@ -6690,6 +6821,10 @@ function bindEvents() {
     submitCoachQuestion();
   });
   $("coachVoiceButton").addEventListener("click", toggleCoachVoice);
+  $("coachAutoSpeak").addEventListener("change", event => {
+    window.localStorage.setItem(COACH_AUTO_SPEAK_KEY, String(event.target.checked));
+    if (!event.target.checked) window.speechSynthesis?.cancel();
+  });
   $("coachQuestionText").addEventListener("input", event => {
     if (!event.target.value.trim()) coachQuestionDraftSource = "text";
   });
@@ -6769,6 +6904,7 @@ function initialize() {
   renderCategoryChooser();
   resetRegistration();
   initializeTimer();
+  $("coachAutoSpeak").checked = window.localStorage.getItem(COACH_AUTO_SPEAK_KEY) === "true";
   bindEvents();
   renderHome();
   renderRoutines();

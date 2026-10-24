@@ -643,6 +643,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-ask-button { border: 0; background: var(--blue); color: white; }
 .coach-ask-button:disabled { opacity: .6; }
 .coach-voice-help { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.coach-ask-card .coach-auto-speak { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; font-weight: 750; }
+.coach-auto-speak input { width: 16px; height: 16px; margin: 0; accent-color: var(--blue); }
 .coach-question-status { margin: 0; color: var(--blue-dark); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .coach-question-status:empty { display: none; }
 .routine-ai-card > span { display: block; color: var(--blue); font-size: 11px; font-weight: 950; line-height: 1.35; letter-spacing: .6px; text-transform: uppercase; }
@@ -724,6 +726,16 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .coach-equipment-choices label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); cursor: pointer; }
 .coach-equipment-choices label:has(input:checked) { border-color: #9ec832; background: #efffc9; color: #345300; }
 .coach-equipment-choices input { width: 15px; height: 15px; margin: 0; accent-color: #3157ff; }
+.coach-memory-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.coach-memory-heading strong { font-size: 12px; }
+.coach-memory-heading small { max-width: 230px; color: var(--muted); font-size: 9px; text-align: right; }
+.coach-memory-list { display: grid; gap: 7px; }
+.coach-memory-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.coach-memory-item span, .coach-memory-item small { display: block; }
+.coach-memory-item span { font-size: 11px; line-height: 1.4; }
+.coach-memory-item small { margin-top: 2px; color: var(--muted); font-size: 9px; text-transform: capitalize; }
+.coach-memory-item button { min-height: 32px; border: 1px solid #e0caca; border-radius: 9px; background: white; color: #9a3030; font-size: 9px; font-weight: 850; }
+.coach-memory-empty { margin: 0; color: var(--muted); font-size: 10px; }
 
 @media (max-width: 430px) {
   .coach-plan-actions { grid-template-columns: 1fr; }
@@ -872,6 +884,11 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .daily-brief-card button:disabled { opacity: .58; cursor: wait; }
 .coach-week-review-button { width: 100%; min-height: 44px; margin: 12px 0 2px; border: 1px solid #c9d5ff; border-radius: 14px; background: #eef2ff; color: var(--blue); font-size: 12px; font-weight: 900; }
 .coach-week-review-button:disabled { opacity: .58; cursor: wait; }
+.coach-follow-up { margin: 10px 0; padding: 12px; border: 1px solid #d8e9a9; border-radius: 14px; background: #f6ffe3; }
+.coach-follow-up strong, .coach-follow-up span { display: block; }
+.coach-follow-up strong { color: #3f6400; font-size: 11px; }
+.coach-follow-up span { margin-top: 5px; font-size: 12px; line-height: 1.45; }
+.coach-follow-up button { width: 100%; min-height: 38px; margin-top: 9px; border: 0; border-radius: 10px; background: var(--night); color: var(--lime); font-size: 10px; font-weight: 900; }
 .coach-speak-button { align-self: flex-start; margin-top: 8px; padding: 7px 10px; border: 1px solid #d7dbea; border-radius: 999px; background: white; color: #293463; font-size: 10px; font-weight: 850; }
 
 .active-session-dock { position: fixed; z-index: 24; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); bottom: calc(88px + env(safe-area-inset-bottom)); width: min(calc(100% - 24px), 540px); margin: auto; padding: 11px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; border: 1px solid rgba(200,255,77,.35); border-radius: 18px; background: rgba(17,21,34,.98); color: white; box-shadow: 0 13px 34px rgba(17,21,34,.34); }
@@ -990,6 +1007,17 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
 .nutrition-protein-progress progress { accent-color: #75a913; }
 .nutrition-water-progress { margin-top: 8px; }
 .nutrition-water-progress progress { accent-color: #169bd5; }
+.nutrition-supplements { margin-top: 8px; padding: 12px; border-radius: 14px; background: #f2f4ff; }
+.nutrition-supplements > strong, .nutrition-supplements > small { display: block; }
+.nutrition-supplements > strong { font-size: 13px; }
+.nutrition-supplements > small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.nutrition-supplement-options { display: grid; gap: 7px; margin-top: 10px; }
+.nutrition-supplement-button { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 9px; width: 100%; min-height: 47px; padding: 8px 11px; border: 1px solid #d4d9ec; border-radius: 12px; background: white; color: var(--ink); text-align: left; }
+.nutrition-supplement-button span { display: grid; place-items: center; width: 23px; height: 23px; border: 2px solid #aeb5ce; border-radius: 50%; color: transparent; font-size: 13px; font-weight: 950; }
+.nutrition-supplement-button strong, .nutrition-supplement-button small { display: block; }
+.nutrition-supplement-button small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.nutrition-supplement-button.taken { border-color: #9bc936; background: #f1ffd1; }
+.nutrition-supplement-button.taken span { border-color: #6d9f11; background: #7eb719; color: white; }
 .nutrition-water-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 13px; }
 .nutrition-water-actions button { min-height: 45px; padding: 6px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
 .nutrition-summary-card > p, .nutrition-disclaimer { color: var(--muted); font-size: 11px; line-height: 1.5; }
