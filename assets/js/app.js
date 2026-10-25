@@ -41,7 +41,8 @@ import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, d
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
-import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=2";
+import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=3";
+import { createBikeIntervalGuide } from "./bike-interval-guide.js?v=1";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -5187,7 +5188,9 @@ function createRoutineSessionHeader(routine, session) {
       ? "Puedes revisarla, pero primero debes finalizar la rutina que está en curso."
       : plannedForRoutine
         ? `Programada para ${formatShortDate(plannedForRoutine.dateISO)}. El cronómetro comenzará solo cuando pulses Iniciar.`
-        : "El cronómetro todavía no está corriendo. Puedes revisar los ejercicios y ajustar sus valores.";
+        : routine.id === "tennis-bike-intervals"
+          ? "Pulsa Iniciar guía: comenzarán juntos el registro del entrenamiento y los intervalos automáticos."
+          : "El cronómetro todavía no está corriendo. Puedes revisar los ejercicios y ajustar sus valores.";
   }
   copy.append(eyebrow, title, description);
 
@@ -5200,7 +5203,7 @@ function createRoutineSessionHeader(routine, session) {
     clock.textContent = formatClock(routineSessionElapsedSeconds(session));
     action.append(clock);
   }
-  if (!isActive) {
+  if (!isActive && routine.id !== "tennis-bike-intervals") {
     const start = document.createElement("button");
     start.type = "button";
     start.textContent = isComplete ? "Iniciar otra" : "Iniciar entrenamiento";
@@ -5719,7 +5722,7 @@ function createExerciseTechniqueDisclosure(routine, exercise) {
   const summaryText = document.createElement("span");
   summaryText.textContent = "Ver video y técnica";
   const summaryHint = document.createElement("small");
-  summaryHint.textContent = "video breve · adaptación personal";
+  summaryHint.textContent = "YouTube · menos de 1 min";
   summary.append(summaryIcon, summaryText, summaryHint);
 
   const content = document.createElement("div");
@@ -5840,6 +5843,22 @@ function renderRoutines() {
       body.append(avoidWhen);
     }
     body.append(createRoutineSessionHeader(routine, session));
+    if (routine.id === "tennis-bike-intervals") {
+      body.append(createBikeIntervalGuide({
+        onEnsureRoutine: () => {
+          const current = loadRoutineSession();
+          if (current?.status === "active" && current.routineId !== routine.id) {
+            const activeRoutine = physicalRoutineById(current.routineId);
+            showToast(`Primero finaliza ${activeRoutine?.name || "la rutina en curso"}.`);
+            return false;
+          }
+          if (current?.status !== "active" || current.routineId !== routine.id) {
+            queueMicrotask(() => startRoutineSession(routine));
+          }
+          return true;
+        }
+      }));
+    }
     const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
     const displayedExercises = routineExercisesForDate(routine, dateISO);

@@ -483,6 +483,33 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .routine-session-action button { min-height: 41px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--lime); color: var(--night); font-size: 11px; font-weight: 900; }
 .routine-session-action button:disabled { opacity: 0.42; cursor: default; }
 .routine-elapsed { margin: 0 !important; color: white; font-size: 20px !important; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+.bike-guide { margin: 0 0 13px; padding: 17px; border-radius: 21px; background: linear-gradient(150deg, #111522, #20273c); color: white; box-shadow: 0 12px 28px rgba(17, 21, 34, 0.16); }
+.bike-guide-eyebrow { color: var(--lime); font-size: 9px; font-weight: 950; letter-spacing: 0.9px; }
+.bike-guide-heading { margin-top: 7px; display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.bike-guide-heading h3 { margin: 0; font-size: 18px; line-height: 1.15; letter-spacing: -0.5px; }
+.bike-guide-heading small { flex: 0 0 auto; color: rgba(255, 255, 255, 0.58); font-size: 9px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bike-guide-dashboard { margin-top: 15px; padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.08); }
+.bike-guide-phase { overflow-wrap: anywhere; font-size: 15px; line-height: 1.2; }
+.bike-guide-clock { grid-row: span 2; color: var(--lime); font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -1.5px; }
+.bike-guide-round { color: rgba(255, 255, 255, 0.6); font-size: 9px; font-weight: 800; }
+.bike-guide-effort { margin-top: 10px; padding: 13px; border-radius: 16px; background: white; color: var(--night); }
+.bike-guide-effort > div:first-child { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bike-guide-effort strong { font-size: 14px; }
+.bike-guide-effort > div:first-child span { color: var(--blue-dark); font-size: 10px; font-weight: 900; text-align: right; }
+.bike-guide-effort-track { height: 9px; margin-top: 9px; overflow: hidden; border-radius: 999px; background: #e7e9e3; }
+.bike-guide-effort-track span { display: block; width: 30%; height: 100%; border-radius: inherit; background: #9bcd26; transition: width 220ms ease, background 220ms ease; }
+.bike-guide-effort-track span[data-tone="fast"] { background: #ffbd3f; }
+.bike-guide-effort-track span[data-tone="hard"] { background: #ff8c35; }
+.bike-guide-effort-track span[data-tone="sprint"] { background: #ef5548; }
+.bike-guide-effort p { margin: 8px 0 0; color: #5d6574; font-size: 10px; line-height: 1.45; }
+.bike-guide-session-track { height: 5px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.13); }
+.bike-guide-session-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--lime); transition: width 350ms linear; }
+.bike-guide-actions { margin-top: 12px; display: grid; grid-template-columns: 1.35fr 0.8fr 0.8fr; gap: 7px; }
+.bike-guide-actions button { min-height: 44px; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 13px; background: rgba(255, 255, 255, 0.08); color: white; font-size: 10px; font-weight: 900; }
+.bike-guide-actions .bike-guide-primary { border: 0; background: var(--lime); color: var(--night); }
+.bike-guide-actions button:disabled { opacity: 0.35; }
+.bike-guide-footnote { display: block; margin-top: 10px; color: rgba(255, 255, 255, 0.54); font-size: 8px; line-height: 1.45; }
+.bike-guide[data-status="complete"] .bike-guide-clock, .bike-guide[data-status="complete"] .bike-guide-phase { color: var(--lime); }
 .routine-finish-card { scroll-margin-top: 16px; margin-top: 12px; padding: 17px; border: 1px solid #d9dcd2; border-radius: 21px; background: #f6f7f2; }
 .routine-finish-card.complete { border-color: #b5dc4a; background: #f1f9dd; }
 .routine-finish-card h3 { margin: 5px 0 0; font-size: 18px; letter-spacing: -0.4px; }
@@ -1151,6 +1178,8 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
   .routine-progress { grid-column: 2; justify-self: start; }
   .routine-session-card { grid-template-columns: 1fr; }
   .routine-session-action { grid-template-columns: 1fr auto; justify-items: start; align-items: center; }
+  .bike-guide-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bike-guide-actions .bike-guide-primary { grid-column: 1 / -1; }
   .routine-balance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .history-routine-balance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .evolution-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

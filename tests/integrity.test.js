@@ -225,17 +225,35 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
-test("Full Core explica sus once ejercicios con videos técnicos breves", async () => {
+test("todas las rutinas complementarias salvo bicicleta tienen videos breves de YouTube", async () => {
   const data = await import("../assets/js/data.js");
   const technique = await import("../assets/js/exercise-technique.js");
   const core = data.physicalRoutines.find(routine => routine.id === "core");
   assert.equal(Object.keys(technique.coreTechniqueGuides).length, core.exercises.length);
-  assert.ok(core.exercises.every(exercise => {
-    const guide = technique.exerciseTechniqueGuide(core.id, exercise.id);
-    return guide?.video?.id && guide?.video?.source && guide?.video?.sourceUrl && guide?.start && guide?.action && guide?.key && guide?.avoid;
-  }));
-  assert.ok(Object.values(technique.coreTechniqueGuides).every(guide => ["youtube", "vimeo"].includes(guide.video.provider)));
+  const extras = data.physicalRoutines.slice(3).filter(routine => routine.id !== "tennis-bike-intervals");
+  const guides = extras.flatMap(routine => routine.exercises.map(exercise => technique.exerciseTechniqueGuide(routine.id, exercise.id)));
+  assert.ok(guides.every(item => item?.video?.id && item?.video?.source && item?.video?.sourceUrl && item?.start && item?.action && item?.key && item?.avoid));
+  assert.ok(guides.every(item => item.video.provider === "youtube"));
+  assert.ok(guides.every(item => item.video.clipSeconds > 0 && item.video.clipSeconds < 60));
+  assert.equal(technique.exerciseTechniqueGuide("tennis-bike-intervals", "bike-tennis-main"), null);
   assert.equal(technique.exerciseTechniqueGuide("legs", "stationary-bike-warmup"), null);
+});
+
+test("la rutina de bicicleta tiene una guía automática de 38 minutos", async () => {
+  const bike = await import("../assets/js/bike-interval-guide.js");
+  assert.equal(bike.bikeIntervalDurationSeconds, 38 * 60);
+  assert.equal(bike.bikeIntervalSteps[0].phase, "Calentamiento progresivo");
+  assert.equal(bike.bikeIntervalSteps.at(-1).phase, "Vuelta a la calma");
+  assert.equal(bike.bikeIntervalSteps.filter(step => step.phase === "Intervalo de punto").length, 10);
+  assert.equal(bike.bikeIntervalSteps.filter(step => step.phase === "Arrancada corta").length, 6);
+  const running = bike.normalizeBikeIntervalState({
+    status: "running",
+    stepIndex: 0,
+    remainingSeconds: bike.bikeIntervalSteps[0].seconds,
+    stepEndsAt: 1_000
+  }, 2_000);
+  assert.equal(running.stepIndex, 1);
+  assert.ok(bike.bikeIntervalRemainingSeconds(running) < bike.bikeIntervalDurationSeconds);
 });
 
 test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", async () => {
@@ -312,7 +330,7 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/progression.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/exercise-technique.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/progression.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/exercise-technique.js", "assets/js/bike-interval-guide.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
@@ -595,7 +613,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=138/);
+  assert.match(html, /assets\/js\/app\.js\?v=140/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
