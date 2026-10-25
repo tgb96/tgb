@@ -1,7 +1,7 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=71";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=72";
 import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=63";
-import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=2";
+import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=3";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -293,9 +293,10 @@ const dailyCoachSchema = {
     dataUsed: { type: "array", items: stringSchema, maxItems: 8 },
     missingData: { type: "array", items: stringSchema, maxItems: 6 },
     recommendation: stringSchema,
+    recommendedRoutineId: stringSchema,
     encouragement: stringSchema
   },
-  required: ["decision", "title", "summary", "signals", "dataUsed", "missingData", "recommendation", "encouragement"]
+  required: ["decision", "title", "summary", "signals", "dataUsed", "missingData", "recommendation", "recommendedRoutineId", "encouragement"]
 };
 
 const weeklyAdjustmentSchema = {
@@ -540,6 +541,18 @@ export function createAiClient() {
       return { transcript, model: MODEL_NAME };
     },
     async analyzeDailyCoach(context = {}) {
+      const catalog = {
+        routines: physicalRoutines.map(item => ({
+          id: item.id,
+          name: item.name,
+          focus: item.focus,
+          objective: item.objective,
+          expectedDurationMinutes: item.expectedDurationMinutes || null,
+          recommendedFor: item.recommendedFor || [],
+          avoidWhen: item.avoidWhen || [],
+          equipment: item.equipment || []
+        }))
+      };
       const insight = await generateJson({
         instructions: [
           "Eres el entrenador diario de TGTrain, centrado en rendimiento para tenis, fuerza funcional y recuperación.",
@@ -548,10 +561,12 @@ export function createAiClient() {
           "Distingue hechos, inferencias y datos faltantes. dataUsed debe nombrar datos concretos realmente presentes, con fecha o cifra cuando ayude. missingData solo incluye ausencias que cambian la decisión; no conviertas cada campo opcional en una carencia.",
           "No inventes calidad de sueño, clima, dolor, carga, comidas, partidos ni métricas. Un dato de pulsera sin vinculación no pertenece automáticamente a una actividad. Los suplementos registrados solo indican si el usuario los marcó ese día; no cambies dosis ni atribuyas efectos no medidos.",
           "Elige train si corresponde mantener el plan, adapt si conviene regularlo, recover si los datos justifican recuperación y waiting-data si falta un dato decisivo. No modifiques la planificación ni propongas cambios guardables en esta respuesta.",
+          "El catálogo contiene rutinas base y complementarias con duración, situaciones recomendadas, contraindicaciones contextuales y equipamiento. Si una rutina física concreta es apropiada hoy, escribe su ID exacto en recommendedRoutineId y explica en recommendation por qué encaja con el tiempo, sensaciones, carga, recuperación y calendario disponibles. Si corresponde mantener otro tipo de actividad, descanso, falta un dato decisivo o no existe una rutina adecuada, deja recommendedRoutineId vacío.",
+          "No elijas una rutina solo para llenar el campo. Respeta la actividad principal ya planificada, el tiempo disponible declarado, el equipamiento real y la cercanía de partidos. Las rutinas complementarias resuelven una necesidad concreta; no se suman automáticamente encima del plan ni compensan sesiones perdidas.",
           "La recomendación debe ser concreta para hoy y coherente con las próximas 48 horas. Si hay dolor relevante o persistente, evita entrenar con dolor y recomienda evaluación profesional sin diagnosticar.",
           "Sé breve, claro y prudente. No prescribas dietas ni afirmes que una pulsera diagnostica recuperación."
         ].join("\n"),
-        input: JSON.stringify(context),
+        input: JSON.stringify({ context, catalog }),
         schema: dailyCoachSchema,
         maxOutputTokens: 1600
       });
@@ -559,7 +574,7 @@ export function createAiClient() {
     },
     async reviewCoachWeek(context = {}) {
       const catalog = {
-        routines: physicalRoutines.map(item => ({ id: item.id, name: item.name, exercises: item.exercises.map(exercise => ({ id: exercise.id, name: exercise.name, sets: exercise.sets, target: exercise.target, weightKg: exercise.weightKg })) })),
+        routines: physicalRoutines.map(item => ({ id: item.id, name: item.name, focus: item.focus, objective: item.objective, expectedDurationMinutes: item.expectedDurationMinutes || null, recommendedFor: item.recommendedFor || [], avoidWhen: item.avoidWhen || [], equipment: item.equipment || [], exercises: item.exercises.map(exercise => ({ id: exercise.id, name: exercise.name, sets: exercise.sets, target: exercise.target, weightKg: exercise.weightKg })) })),
         cardio: cardioTypes.map(item => ({ id: item.id, name: item.name })),
         tennis: tennisTypes.map(item => ({ id: item.id, name: item.name })),
         rest: restTypes.map(item => ({ id: item.id, name: item.name }))
@@ -572,6 +587,7 @@ export function createAiClient() {
           "Solo puedes ajustar fechas futuras que ya aparezcan en currentPlan.upcomingSessions. Nunca cambies una fecha pasada ni una actividad ya registrada.",
           "Respeta partidos confirmados, evita piernas pesadas cerca de ellos y distribuye fuerza, tenis y recuperación sin compensar sesiones perdidas con exceso de carga.",
           "Integra sueño, molestias, carga reciente, salidas informadas, nutrición disponible y equipment. No inventes clima. Si el usuario solo mencionó una posibilidad de lluvia o suspensión, conserva una alternativa y no la presentes como hecho.",
+          "Elige entre rutinas base y complementarias por su función, duración y condiciones de uso. Si el usuario declaró poco tiempo, usa una duración compatible o reduce explícitamente una rutina mediante exerciseSettings; no prometas una sesión más larga de lo disponible. Las complementarias reemplazan o apoyan una necesidad concreta y no se agregan por coleccionarlas.",
           "Usa exclusivamente IDs del catalog. Para rutinas adaptadas, exerciseSettings solo puede contener ejercicios de la rutina elegida. Propón como máximo tres ajustes y una actividad principal por fecha.",
           "Cada ajuste debe explicar el motivo y un nutritionMode coherente, pero no aplicar nada. TGTrain pedirá confirmación individual.",
           "Distingue observaciones basadas en datos de recomendaciones. No diagnostiques lesiones ni prescribas tratamientos."
@@ -588,6 +604,11 @@ export function createAiClient() {
           id: item.id,
           name: item.name,
           objective: item.objective,
+          focus: item.focus,
+          expectedDurationMinutes: item.expectedDurationMinutes || null,
+          recommendedFor: item.recommendedFor || [],
+          avoidWhen: item.avoidWhen || [],
+          equipment: item.equipment || [],
           exercises: item.exercises.map(exercise => ({ id: exercise.id, name: exercise.name, phase: exercise.phase, sets: exercise.sets, target: exercise.target, weightKg: exercise.weightKg, caution: exercise.caution || "" }))
         })),
         cardio: cardioTypes.map(item => ({ id: item.id, name: item.name })),
@@ -612,6 +633,7 @@ export function createAiClient() {
         "Un recoveryContext no modifica por sí solo el calendario. Si afecta una sesión prevista dentro de las siguientes 48 horas, puedes proponer un planAdjustment más suave para una sola fecha, siempre sujeto a confirmación. Si no hay fecha planificada relevante, explica cómo regular la sesión y no inventes un cambio.",
         "El calendario competitivo incluido en el contexto es la fuente común para entrenamiento y nutrición. Un evento calendarStatus=scheduled es un partido confirmado para planificar; likely-suspended, suspended y pending no deben contarse como carga competitiva hasta que Open Tennis o el usuario confirme que se jugará. Mantén una alternativa suave o descanso y no compenses una suspensión con carga excesiva.",
         "Si la lluvia impide el tenis, no propongas descanso automáticamente. Revisa primero equipment, lo realizado en las últimas 24–48 horas, sueño, molestias y el próximo partido. Si la recuperación lo permite, prioriza una alternativa suave bajo techo usando solo implementos disponibles: físico reducido, bicicleta estática, core, movilidad o técnica sin cancha. Evita repetir el grupo muscular trabajado el día anterior y evita piernas pesadas o pliometría cerca de un partido. Propón descanso solo si los datos de recuperación, dolor o carga realmente lo justifican, y explica por qué.",
+        "El CATÁLOGO incluye rutinas base y complementarias con duración y condiciones de uso. Cuando el usuario diga cuánto tiempo tiene, cómo se siente o qué quiere trabajar, elige la rutina que mejor encaje; no recomiendes siempre la rutina más completa. Si ninguna cabe exactamente, adapta una sola mediante exerciseSettings y declara la duración resultante. No agregues una complementaria encima de la actividad principal salvo que sea una activación o recuperación breve claramente compatible.",
         "Cuando propongas una rutina física adaptada, usa exerciseSettings para bajar series, carga o repeticiones y para omitir ejercicios incompatibles con el objetivo del día. No incluyas ejercicios ajenos a la rutina elegida ni implementos que no figuren en equipment. Si la disponibilidad no está clara, dilo en la respuesta y pide actualizar los implementos antes de confirmar.",
         "Si el usuario dice que todavía puede o quiere entrenar hoy, no descartes automáticamente la sesión solo porque sea de tarde o noche. Evalúa hora, sueño, dolor, carga reciente, equipamiento y proximidad del partido; si no hay una contraindicación informada, ofrece una opción segura y ajustada.",
         "Cuando pida entrenar en casa o solicite qué hacer hoy, entrega una sesión completa y directamente ejecutable, no solo consejos generales: duración total, calentamiento, ejercicios en orden, series y repeticiones o segundos, intensidad/RPE, descansos y vuelta a la calma. Usa únicamente ejercicios del catálogo y el equipamiento declarado. Si faltan datos para prescribirla con seguridad, dilo y formula una alternativa conservadora concreta.",

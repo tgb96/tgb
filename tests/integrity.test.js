@@ -113,10 +113,10 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("hay cinco rutinas físicas completas y configurables", async () => {
+test("hay catorce rutinas físicas base y complementarias configurables", async () => {
   const data = await import("../assets/js/data.js");
-  assert.equal(data.physicalRoutines.length, 5);
-  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12, 11]);
+  assert.equal(data.physicalRoutines.length, 14);
+  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12, 11, 10, 8, 8, 5, 9, 9, 7, 10, 9]);
   assert.ok(data.physicalRoutines.slice(0, 4).every(routine => {
     const warmup = routine.exercises[0];
     return warmup.name === "Bicicleta estática" && warmup.sets === 1 && warmup.target === "10 min";
@@ -127,6 +127,12 @@ test("hay cinco rutinas físicas completas y configurables", async () => {
   assert.ok(core.exercises.every(exercise => !/plancha/i.test(exercise.name)));
   assert.ok(core.exercises.some(exercise => /mano derecha/i.test(exercise.name)));
   assert.ok(core.exercises.some(exercise => /brazo izquierdo/i.test(`${exercise.description} ${exercise.benefit} ${exercise.caution || ""}`)));
+  assert.deepEqual(data.physicalRoutines.slice(5).map(routine => routine.id), [
+    "mobility-recovery", "prematch-activation", "indoor-power", "tennis-bike-intervals", "right-upper-maintenance",
+    "deceleration-direction", "physical-express", "adapted-full-body", "physical-assessment"
+  ]);
+  assert.ok(data.physicalRoutines.every(routine => Number(routine.expectedDurationMinutes) >= 15));
+  assert.ok(data.physicalRoutines.every(routine => routine.recommendedFor?.length && routine.avoidWhen?.length && routine.equipment?.length));
   assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking", "padel"]);
   assert.deepEqual(data.cardioTypes.find(type => type.id === "padel"), {
@@ -337,6 +343,9 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /async transcribeCoachAudio\(audioBlob\)/);
   assert.match(ai, /async analyzeDailyCoach\(context/);
   assert.match(ai, /async reviewCoachWeek\(context/);
+  assert.match(ai, /recommendedRoutineId/);
+  assert.match(ai, /expectedDurationMinutes/);
+  assert.match(ai, /tiempo disponible declarado/);
   assert.match(ai, /mealDescriptionSchema/);
   assert.match(ai, /combina una sola foto de comida|combinándola con userContext/);
   assert.match(ai, /plato chico.*23 cm.*plato grande.*27 cm/);
@@ -388,6 +397,9 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /Contexto de recuperación guardado/);
   assert.match(app, /requestDailyCoachInsight/);
   assert.match(app, /requestWeeklyCoachReview/);
+  assert.match(app, /recommended-routine/);
+  assert.match(app, /physicalRoutineById\(insight\.recommendedRoutineId\)/);
+  assert.match(app, /sourceNutritionKinds\.has\(item\.kind\)/);
   assert.match(app, /speechSynthesis\.speak/);
   assert.match(html, /wearableSleepDetails/);
   assert.match(html, /dailyBriefAiAction/);
@@ -414,7 +426,7 @@ test("el perfil maestro de Tomás guía siempre al entrenador y no depende de un
   assert.match(app, /coachProfilePrompt\(\)\.slice\(0, 40000\)/);
   assert.doesNotMatch(app, /Configura primero el perfil|openCoachProfileDialog/);
   assert.doesNotMatch(html, /Perfil del entrenador IA|coachProfileDialog|coachProfileText/);
-  assert.match(worker, /master-coach-profile\.js\?v=2/);
+  assert.match(worker, /master-coach-profile\.js\?v=3/);
 });
 
 test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
@@ -570,7 +582,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=135/);
+  assert.match(html, /assets\/js\/app\.js\?v=136/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

@@ -24,7 +24,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Una rutina en curso se reabre automáticamente al volver desde Timer o al iniciar nuevamente la aplicación.
 - Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
-- Biblioteca de cinco rutinas con ejercicios, propósito para el tenis, series marcables y sesiones cronometradas.
+- Biblioteca de catorce rutinas base y complementarias con propósito para el tenis, series marcables y sesiones cronometradas.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 - Panel de evolución de seis semanas y progreso detallado por ejercicio.
@@ -37,15 +37,24 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 
 ### Entrenamiento físico
 
-Incluye cinco rutinas configuradas en `assets/js/data.js`:
+Incluye catorce rutinas configuradas en `assets/js/data.js`:
 
 1. Día 1: piernas, glúteos y core.
 2. Día 2: tren superior y estabilidad.
 3. Día 3: potencia y desplazamientos.
 4. Día 4 extra: antebrazo, core y técnica.
 5. Día 5 extra: full core adaptado para tenis, de aproximadamente 40 minutos.
+6. Movilidad y recuperación.
+7. Activación prepartido.
+8. Potencia controlada bajo techo.
+9. Intervalos en bicicleta para tenis.
+10. Mantenimiento de hombro y antebrazo derechos.
+11. Frenada y cambios de dirección.
+12. Físico express de 20 minutos.
+13. Full body de fuerza adaptada.
+14. Evaluación periódica de indicadores físicos.
 
-Cada ejercicio permite elegir entre 1 y 10 series desde un desplegable, además de modificar repeticiones o tiempo y peso. El editor distingue si el objetivo corresponde a repeticiones, segundos o minutos y permite borrar y sobrescribir el valor con normalidad. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Desde Registrar se elige Entrenamiento físico y luego una de las cinco rutinas; esa elección abre una vista previa para revisar ejercicios y preparar implementos, sin iniciar el cronómetro. Al pulsar Iniciar entrenamiento comienza el seguimiento. Al finalizar se seleccionan sensaciones, esfuerzo, técnica y molestias; la duración y las calorías se completan al vincular la sesión de la pulsera. El cierre registra el entrenamiento y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
+Cada ejercicio permite elegir entre 1 y 10 series desde un desplegable, además de modificar repeticiones o tiempo y peso. El editor distingue si el objetivo corresponde a repeticiones, segundos o minutos y permite borrar y sobrescribir el valor con normalidad. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Desde Registrar se elige Entrenamiento físico y luego una rutina; esa elección abre una vista previa para revisar ejercicios y preparar implementos, sin iniciar el cronómetro. Al pulsar Iniciar entrenamiento comienza el seguimiento. Al finalizar se seleccionan sensaciones, esfuerzo, técnica y molestias; la duración y las calorías se completan al vincular la sesión de la pulsera. El entrenador IA puede recomendar una rutina según el tiempo disponible, carga, sueño, molestias, clima informado, equipamiento y calendario, pero no reemplaza una actividad planificada sin confirmación. El cierre registra el entrenamiento y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
 
 ### Cardio
 

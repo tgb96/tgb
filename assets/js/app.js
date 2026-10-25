@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=71";
+} from "./data.js?v=72";
 import {
   coachOption,
   coachBaseTrainingBlock,
@@ -26,15 +26,15 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=116";
+import { createRepository } from "./storage.js?v=117";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=118";
+import { createNutritionUI } from "./nutrition-ui.js?v=119";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
-import { createGuidedUI } from "./guided-ui.js?v=100";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=112";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=100";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=101";
+import { createGuidedUI } from "./guided-ui.js?v=101";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=113";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=101";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
@@ -66,7 +66,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=74";
+} from "./utils.js?v=75";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -1813,20 +1813,25 @@ function coachQuestionContext() {
 }
 
 function dailyCoachSourceUpdatedAt(context = coachQuestionContext()) {
+  const sourceNutritionKinds = new Set(["meal", "water", "plan", "supplement"]);
   return newestTimestamp([
     activeTrainingBlock(),
     repository.getCoachProfile(),
     ...repository.list().filter(item => item.dateISO >= addDaysISO(context.todayISO, -6)),
-    ...repository.listNutritionEntries().filter(item => item.dateISO >= addDaysISO(context.todayISO, -2)),
+    ...repository.listNutritionEntries().filter(item => item.dateISO >= addDaysISO(context.todayISO, -2) && sourceNutritionKinds.has(item.kind)),
     ...repository.listCoachQuestions().slice(0, 8),
     wearableData.status || {}
-  ]) || new Date().toISOString();
+  ]) || `${context.todayISO}T00:00:00.000Z`;
 }
 
 async function requestDailyCoachInsight({ interactive = true, force = true } = {}) {
   const todayISO = getChileDateISO();
   const existing = repository.getNutritionEntry(`daily-coach-${todayISO}`);
-  if (dailyCoachInFlight || (!force && existing)) return existing;
+  const context = coachQuestionContext();
+  const sourceUpdatedAt = dailyCoachSourceUpdatedAt(context);
+  const existingSourceTime = Date.parse(existing?.sourceUpdatedAt || "");
+  const currentSourceTime = Date.parse(sourceUpdatedAt || "");
+  if (dailyCoachInFlight || (!force && existing && Number.isFinite(existingSourceTime) && existingSourceTime >= currentSourceTime)) return existing;
   if (!cloudSync.currentUser) {
     if (interactive) { openCloudDialog(); showToast("Inicia sesión con Google para actualizar el chequeo diario."); }
     return null;
@@ -1836,13 +1841,16 @@ async function requestDailyCoachInsight({ interactive = true, force = true } = {
   button.disabled = true;
   button.textContent = "Gemini está revisando tu día…";
   try {
-    const context = coachQuestionContext();
     const result = await aiClient.analyzeDailyCoach(context);
     const insight = result.insight;
+    const recommendedRoutine = ["train", "adapt"].includes(insight.decision)
+      ? physicalRoutineById(insight.recommendedRoutineId)
+      : null;
     const sections = [
       { title: "Señales del día", items: insight.signals || [] },
       { title: "Datos considerados", items: insight.dataUsed || [] },
       ...(insight.missingData?.length ? [{ title: "Información que falta", items: insight.missingData }] : []),
+      ...(recommendedRoutine ? [{ title: "Rutina sugerida", items: [`${recommendedRoutine.name}${recommendedRoutine.expectedDurationMinutes ? ` · ${recommendedRoutine.expectedDurationMinutes} min aprox.` : ""}`] }] : []),
       { title: "Recomendación para hoy", items: [insight.recommendation].filter(Boolean) }
     ];
     repository.saveNutritionEntry({
@@ -1853,8 +1861,8 @@ async function requestDailyCoachInsight({ interactive = true, force = true } = {
       summary: insight.summary,
       sections,
       encouragement: insight.encouragement,
-      stats: { decision: insight.decision },
-      sourceUpdatedAt: dailyCoachSourceUpdatedAt(context),
+      stats: { decision: insight.decision, recommendedRoutineId: recommendedRoutine?.id || "" },
+      sourceUpdatedAt,
       generatedAt: new Date().toISOString(),
       model: result.model,
       createdAt: existing?.createdAt || new Date().toISOString(),
@@ -2212,6 +2220,7 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     recoveryContexts: recoveryContextsFromQuestions(repository.listCoachQuestions())
   });
   const aiInsight = repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  const recommendedRoutine = physicalRoutineById(aiInsight?.stats?.recommendedRoutineId);
   const decision = aiInsight?.stats?.decision || "";
   const decisionView = {
     train: { label: "Plan confirmado por IA", tone: "ready" },
@@ -2247,11 +2256,14 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
   $("dailyBriefAiAction").disabled = dailyCoachInFlight;
   const active = loadRoutineSession()?.status === "active" || guidedUI.hasPending() || Boolean(plannedActivityContext(loadPlannedActivity()));
   const button = $("dailyBriefAction");
+  const hasRoutineRecommendation = Boolean(recommendedRoutine && !brief.hasTodayActivity && !todayPlan);
   // El banner principal y la barra de sesión ya contienen esas acciones.
   // La recomendación diaria conserva un botón solo cuando aporta un destino distinto.
-  button.classList.toggle("hidden", active || (!brief.hasTodayActivity && Boolean(todayPlan)));
-  button.dataset.action = active ? "active-session" : !brief.hasTodayActivity && todayPlan ? "planned" : brief.hasTodayActivity ? "history" : "register";
+  button.classList.toggle("hidden", active || (!hasRoutineRecommendation && !brief.hasTodayActivity && Boolean(todayPlan)));
+  button.dataset.action = active ? "active-session" : hasRoutineRecommendation ? "recommended-routine" : !brief.hasTodayActivity && todayPlan ? "planned" : brief.hasTodayActivity ? "history" : "register";
+  button.dataset.routineId = hasRoutineRecommendation ? recommendedRoutine.id : "";
   button.textContent = active ? "Volver a mi sesión"
+    : hasRoutineRecommendation ? `Ver rutina sugerida${recommendedRoutine.expectedDurationMinutes ? ` · ${recommendedRoutine.expectedDurationMinutes} min` : ""}`
     : !brief.hasTodayActivity && todayPlan ? "Iniciar actividad de hoy"
       : brief.hasTodayActivity ? "Ver actividad de hoy" : "Registrar lo que hice";
 }
@@ -2566,8 +2578,16 @@ function renderPhysicalFields(record = {}) {
     const description = document.createElement("p");
     description.textContent = "Puedes revisar sus ejercicios y preparar tus implementos. El tiempo solo comenzará cuando pulses Iniciar entrenamiento.";
     heading.append(title, description);
-    const grid = document.createElement("div");
-    grid.className = "routine-launch-grid";
+    const baseLabel = document.createElement("p");
+    baseLabel.className = "eyebrow dark";
+    baseLabel.textContent = "Rutinas base";
+    const baseGrid = document.createElement("div");
+    baseGrid.className = "routine-launch-grid";
+    const complementaryLabel = document.createElement("p");
+    complementaryLabel.className = "eyebrow dark";
+    complementaryLabel.textContent = "Rutinas complementarias";
+    const complementaryGrid = document.createElement("div");
+    complementaryGrid.className = "routine-launch-grid";
     physicalRoutines.forEach((routine, index) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -2594,15 +2614,15 @@ function renderPhysicalFields(record = {}) {
       action.textContent = "Ver rutina →";
       button.append(number, copy, action);
       button.addEventListener("click", () => launchRoutineFromRegistration(routine));
-      grid.append(button);
+      (index < 3 ? baseGrid : complementaryGrid).append(button);
     });
-    $("categoryFields").append(heading, grid);
+    $("categoryFields").append(heading, baseLabel, baseGrid, complementaryLabel, complementaryGrid);
     return;
   }
 
   const fieldset = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  legend.textContent = "Elige una de las cinco rutinas";
+  legend.textContent = "Elige una rutina";
   const grid = document.createElement("div");
   grid.className = "choice-grid two";
   physicalRoutines.forEach((routine, index) => {
@@ -5288,7 +5308,7 @@ function createRoutineAbsRecordBadge(record) {
   badge.textContent = record.count > 0
     ? `Récord abs. ${record.count} · meta ${record.nextTarget}`
     : "Abs. · crea tu primera marca";
-  badge.title = "Este récord es único y se comparte entre las cinco rutinas";
+  badge.title = "Este récord es único y se comparte entre todas las rutinas";
   return badge;
 }
 
@@ -5745,13 +5765,30 @@ function renderRoutines() {
     const objective = document.createElement("p");
     objective.className = "routine-objective";
     objective.textContent = routine.objective;
-    body.append(note, objective, createRoutineSessionHeader(routine, session));
+    body.append(note, objective);
     if (routine.durationGuidance) {
       const durationGuidance = document.createElement("p");
-      durationGuidance.className = "routine-note";
+      durationGuidance.className = "routine-objective";
       durationGuidance.textContent = routine.durationGuidance;
-      objective.insertAdjacentElement("afterend", durationGuidance);
+      body.append(durationGuidance);
     }
+    if (routine.recommendedFor?.length) {
+      const recommendedFor = document.createElement("p");
+      recommendedFor.className = "routine-objective";
+      const label = document.createElement("strong");
+      label.textContent = "Conviene cuando: ";
+      recommendedFor.append(label, routine.recommendedFor.join("; "));
+      body.append(recommendedFor);
+    }
+    if (routine.avoidWhen?.length) {
+      const avoidWhen = document.createElement("p");
+      avoidWhen.className = "routine-objective";
+      const label = document.createElement("strong");
+      label.textContent = "Evítala o adáptala si: ";
+      avoidWhen.append(label, routine.avoidWhen.join("; "));
+      body.append(avoidWhen);
+    }
+    body.append(createRoutineSessionHeader(routine, session));
     const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
     const displayedExercises = routineExercisesForDate(routine, dateISO);
@@ -6720,6 +6757,10 @@ function bindEvents() {
   $("dailyBriefAction").addEventListener("click", event => {
     const action = event.currentTarget.dataset.action;
     if (action === "active-session") return openActiveSession();
+    if (action === "recommended-routine") {
+      const routine = physicalRoutineById(event.currentTarget.dataset.routineId);
+      if (routine) return launchRoutineFromRegistration(routine);
+    }
     if (action === "planned") return openTodayPlannedActivity();
     if (action === "history") return showView("history");
     openRegistration();

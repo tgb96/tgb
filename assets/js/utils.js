@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=71";
+} from "./data.js?v=72";
 import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=70";
 
 export function getChileParts(now = new Date()) {

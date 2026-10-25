@@ -1,5 +1,5 @@
 import { guidedElapsedMs, guidedOptions, guidedPlan, guidedRemainingMs, guidedTotalSeconds } from "./guided-sessions.js?v=68";
-import { getChileDateISO } from "./utils.js?v=74";
+import { getChileDateISO } from "./utils.js?v=75";
 
 const KEY = "tgtrain-guided-session-v1";
 const pad = n => String(Math.max(0, n)).padStart(2, "0");
