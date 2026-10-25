@@ -542,33 +542,19 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-technique[open] > summary > span:first-child { transform: rotate(90deg); }
 .exercise-technique > summary > span:nth-child(2) { font-size: 11px; font-weight: 950; }
 .exercise-technique > summary small { justify-self: end; color: #66718d; font-size: 8px; font-weight: 750; }
-.exercise-technique-content { padding: 0 11px 12px; display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 11px; align-items: start; }
-.technique-figure { min-width: 0; border-radius: 14px; background: var(--night); overflow: hidden; }
-.technique-svg { display: block; width: 100%; height: auto; }
-.technique-backdrop { fill: #151a2a; stroke: #30384e; }
-.technique-body, .technique-soft, .technique-accent, .technique-floor, .technique-equipment, .technique-arrow, .technique-guide-line, .technique-racket { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.technique-body { stroke: #f7f8f2; stroke-width: 5; }
-.technique-soft { stroke: #8e98b0; stroke-width: 4; }
-.technique-accent { stroke: var(--lime); stroke-width: 5; }
-.technique-floor { stroke: #4a5267; stroke-width: 3; }
-.technique-equipment { fill: #283046; stroke: #737f9e; stroke-width: 3; }
-.technique-arrow { stroke: #8da7ff; stroke-width: 3; stroke-dasharray: 6 6; }
-.technique-guide-line { stroke: #ffcc75; stroke-width: 2; stroke-dasharray: 4 5; }
-.technique-racket { stroke: #b8c6ff; stroke-width: 3; }
-.technique-head { fill: #f7f8f2; }
-.technique-joint { fill: var(--lime); }
-.technique-weight { fill: var(--lime); stroke: #111522; stroke-width: 2; }
-.technique-pulse { fill: rgba(183, 255, 58, 0.1); stroke: var(--lime); stroke-width: 2; transform-origin: center; animation: technique-pulse 2.6s ease-in-out infinite; }
-.technique-crank { transform-origin: 118px 92px; animation: technique-spin 2.4s linear infinite; }
-.technique-bike-leg { animation: technique-fade 1.2s ease-in-out infinite alternate; }
-[data-motion="curl-up"] .technique-upper, [data-motion="side-crunch"] .technique-upper { transform-origin: 108px 102px; animation: technique-lift 2.7s ease-in-out infinite; }
-[data-motion="dead-bug"] .technique-moving-leg { transform-origin: 113px 96px; animation: technique-leg-lower 3s ease-in-out infinite; }
-[data-motion="bridge-march"] .technique-march-leg { transform-origin: 132px 66px; animation: technique-knee-lift 2.5s ease-in-out infinite; }
-[data-motion="seated-rotation"] .technique-shoulders { transform-origin: 119px 56px; animation: technique-turn 3s ease-in-out infinite; }
-[data-motion="suitcase-march"] .technique-knee, [data-motion="knee-hold"] .technique-knee { transform-origin: 113px 77px; animation: technique-knee-lift 2.6s ease-in-out infinite; }
-[data-motion="shadow-tennis"] .technique-shadow-body { transform-origin: 108px 77px; animation: technique-body-turn 3s ease-in-out infinite; }
-[data-motion="shadow-tennis"] .technique-shadow-arm { transform-origin: 108px 50px; animation: technique-swing 3s ease-in-out infinite; }
-[data-motion="cooldown"] .technique-knees { transform-origin: 116px 99px; animation: technique-sway 4s ease-in-out infinite; }
+.exercise-technique-content { padding: 0 11px 12px; display: grid; grid-template-columns: minmax(180px, 0.82fr) minmax(0, 1fr); gap: 11px; align-items: start; }
+.technique-video { min-width: 0; }
+.technique-video-stage { position: relative; aspect-ratio: 16 / 9; border-radius: 14px; background: linear-gradient(145deg, #111522, #252d43); overflow: hidden; box-shadow: 0 8px 18px rgba(17, 21, 34, 0.16); }
+.technique-video-play { width: 100%; height: 100%; padding: 16px; display: flex; align-items: center; justify-content: center; gap: 11px; border: 0; border-radius: 0; background: transparent; color: white; text-align: left; cursor: pointer; }
+.technique-video-play:hover, .technique-video-play:focus-visible { background: rgba(83, 112, 255, 0.16); }
+.technique-video-play-icon { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 50%; background: var(--lime); color: var(--night); font-size: 16px; box-shadow: 0 0 0 7px rgba(183, 255, 58, 0.12); }
+.technique-video-play > span:last-child { min-width: 0; }
+.technique-video-play strong, .technique-video-play small { display: block; }
+.technique-video-play strong { font-size: 11px; line-height: 1.3; }
+.technique-video-play small { margin-top: 4px; color: rgba(255, 255, 255, 0.68); font-size: 8px; font-weight: 750; }
+.technique-video-frame { width: 100%; height: 100%; display: block; border: 0; }
+.technique-video-source { display: inline-block; margin: 7px 2px 0; color: var(--blue-dark); font-size: 8px; font-weight: 800; line-height: 1.35; text-decoration: none; }
+.technique-video-source:hover { text-decoration: underline; }
 .exercise-technique-steps { min-width: 0; display: grid; gap: 7px; }
 .exercise-technique-steps > div { padding: 8px 9px; border-radius: 10px; background: white; }
 .exercise-technique-steps strong { display: block; color: var(--blue-dark); font-size: 9px; text-transform: uppercase; letter-spacing: 0.35px; }
@@ -576,16 +562,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-technique-steps .technique-key { border-left: 3px solid var(--lime); background: #f4fbdc; }
 .exercise-technique-steps .technique-avoid { border-left: 3px solid #ef9a3c; background: #fff5e8; }
 .exercise-technique-note { color: #66718d; font-size: 8px; line-height: 1.4; }
-@keyframes technique-spin { to { transform: rotate(360deg); } }
-@keyframes technique-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.84); } 50% { opacity: 0.9; transform: scale(1.12); } }
-@keyframes technique-fade { from { opacity: 0.55; } to { opacity: 1; } }
-@keyframes technique-lift { 0%, 20%, 100% { transform: translate(0, 0) rotate(0); } 50%, 72% { transform: translate(5px, -6px) rotate(-3deg); } }
-@keyframes technique-leg-lower { 0%, 18%, 100% { transform: rotate(0); } 48%, 70% { transform: rotate(22deg); } }
-@keyframes technique-knee-lift { 0%, 20%, 100% { transform: rotate(0); } 50%, 72% { transform: rotate(-15deg); } }
-@keyframes technique-turn { 0%, 100% { transform: scaleX(1); } 28% { transform: scaleX(0.5); } 72% { transform: scaleX(0.72); } }
-@keyframes technique-body-turn { 0%, 18%, 100% { transform: rotate(0); } 48%, 70% { transform: rotate(-7deg); } }
-@keyframes technique-swing { 0%, 18%, 100% { transform: rotate(-10deg); } 48%, 70% { transform: rotate(35deg); } }
-@keyframes technique-sway { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(18deg); } }
 .abdominal-finisher { margin-top: 12px !important; border-color: #a8d62f; background: linear-gradient(145deg, #f5fbe7, #eef8d5); }
 .abdominal-finisher .exercise-phase { background: var(--lime); color: var(--night); }
 .abdominal-record-target { margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
@@ -1185,12 +1161,11 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
   .activity-line { flex-wrap: wrap; }
   .activity-line .record-state-badge { margin-left: 17px; }
   .exercise-technique-content { grid-template-columns: 1fr; }
-  .technique-figure { max-width: 210px; justify-self: center; }
+  .technique-video { width: 100%; max-width: 420px; justify-self: center; }
   .exercise-technique > summary { grid-template-columns: auto 1fr; }
   .exercise-technique > summary small { grid-column: 2; justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
-  .technique-svg * { animation: none !important; }
 }

@@ -225,15 +225,16 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
-test("Full Core explica sus once ejercicios con guías técnicas animadas", async () => {
+test("Full Core explica sus once ejercicios con videos técnicos breves", async () => {
   const data = await import("../assets/js/data.js");
   const technique = await import("../assets/js/exercise-technique.js");
   const core = data.physicalRoutines.find(routine => routine.id === "core");
   assert.equal(Object.keys(technique.coreTechniqueGuides).length, core.exercises.length);
   assert.ok(core.exercises.every(exercise => {
     const guide = technique.exerciseTechniqueGuide(core.id, exercise.id);
-    return guide?.visual && guide?.start && guide?.action && guide?.key && guide?.avoid;
+    return guide?.video?.id && guide?.video?.source && guide?.video?.sourceUrl && guide?.start && guide?.action && guide?.key && guide?.avoid;
   }));
+  assert.ok(Object.values(technique.coreTechniqueGuides).every(guide => ["youtube", "vimeo"].includes(guide.video.provider)));
   assert.equal(technique.exerciseTechniqueGuide("legs", "stationary-bike-warmup"), null);
 });
 
@@ -594,7 +595,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=137/);
+  assert.match(html, /assets\/js\/app\.js\?v=138/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

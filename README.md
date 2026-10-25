@@ -25,7 +25,7 @@ PWA personal para registrar y revisar entrenamiento físico, cardio y tenis, org
 - Al reabrirse, la vista se desplaza hasta el ejercicio parcialmente realizado, el siguiente pendiente o el cierre si ya se completaron todos.
 - Catálogo amplio de sensaciones por categoría que pueden combinarse sin escribir.
 - Biblioteca de catorce rutinas base y complementarias con propósito para el tenis, series marcables y sesiones cronometradas.
-- Full Core incorpora una guía técnica plegable para sus once ejercicios, con ilustración animada, posición inicial, ejecución, clave técnica y errores a evitar.
+- Full Core incorpora una guía técnica plegable para sus once ejercicios, con video breve bajo demanda, posición inicial, ejecución, adaptación unilateral, clave técnica y errores a evitar.
 - Timer de intervalos y descansos que continúa al cambiar de sección.
 - Historial agrupado por semanas con informe completo copiable para compartir con un entrenador.
 - Panel de evolución de seis semanas y progreso detallado por ejercicio.

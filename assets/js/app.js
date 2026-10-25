@@ -41,7 +41,7 @@ import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, d
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
-import { createTechniqueIllustration, exerciseTechniqueGuide } from "./exercise-technique.js?v=1";
+import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=2";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -5717,14 +5717,14 @@ function createExerciseTechniqueDisclosure(routine, exercise) {
   summaryIcon.setAttribute("aria-hidden", "true");
   summaryIcon.textContent = "▶";
   const summaryText = document.createElement("span");
-  summaryText.textContent = "Ver técnica animada";
+  summaryText.textContent = "Ver video y técnica";
   const summaryHint = document.createElement("small");
-  summaryHint.textContent = "posición · movimiento · claves";
+  summaryHint.textContent = "video breve · adaptación personal";
   summary.append(summaryIcon, summaryText, summaryHint);
 
   const content = document.createElement("div");
   content.className = "exercise-technique-content";
-  content.append(createTechniqueIllustration(guide.visual, document));
+  content.append(createTechniqueVideoPlayer(guide.video, document));
   const instructions = document.createElement("div");
   instructions.className = "exercise-technique-steps";
   [
@@ -5744,7 +5744,7 @@ function createExerciseTechniqueDisclosure(routine, exercise) {
   });
   const note = document.createElement("small");
   note.className = "exercise-technique-note";
-  note.textContent = "La animación muestra la dirección general. Haz el movimiento con control y usa las indicaciones escritas para ajustar tu posición.";
+  note.textContent = guide.video.note || "El video muestra la ejecución general. Sigue las indicaciones de TGTrain para adaptarla a tu condición y detente si aparece dolor.";
   instructions.append(note);
   content.append(instructions);
   disclosure.append(summary, content);
@@ -5791,7 +5791,7 @@ function renderRoutines() {
     if (routine.exercises.some(exercise => exerciseTechniqueGuide(routine.id, exercise.id))) {
       const techniqueBadge = document.createElement("span");
       techniqueBadge.className = "technique-available-badge";
-      techniqueBadge.textContent = "Técnica animada";
+      techniqueBadge.textContent = "Videos técnicos";
       titleLine.append(techniqueBadge);
     }
     const focus = document.createElement("p");
