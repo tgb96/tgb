@@ -41,6 +41,7 @@ import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, d
 import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
+import { createTechniqueIllustration, exerciseTechniqueGuide } from "./exercise-technique.js?v=1";
 import {
   dayIndexFromISO,
   addDaysISO,
@@ -5706,6 +5707,50 @@ function createRoutineFocusControls(routine, session, displayedExercises, focusI
   return controls;
 }
 
+function createExerciseTechniqueDisclosure(routine, exercise) {
+  const guide = exerciseTechniqueGuide(routine.id, exercise.id);
+  if (!guide) return null;
+  const disclosure = document.createElement("details");
+  disclosure.className = "exercise-technique";
+  const summary = document.createElement("summary");
+  const summaryIcon = document.createElement("span");
+  summaryIcon.setAttribute("aria-hidden", "true");
+  summaryIcon.textContent = "▶";
+  const summaryText = document.createElement("span");
+  summaryText.textContent = "Ver técnica animada";
+  const summaryHint = document.createElement("small");
+  summaryHint.textContent = "posición · movimiento · claves";
+  summary.append(summaryIcon, summaryText, summaryHint);
+
+  const content = document.createElement("div");
+  content.className = "exercise-technique-content";
+  content.append(createTechniqueIllustration(guide.visual, document));
+  const instructions = document.createElement("div");
+  instructions.className = "exercise-technique-steps";
+  [
+    ["1. Posición", guide.start, ""],
+    ["2. Movimiento", guide.action, ""],
+    ["3. Clave técnica", guide.key, "technique-key"],
+    ["Evita", guide.avoid, "technique-avoid"]
+  ].forEach(([labelText, text, className]) => {
+    const row = document.createElement("div");
+    if (className) row.className = className;
+    const label = document.createElement("strong");
+    label.textContent = labelText;
+    const copy = document.createElement("p");
+    copy.textContent = text;
+    row.append(label, copy);
+    instructions.append(row);
+  });
+  const note = document.createElement("small");
+  note.className = "exercise-technique-note";
+  note.textContent = "La animación muestra la dirección general. Haz el movimiento con control y usa las indicaciones escritas para ajustar tu posición.";
+  instructions.append(note);
+  content.append(instructions);
+  disclosure.append(summary, content);
+  return disclosure;
+}
+
 function renderRoutines() {
   const container = $("routineLibrary");
   let session = loadRoutineSession();
@@ -5743,6 +5788,12 @@ function renderRoutines() {
     const title = document.createElement("h2");
     title.textContent = routine.name;
     titleLine.append(title, createRoutineDurationBadge(routine, durationAverages), createRoutineAbsRecordBadge(abdominalRecord));
+    if (routine.exercises.some(exercise => exerciseTechniqueGuide(routine.id, exercise.id))) {
+      const techniqueBadge = document.createElement("span");
+      techniqueBadge.className = "technique-available-badge";
+      techniqueBadge.textContent = "Técnica animada";
+      titleLine.append(techniqueBadge);
+    }
     const focus = document.createElement("p");
     focus.textContent = routine.focus;
     summaryCopy.append(titleLine, focus);
@@ -5951,7 +6002,10 @@ function renderRoutines() {
       weightInput.addEventListener("input", persistExerciseSettings);
       weightInput.addEventListener("focus", () => weightInput.select());
       renderSeries();
-      exerciseCard.append(exerciseTop, description, benefit, guidance, controls, series);
+      exerciseCard.append(exerciseTop, description, benefit, guidance);
+      const techniqueDisclosure = createExerciseTechniqueDisclosure(routine, exercise);
+      if (techniqueDisclosure) exerciseCard.append(techniqueDisclosure);
+      exerciseCard.append(controls, series);
       body.append(exerciseCard);
     });
     const abdominalFinisher = createRoutineAbsFinisher(routine, session, abdominalRecord, displayedExercises.length);

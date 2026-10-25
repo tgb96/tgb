@@ -225,6 +225,18 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   assert.doesNotMatch(app, /coachUpdateReport|coachSentAt|COACH_PENDING_BATCH_KEY/);
 });
 
+test("Full Core explica sus once ejercicios con guías técnicas animadas", async () => {
+  const data = await import("../assets/js/data.js");
+  const technique = await import("../assets/js/exercise-technique.js");
+  const core = data.physicalRoutines.find(routine => routine.id === "core");
+  assert.equal(Object.keys(technique.coreTechniqueGuides).length, core.exercises.length);
+  assert.ok(core.exercises.every(exercise => {
+    const guide = technique.exerciseTechniqueGuide(core.id, exercise.id);
+    return guide?.visual && guide?.start && guide?.action && guide?.key && guide?.avoid;
+  }));
+  assert.equal(technique.exerciseTechniqueGuide("legs", "stationary-bike-warmup"), null);
+});
+
 test("la importación del plan vive en Cuenta y respaldo, no ocupa el inicio", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
   const home = html.slice(html.indexOf('id="viewHome"'), html.indexOf('id="viewRegister"'));
@@ -299,7 +311,7 @@ test("normaliza una respuesta compacta sin campos vacíos", async () => {
 
 test("el shell offline incluye todos los recursos de la aplicación", async () => {
   const worker = await readFile(resolve(root, "service-worker.js"), "utf8");
-  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/progression.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
+  for (const asset of ["index.html", "assets/css/styles.css", "assets/js/app.js", "assets/js/coach-plan.js", "assets/js/open-tennis-sync.js", "assets/js/data.js", "assets/js/storage.js", "assets/js/utils.js", "assets/js/cloud.js", "assets/js/ai.js", "assets/js/progression.js", "assets/js/training-plan.js", "assets/js/wearable-link.js", "assets/js/exercise-technique.js", "assets/js/nutrition.js", "assets/js/nutrition-presets.js", "assets/js/nutrition-ui.js", "assets/js/daily-insights.js", "assets/js/guided-sessions.js", "assets/js/guided-ui.js", "assets/js/firebase-config.js", "icon-maskable-192.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/brand/tgtrain-mark-160.png"]) {
     assert.match(worker, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(worker, /tgtrain-shell-v\d+/);
@@ -582,7 +594,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=136/);
+  assert.match(html, /assets\/js\/app\.js\?v=137/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

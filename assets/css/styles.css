@@ -534,6 +534,58 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.45; }
 .exercise-guidance p { padding: 8px 9px; border-radius: 10px; background: white; color: #58606d; font-size: 10px; }
 .exercise-guidance .exercise-progression-rule { border-left: 3px solid var(--lime); background: #f4fbdc; color: #26320f; }
 .exercise-guidance .exercise-caution { background: #fff0dd; color: #7a4a10; }
+.technique-available-badge { padding: 5px 7px; border-radius: 8px; background: #e7ecff; color: var(--blue-dark); font-size: 8px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.45px; white-space: nowrap; }
+.exercise-technique { margin-top: 11px; border: 1px solid #cfd7f2; border-radius: 14px; background: #f3f6ff; overflow: hidden; }
+.exercise-technique > summary { min-height: 45px; padding: 10px 11px; display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 7px; list-style: none; color: var(--blue-dark); cursor: pointer; }
+.exercise-technique > summary::-webkit-details-marker { display: none; }
+.exercise-technique > summary > span:first-child { font-size: 9px; transition: transform 180ms ease; }
+.exercise-technique[open] > summary > span:first-child { transform: rotate(90deg); }
+.exercise-technique > summary > span:nth-child(2) { font-size: 11px; font-weight: 950; }
+.exercise-technique > summary small { justify-self: end; color: #66718d; font-size: 8px; font-weight: 750; }
+.exercise-technique-content { padding: 0 11px 12px; display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 11px; align-items: start; }
+.technique-figure { min-width: 0; border-radius: 14px; background: var(--night); overflow: hidden; }
+.technique-svg { display: block; width: 100%; height: auto; }
+.technique-backdrop { fill: #151a2a; stroke: #30384e; }
+.technique-body, .technique-soft, .technique-accent, .technique-floor, .technique-equipment, .technique-arrow, .technique-guide-line, .technique-racket { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.technique-body { stroke: #f7f8f2; stroke-width: 5; }
+.technique-soft { stroke: #8e98b0; stroke-width: 4; }
+.technique-accent { stroke: var(--lime); stroke-width: 5; }
+.technique-floor { stroke: #4a5267; stroke-width: 3; }
+.technique-equipment { fill: #283046; stroke: #737f9e; stroke-width: 3; }
+.technique-arrow { stroke: #8da7ff; stroke-width: 3; stroke-dasharray: 6 6; }
+.technique-guide-line { stroke: #ffcc75; stroke-width: 2; stroke-dasharray: 4 5; }
+.technique-racket { stroke: #b8c6ff; stroke-width: 3; }
+.technique-head { fill: #f7f8f2; }
+.technique-joint { fill: var(--lime); }
+.technique-weight { fill: var(--lime); stroke: #111522; stroke-width: 2; }
+.technique-pulse { fill: rgba(183, 255, 58, 0.1); stroke: var(--lime); stroke-width: 2; transform-origin: center; animation: technique-pulse 2.6s ease-in-out infinite; }
+.technique-crank { transform-origin: 118px 92px; animation: technique-spin 2.4s linear infinite; }
+.technique-bike-leg { animation: technique-fade 1.2s ease-in-out infinite alternate; }
+[data-motion="curl-up"] .technique-upper, [data-motion="side-crunch"] .technique-upper { transform-origin: 108px 102px; animation: technique-lift 2.7s ease-in-out infinite; }
+[data-motion="dead-bug"] .technique-moving-leg { transform-origin: 113px 96px; animation: technique-leg-lower 3s ease-in-out infinite; }
+[data-motion="bridge-march"] .technique-march-leg { transform-origin: 132px 66px; animation: technique-knee-lift 2.5s ease-in-out infinite; }
+[data-motion="seated-rotation"] .technique-shoulders { transform-origin: 119px 56px; animation: technique-turn 3s ease-in-out infinite; }
+[data-motion="suitcase-march"] .technique-knee, [data-motion="knee-hold"] .technique-knee { transform-origin: 113px 77px; animation: technique-knee-lift 2.6s ease-in-out infinite; }
+[data-motion="shadow-tennis"] .technique-shadow-body { transform-origin: 108px 77px; animation: technique-body-turn 3s ease-in-out infinite; }
+[data-motion="shadow-tennis"] .technique-shadow-arm { transform-origin: 108px 50px; animation: technique-swing 3s ease-in-out infinite; }
+[data-motion="cooldown"] .technique-knees { transform-origin: 116px 99px; animation: technique-sway 4s ease-in-out infinite; }
+.exercise-technique-steps { min-width: 0; display: grid; gap: 7px; }
+.exercise-technique-steps > div { padding: 8px 9px; border-radius: 10px; background: white; }
+.exercise-technique-steps strong { display: block; color: var(--blue-dark); font-size: 9px; text-transform: uppercase; letter-spacing: 0.35px; }
+.exercise-technique-steps p { margin: 3px 0 0; color: #4d5666; font-size: 10px; line-height: 1.45; }
+.exercise-technique-steps .technique-key { border-left: 3px solid var(--lime); background: #f4fbdc; }
+.exercise-technique-steps .technique-avoid { border-left: 3px solid #ef9a3c; background: #fff5e8; }
+.exercise-technique-note { color: #66718d; font-size: 8px; line-height: 1.4; }
+@keyframes technique-spin { to { transform: rotate(360deg); } }
+@keyframes technique-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.84); } 50% { opacity: 0.9; transform: scale(1.12); } }
+@keyframes technique-fade { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes technique-lift { 0%, 20%, 100% { transform: translate(0, 0) rotate(0); } 50%, 72% { transform: translate(5px, -6px) rotate(-3deg); } }
+@keyframes technique-leg-lower { 0%, 18%, 100% { transform: rotate(0); } 48%, 70% { transform: rotate(22deg); } }
+@keyframes technique-knee-lift { 0%, 20%, 100% { transform: rotate(0); } 50%, 72% { transform: rotate(-15deg); } }
+@keyframes technique-turn { 0%, 100% { transform: scaleX(1); } 28% { transform: scaleX(0.5); } 72% { transform: scaleX(0.72); } }
+@keyframes technique-body-turn { 0%, 18%, 100% { transform: rotate(0); } 48%, 70% { transform: rotate(-7deg); } }
+@keyframes technique-swing { 0%, 18%, 100% { transform: rotate(-10deg); } 48%, 70% { transform: rotate(35deg); } }
+@keyframes technique-sway { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(18deg); } }
 .abdominal-finisher { margin-top: 12px !important; border-color: #a8d62f; background: linear-gradient(145deg, #f5fbe7, #eef8d5); }
 .abdominal-finisher .exercise-phase { background: var(--lime); color: var(--night); }
 .abdominal-record-target { margin-top: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
@@ -1132,8 +1184,13 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
   .cloud-sync-action button { width: 100%; max-width: none; }
   .activity-line { flex-wrap: wrap; }
   .activity-line .record-state-badge { margin-left: 17px; }
+  .exercise-technique-content { grid-template-columns: 1fr; }
+  .technique-figure { max-width: 210px; justify-self: center; }
+  .exercise-technique > summary { grid-template-columns: auto 1fr; }
+  .exercise-technique > summary small { grid-column: 2; justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+  .technique-svg * { animation: none !important; }
 }
