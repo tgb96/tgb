@@ -113,14 +113,20 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("hay cuatro rutinas físicas completas y configurables", async () => {
+test("hay cinco rutinas físicas completas y configurables", async () => {
   const data = await import("../assets/js/data.js");
-  assert.equal(data.physicalRoutines.length, 4);
-  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12]);
-  assert.ok(data.physicalRoutines.every(routine => {
+  assert.equal(data.physicalRoutines.length, 5);
+  assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12, 11]);
+  assert.ok(data.physicalRoutines.slice(0, 4).every(routine => {
     const warmup = routine.exercises[0];
     return warmup.name === "Bicicleta estática" && warmup.sets === 1 && warmup.target === "10 min";
   }));
+  const core = data.physicalRoutines.find(routine => routine.id === "core");
+  assert.equal(core.expectedDurationMinutes, 40);
+  assert.equal(core.exercises[0].target, "5 min");
+  assert.ok(core.exercises.every(exercise => !/plancha/i.test(exercise.name)));
+  assert.ok(core.exercises.some(exercise => /mano derecha/i.test(exercise.name)));
+  assert.ok(core.exercises.some(exercise => /brazo izquierdo/i.test(`${exercise.description} ${exercise.benefit} ${exercise.caution || ""}`)));
   assert.ok(data.physicalRoutines.flatMap(routine => routine.exercises).every(exercise => exercise.sets && exercise.target));
   assert.deepEqual(data.cardioTypes.map(type => type.id), ["outdoor-bike", "stationary-bike", "running", "walking", "trekking", "padel"]);
   assert.deepEqual(data.cardioTypes.find(type => type.id === "padel"), {
@@ -408,7 +414,7 @@ test("el perfil maestro de Tomás guía siempre al entrenador y no depende de un
   assert.match(app, /coachProfilePrompt\(\)\.slice\(0, 40000\)/);
   assert.doesNotMatch(app, /Configura primero el perfil|openCoachProfileDialog/);
   assert.doesNotMatch(html, /Perfil del entrenador IA|coachProfileDialog|coachProfileText/);
-  assert.match(worker, /master-coach-profile\.js\?v=1/);
+  assert.match(worker, /master-coach-profile\.js\?v=2/);
 });
 
 test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
@@ -564,7 +570,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=134/);
+  assert.match(html, /assets\/js\/app\.js\?v=135/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

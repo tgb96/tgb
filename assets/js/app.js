@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=70";
+} from "./data.js?v=71";
 import {
   coachOption,
   coachBaseTrainingBlock,
@@ -26,15 +26,15 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=115";
+import { createRepository } from "./storage.js?v=116";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=117";
+import { createNutritionUI } from "./nutrition-ui.js?v=118";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
-import { createGuidedUI } from "./guided-ui.js?v=99";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=111";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=99";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=100";
+import { createGuidedUI } from "./guided-ui.js?v=100";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=112";
+import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=100";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=101";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
@@ -66,7 +66,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=73";
+} from "./utils.js?v=74";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -2602,7 +2602,7 @@ function renderPhysicalFields(record = {}) {
 
   const fieldset = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  legend.textContent = "Elige una de las cuatro rutinas";
+  legend.textContent = "Elige una de las cinco rutinas";
   const grid = document.createElement("div");
   grid.className = "choice-grid two";
   physicalRoutines.forEach((routine, index) => {
@@ -5269,10 +5269,16 @@ function createRoutineDurationBadge(routine, averages) {
   const average = averages.get(routine.id) || averages.get(routine.name);
   const badge = document.createElement("span");
   badge.className = "routine-duration-average";
-  badge.textContent = average ? `Duración aprox. ${average.minutes} min` : "Sin promedio aún";
+  badge.textContent = average
+    ? `Duración aprox. ${average.minutes} min`
+    : routine.expectedDurationMinutes
+      ? `Duración aprox. ${routine.expectedDurationMinutes} min`
+      : "Sin promedio aún";
   badge.title = average
     ? `Promedio calculado con ${average.sessions} ${average.sessions === 1 ? "entrenamiento" : "entrenamientos"}`
-    : "Aparecerá después de registrar esta rutina";
+    : routine.expectedDurationMinutes
+      ? "Duración objetivo inicial; después se reemplazará por tu promedio real"
+      : "Aparecerá después de registrar esta rutina";
   return badge;
 }
 
@@ -5282,7 +5288,7 @@ function createRoutineAbsRecordBadge(record) {
   badge.textContent = record.count > 0
     ? `Récord abs. ${record.count} · meta ${record.nextTarget}`
     : "Abs. · crea tu primera marca";
-  badge.title = "Este récord es único y se comparte entre las cuatro rutinas";
+  badge.title = "Este récord es único y se comparte entre las cinco rutinas";
   return badge;
 }
 
@@ -5740,6 +5746,12 @@ function renderRoutines() {
     objective.className = "routine-objective";
     objective.textContent = routine.objective;
     body.append(note, objective, createRoutineSessionHeader(routine, session));
+    if (routine.durationGuidance) {
+      const durationGuidance = document.createElement("p");
+      durationGuidance.className = "routine-note";
+      durationGuidance.textContent = routine.durationGuidance;
+      objective.insertAdjacentElement("afterend", durationGuidance);
+    }
     const isRoutineActive = session?.status === "active" && session.routineId === routine.id;
 
     const displayedExercises = routineExercisesForDate(routine, dateISO);

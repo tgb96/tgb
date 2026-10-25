@@ -1,7 +1,7 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
-import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=70";
+import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=71";
 import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=63";
-import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=1";
+import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=2";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
