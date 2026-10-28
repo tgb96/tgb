@@ -4,8 +4,15 @@ export function durationModeFor(category, cardioTypeId) {
 
 export function activityTiming(record) {
   const present = value => value !== "" && value !== null && value !== undefined && Number.isFinite(Number(value));
-  const seconds = present(record.durationSeconds) ? Number(record.durationSeconds)
+  const manualSeconds = present(record.durationSeconds) ? Number(record.durationSeconds)
     : present(record.durationMinutes) ? Number(record.durationMinutes) * 60 : null;
+  const wearableSeconds = present(record?.wearableSnapshot?.durationSeconds)
+    ? Number(record.wearableSnapshot.durationSeconds) : null;
+  const seconds = manualSeconds !== null && manualSeconds > 0
+    ? manualSeconds
+    : wearableSeconds !== null && wearableSeconds > 0
+      ? wearableSeconds
+      : manualSeconds;
   const durationSeconds = seconds === null ? null : Math.max(0, Math.round(seconds));
   const distanceKm = Number(record.distanceKm);
   const pace = record.category === "cardio" && record.cardioTypeId === "running" && distanceKm > 0 && durationSeconds > 0
@@ -18,6 +25,19 @@ export function activityTiming(record) {
     averagePaceSecondsPerKm: pace,
     averagePaceFormatted: pace === null ? null : `${Math.floor(pace / 60)}:${pad(pace % 60)} min/km`
   };
+}
+
+// Un entrenamiento aporta una sola cifra de gasto. Si la pulsera entregó
+// calorías activas usamos esa medición; de lo contrario conservamos la
+// estimación manual. Nunca se suman ambas ni se mezclan con nutrición.
+export function activityBurnedCalories(record) {
+  const wearable = Number(record?.wearableSnapshot?.activeCaloriesKcal);
+  if (record?.wearableSnapshot?.activeCaloriesKcal !== null
+    && record?.wearableSnapshot?.activeCaloriesKcal !== undefined
+    && Number.isFinite(wearable) && wearable >= 0) return wearable;
+  const manual = Number(record?.calories);
+  return record?.calories !== "" && record?.calories !== null && record?.calories !== undefined
+    && Number.isFinite(manual) && manual >= 0 ? manual : null;
 }
 
 // Valida ritmos citados en el texto antes de guardar la respuesta del modelo.

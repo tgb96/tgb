@@ -38,7 +38,7 @@ import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
-import { activityTiming, durationModeFor } from "./training-metrics.js?v=63";
+import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
 import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=3";
@@ -1479,7 +1479,7 @@ function monthlyCoachContext(startISO, endISO) {
     sessions: main.length,
     activeDays: new Set(main.filter(item => item.category !== "rest").map(item => item.dateISO)).size,
     minutes: Math.round(sum(main, item => activityTiming(item).durationSeconds) / 60),
-    trainingCaloriesKcal: Math.round(sum(main, item => item.calories)),
+    trainingCaloriesKcal: Math.round(sum(main, activityBurnedCalories)),
     physicalVolumeKg: Math.round(sum(main, item => item.routineVolumeKg)),
     tennisSessions: main.filter(item => item.category === "tennis").length,
     cardioSessions: main.filter(item => item.category === "cardio").length,
@@ -1503,7 +1503,7 @@ function monthlyCoachContext(startISO, endISO) {
     stats,
     activities: main.slice().reverse().slice(0, 80).map(item => ({
       dateISO: item.dateISO, title: recordTitle(item), category: item.category,
-      durationMinutes: Math.round(activityTiming(item).durationSeconds / 60), calories: item.calories,
+      durationMinutes: Math.round((activityTiming(item).durationSeconds || 0) / 60), calories: activityBurnedCalories(item),
       volumeKg: item.routineVolumeKg, abdominalCount: item.routineAbsCount,
       effort: item.routineEffort, pain: item.routinePain, sensations: item.sensations,
       wearable: item.wearableSnapshot ? wearableSummaryText(item.wearableSnapshot) : ""
@@ -3967,14 +3967,15 @@ function renderHeroEvolution(records) {
     ["weekMinutes", "weekMinutesDelta", current.minutes, previous.minutes, " min"],
     ["weekCalories", "weekCaloriesDelta", current.calories, previous.calories, " kcal"],
     ["weekActiveDays", "weekActiveDaysDelta", current.activeDays, previous.activeDays, ""],
-    ["weekVolumeKg", "weekVolumeDelta", current.volumeKg, previous.volumeKg, " kg"],
-    ["weekBestAbs", "weekBestAbsDelta", current.maxAbdominals, previous.maxAbdominals, ""]
+    ["weekVolumeKg", "weekVolumeDelta", current.volumeKg, previous.volumeKg, " kg"]
   ];
   values.forEach(([valueId, comparisonId, value, before, unit]) => {
-    $(valueId).textContent = valueId === "weekBestAbs" && !value ? "—" : `${Number(value).toLocaleString("es-CL")}${valueId === "weekVolumeKg" ? " kg" : ""}`;
-    $(comparisonId).textContent = valueId === "weekBestAbs" && !value
-      ? "Sin marca esta semana" : signedDifference(value, before, unit);
+    $(valueId).textContent = `${Number(value).toLocaleString("es-CL")}${valueId === "weekVolumeKg" ? " kg" : ""}`;
+    $(comparisonId).textContent = signedDifference(value, before, unit);
   });
+  const abdominalRecord = globalAbdominalRecord(records).count;
+  $("weekBestAbs").textContent = abdominalRecord ? abdominalRecord.toLocaleString("es-CL") : "—";
+  $("weekBestAbsDelta").textContent = "";
 }
 
 function routineSettingsSnapshot(routine, settings) {

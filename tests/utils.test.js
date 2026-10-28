@@ -265,6 +265,22 @@ test("calcula la evolución semanal y el progreso de cada ejercicio", () => {
   assert.match(comparison.text, /carga mayor/);
 });
 
+test("el resumen semanal incorpora las métricas vinculadas de la pulsera una sola vez", () => {
+  const physical = { ...physicalRecord, id: "linked-physical", dateISO: "2026-10-26",
+    durationMinutes: 31, durationSeconds: 1860, calories: "",
+    wearableSnapshot: { id: "band-physical", durationSeconds: 1900, activeCaloriesKcal: 220 } };
+  const tennis = { id: "linked-tennis", dateISO: "2026-10-27", category: "tennis",
+    durationMinutes: "", durationSeconds: "", calories: "",
+    wearableSnapshot: { id: "band-tennis", durationSeconds: 5400, activeCaloriesKcal: 610 } };
+  const manual = { ...physicalRecord, id: "manual-physical", dateISO: "2026-10-28",
+    durationMinutes: 40, durationSeconds: 2400, calories: 310 };
+  const nutritionOnly = { id: "meal", dateISO: "2026-10-28", category: "nutrition", calories: 2400 };
+  const week = weeklyEvolution([physical, tennis, manual, nutritionOnly], "2026-10-28", 1)[0];
+  assert.equal(week.sessions, 3);
+  assert.equal(week.minutes, 161);
+  assert.equal(week.calories, 1140);
+});
+
 test("detecta tres configuraciones idénticas sin aumento de volumen", () => {
   const attempts = ["2026-08-10", "2026-08-17", "2026-08-24"].map((dateISO, index) => ({
     ...physicalRecord,

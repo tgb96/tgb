@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { activityTiming, durationModeFor, validateAnalysisPaces } from "../assets/js/training-metrics.js";
+import { activityBurnedCalories, activityTiming, durationModeFor, validateAnalysisPaces } from "../assets/js/training-metrics.js";
 
 const run = { category: "cardio", cardioTypeId: "running", distanceKm: 5, durationSeconds: 1856, durationMinutes: 31 };
 
@@ -18,6 +18,15 @@ test("interpreta correctamente minutos antiguos, horas y datos ausentes", () => 
   assert.equal(activityTiming({ ...run, durationSeconds: 3601 }).durationHms, "01:00:01");
   assert.equal(activityTiming({ category: "rest" }).durationSeconds, null);
   assert.equal(activityTiming({ ...run, distanceKm: 0 }).averagePaceFormatted, null);
+});
+
+test("recupera duración y calorías quemadas desde la pulsera sin duplicarlas", () => {
+  const linked = { category: "tennis", durationSeconds: "", durationMinutes: "", calories: "",
+    wearableSnapshot: { durationSeconds: 5400, activeCaloriesKcal: 612 } };
+  assert.equal(activityTiming(linked).durationMinutes, 90);
+  assert.equal(activityBurnedCalories(linked), 612);
+  assert.equal(activityBurnedCalories({ ...linked, calories: 500 }), 612);
+  assert.equal(activityBurnedCalories({ ...linked, wearableSnapshot: null, calories: 500 }), 500);
 });
 
 test("solo el trote recupera los segundos entre las modalidades de cardio", () => {

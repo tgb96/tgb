@@ -9,6 +9,7 @@ import {
   TZ
 } from "./data.js?v=72";
 import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=70";
+import { activityBurnedCalories, activityTiming } from "./training-metrics.js?v=63";
 
 export function getChileParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat("es-CL", {
@@ -575,8 +576,8 @@ export function weeklyEvolution(records, dateISO = getChileDateISO(), count = 6)
       ...week,
       sessions: trainings.length,
       activeDays: new Set(trainings.map(record => record.dateISO)).size,
-      minutes: Math.round(trainings.reduce((sum, record) => sum + (Number(record.durationMinutes) || 0), 0)),
-      calories: Math.round(trainings.reduce((sum, record) => sum + (Number(record.calories) || 0), 0)),
+      minutes: Math.round(trainings.reduce((sum, record) => sum + (activityTiming(record).durationSeconds || 0), 0) / 60),
+      calories: Math.round(trainings.reduce((sum, record) => sum + (activityBurnedCalories(record) || 0), 0)),
       volumeKg: Math.round(trainings.reduce((sum, record) => sum + (Number(record.routineVolumeKg) || 0), 0)),
       maxAbdominals: Math.max(0, ...trainings.map(record => Number(record.routineAbsCount) || 0))
     };
