@@ -554,7 +554,7 @@ test("Gemini propone memoria aprobable y TGTrain registra suplementos diarios", 
   assert.match(app, /Guardar en memoria/);
   assert.match(app, /renderCoachFollowUp/);
   assert.match(nutrition, /5 g diarios/);
-  assert.match(nutrition, /Centrum Hombre/);
+  assert.match(nutrition, /name: "Centrum"/);
   assert.match(nutrition, /Omega-3/);
   assert.match(nutrition, /Minoxidil/);
   assert.match(nutrition, /Según indicación médica/);
@@ -618,7 +618,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=146/);
+  assert.match(html, /assets\/js\/app\.js\?v=147/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

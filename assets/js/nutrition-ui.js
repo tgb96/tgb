@@ -10,7 +10,7 @@ const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
 export const DAILY_INTAKE_ITEMS = [
   { id: "creatine", name: "Creatina", dose: "5 g diarios", type: "supplement" },
-  { id: "centrum-men", name: "Centrum Hombre", dose: "Dosis diaria indicada en el envase", type: "supplement" },
+  { id: "centrum-men", name: "Centrum", dose: "Dosis diaria indicada en el envase", type: "supplement" },
   { id: "omega-3", name: "Omega-3", dose: "Dosis diaria indicada en el envase", type: "supplement" },
   { id: "minoxidil", name: "Minoxidil", dose: "Según indicación médica", type: "medication" }
 ];
