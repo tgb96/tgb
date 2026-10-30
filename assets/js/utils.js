@@ -299,7 +299,7 @@ export function recordTitle(record) {
   return normalized.categoryName || "Entrenamiento";
 }
 
-export function recordDetails(record) {
+export function recordDetails(record, { durationFormat = "readable" } = {}) {
   const normalized = normalizeRecord(record);
   if (normalized.category === "rest") return normalized.restTypeId === "discomfort"
     ? `Molestia: ${normalized.restDetail || "Sin detalle"}`
@@ -316,9 +316,13 @@ export function recordDetails(record) {
     durationSeconds: timing.durationSeconds ?? "",
     durationMinutes: timing.durationMinutes ?? ""
   };
-  const displayedDuration = normalized.category === "cardio"
-    ? formatDuration({ ...displayRecord, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
-    : formatDuration(displayRecord);
+  const displayedDuration = durationFormat === "clock"
+    ? timing.durationSeconds === null
+      ? "—"
+      : `${String(Math.floor(timing.durationSeconds / 3600)).padStart(2, "0")}:${String(Math.floor(timing.durationSeconds % 3600 / 60)).padStart(2, "0")}`
+    : normalized.category === "cardio"
+      ? formatDuration({ ...displayRecord, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
+      : formatDuration(displayRecord);
   const burnedCalories = activityBurnedCalories(normalized);
   const details = [displayedDuration, `${burnedCalories === null ? "—" : Math.round(burnedCalories)} kcal`];
   if (normalized.activityStartTime) details.push(`inicio ${normalized.activityStartTime}`);

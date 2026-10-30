@@ -68,7 +68,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=76";
+} from "./utils.js?v=77";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -2413,7 +2413,7 @@ function renderHome() {
         const title = document.createElement("strong");
         title.textContent = isComplementaryActivity(record) ? `Complemento · ${recordTitle(record)}` : recordTitle(record);
         const details = document.createElement("small");
-        details.textContent = recordDetails(record);
+        details.textContent = recordDetails(record, { durationFormat: "clock" });
         text.append(title, details);
         copy.append(dot, text);
         const workflow = recordWorkflowState(record);

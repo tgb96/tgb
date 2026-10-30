@@ -412,7 +412,7 @@ test("muestra segundos en trote y mantiene HH:MM en el resto del cardio", () => 
 });
 
 test("Inicio completa tiempo y calorías del tenis desde la pulsera vinculada", () => {
-  const details = recordDetails({
+  const tennis = {
     id: "tennis-watch",
     dateISO: "2026-10-27",
     category: "tennis",
@@ -434,8 +434,9 @@ test("Inicio completa tiempo y calorías del tenis desde la pulsera vinculada", 
       durationSeconds: 5400,
       activeCaloriesKcal: 612
     }
-  });
-  assert.equal(details, "90 min · 612 kcal · Club Open Tenis · Arcilla");
+  };
+  assert.equal(recordDetails(tennis), "90 min · 612 kcal · Club Open Tenis · Arcilla");
+  assert.equal(recordDetails(tennis, { durationFormat: "clock" }), "01:30 · 612 kcal · Club Open Tenis · Arcilla");
 });
 
 test("formatea la distancia como marca de carrera legible", () => {
