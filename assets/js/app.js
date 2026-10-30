@@ -68,7 +68,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=75";
+} from "./utils.js?v=76";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);

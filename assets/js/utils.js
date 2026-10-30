@@ -306,10 +306,21 @@ export function recordDetails(record) {
     : normalized.restTypeId === "weather"
       ? normalized.restDetail || "Actividad suspendida por condiciones climáticas"
       : "Recuperación planificada";
+  // Inicio y Registro deben leer una sola fuente de métricas. Si el usuario
+  // dejó tiempo o calorías pendientes al registrar, completamos la tarjeta
+  // con la sesión vinculada de la pulsera. La cifra wearable reemplaza a la
+  // manual para mostrar el gasto: nunca se suman ambas.
+  const timing = activityTiming(normalized);
+  const displayRecord = {
+    ...normalized,
+    durationSeconds: timing.durationSeconds ?? "",
+    durationMinutes: timing.durationMinutes ?? ""
+  };
   const displayedDuration = normalized.category === "cardio"
-    ? formatDuration({ ...normalized, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
-    : formatDuration(normalized);
-  const details = [displayedDuration, `${normalized.calories === "" ? "—" : normalized.calories} kcal`];
+    ? formatDuration({ ...displayRecord, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
+    : formatDuration(displayRecord);
+  const burnedCalories = activityBurnedCalories(normalized);
+  const details = [displayedDuration, `${burnedCalories === null ? "—" : Math.round(burnedCalories)} kcal`];
   if (normalized.activityStartTime) details.push(`inicio ${normalized.activityStartTime}`);
   if (normalized.category === "warmup" || normalized.category === "stretching") {
     const done = normalized.guidedSteps.filter(step => step.status === "done").length;

@@ -411,6 +411,33 @@ test("muestra segundos en trote y mantiene HH:MM en el resto del cardio", () => 
   assert.equal(recordDetails({ ...physicalRecord, category: "cardio", cardioTypeId: "padel", routineId: "", routineName: "", durationMinutes: 36 + 38 / 60, durationSeconds: 2198, durationPrecision: "hms" }), "36 min · 420 kcal");
 });
 
+test("Inicio completa tiempo y calorías del tenis desde la pulsera vinculada", () => {
+  const details = recordDetails({
+    id: "tennis-watch",
+    dateISO: "2026-10-27",
+    category: "tennis",
+    categoryName: "Tenis",
+    tennisTypeId: "group-training",
+    tennisTypeName: "Entrenamiento grupal",
+    location: "Club Open Tenis",
+    surface: "Arcilla",
+    durationMinutes: "",
+    durationSeconds: "",
+    calories: "",
+    metricsPending: true,
+    wearableSessionId: "watch-tennis-1",
+    wearableSnapshot: {
+      id: "watch-tennis-1",
+      title: "Tenis",
+      startTime: "2026-10-27T20:30:00-03:00",
+      endTime: "2026-10-27T22:00:00-03:00",
+      durationSeconds: 5400,
+      activeCaloriesKcal: 612
+    }
+  });
+  assert.equal(details, "90 min · 612 kcal · Club Open Tenis · Arcilla");
+});
+
 test("formatea la distancia como marca de carrera legible", () => {
   assert.equal(formatDistance(5), "5K");
   assert.equal(formatDistance(10), "10K");
