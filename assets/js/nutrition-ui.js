@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=105";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, nutritionSlotFamily, summarizeParts } from "./nutrition-presets.js?v=106";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=75";
 
@@ -265,7 +265,12 @@ export function createNutritionUI(repository, {
     const seen = new Set();
     const recent = repository.listNutritionEntries()
       .filter(entry => !entry.deleted && entry.kind === "meal" && entry.id !== editingId)
-      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+      .sort((a, b) => {
+        const affinity = entry => entry.slotId === selectedSlot ? 2
+          : nutritionSlotFamily(entry.slotId) === nutritionSlotFamily(selectedSlot) ? 1 : 0;
+        return affinity(b) - affinity(a)
+          || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
+      })
       .filter(entry => {
         const key = `${summarizeParts(entry.parts || {})}|${entry.note || entry.text || ""}`.toLowerCase();
         if (!key.replace("|", "") || seen.has(key)) return false;
@@ -412,17 +417,28 @@ export function createNutritionUI(repository, {
     if (count) selectedParts[id] = count;
     else delete selectedParts[id];
     renderSelectedParts();
+    renderIngredientChoices();
   }
 
   function renderIngredientChoices() {
     const list = byId("nutritionIngredientChoices"); list.replaceChildren();
-    const foods = foodsForSlot(selectedSlot, byId("nutritionIngredientSearch").value);
+    const foods = foodsForSlot(selectedSlot, byId("nutritionIngredientSearch").value, {
+      history: repository.listNutritionEntries().filter(entry => entry.id !== editingId),
+      selectedParts,
+      referenceDate: selectedDate
+    });
     if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
       const name = document.createElement("strong"); name.textContent = item.name;
       const detail = document.createElement("small"); detail.textContent = `${item.portion} · ${item.source === "label" ? "" : "≈ "}${item.kcal} kcal`;
       button.append(name, detail);
+      if (item.suggestion) {
+        const suggestion = document.createElement("span");
+        suggestion.className = "nutrition-food-suggestion";
+        suggestion.textContent = item.suggestion;
+        button.append(suggestion);
+      }
       button.addEventListener("click", () => changePart(item.id, 1));
       list.append(button);
     }

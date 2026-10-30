@@ -1084,6 +1084,7 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
 .nutrition-ingredient-choices strong, .nutrition-ingredient-choices small { display: block; }
 .nutrition-ingredient-choices strong { font-size: 11px; line-height: 1.3; }
 .nutrition-ingredient-choices small { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.25; }
+.nutrition-food-suggestion { display: inline-block; margin-top: 6px; padding: 3px 6px; border-radius: 999px; background: #e3f6b2; color: #344715; font-size: 9px; font-weight: 900; line-height: 1.2; }
 .nutrition-selected-title { margin: 15px 0 7px; font-size: 13px; font-weight: 900; }
 .nutrition-selected-ingredients { display: grid; gap: 6px; }
 .nutrition-selected-ingredients > span { color: var(--muted); font-size: 12px; }

@@ -145,6 +145,24 @@ test("cada alimento admite cantidades en medias porciones", () => {
   assert.deepEqual(entry.parts, { rice: 0.5, beef: 1.5, chicken: 2 });
 });
 
+test("el selector aprende frecuencia, recencia y combinaciones por tipo de comida", () => {
+  const history = [
+    { id: "b1", kind: "meal", slotId: "breakfast", dateISO: "2026-10-28", parts: { hamSlice: 1, integralBread: 2 } },
+    { id: "b2", kind: "meal", slotId: "breakfast", dateISO: "2026-10-29", parts: { hamSlice: 1, egg: 2 } },
+    { id: "b3", kind: "meal", slotId: "breakfast", dateISO: "2026-10-30", parts: { hamSlice: 1, cheeseSlice: 1 } },
+    { id: "l1", kind: "meal", slotId: "lunch", dateISO: "2026-10-29", parts: { chicken: 1, rice: 1 } },
+    { id: "l2", kind: "meal", slotId: "lunch", dateISO: "2026-10-30", parts: { chicken: 1, rice: 1 } },
+    { id: "s1", kind: "meal", slotId: "pre", dateISO: "2026-10-30", parts: { cerealBar: 1 } }
+  ];
+  const breakfastFoods = foodsForSlot("breakfast", "", { history, referenceDate: "2026-10-30" });
+  assert.equal(breakfastFoods[0].id, "hamSlice");
+  assert.match(breakfastFoods[0].suggestion, /Frecuente/);
+  const lunchFoods = foodsForSlot("lunch", "", { history, selectedParts: { rice: 1 }, referenceDate: "2026-10-30" });
+  assert.equal(lunchFoods[0].id, "chicken");
+  assert.match(lunchFoods[0].suggestion, /acompañar/);
+  assert.equal(foodsForSlot("snack", "", { history, referenceDate: "2026-10-30" })[0].id, "cerealBar");
+});
+
 test("una comida ya guardada recibe la estimación visible sin modificar el registro original", () => {
   const entry = Object.values(normalizeNutritionEntries([{
     id: "existing", dateISO: "2026-09-24", kind: "meal", text: "Desayuno", parts: {

@@ -101,12 +101,67 @@ const breakfast = ["integralBread", "semiIntegralArtisanBread", "whiteBread", "e
 const snack = ["yogurtPlain", "yogurtProtein", "applePortion", "bananaPortion", "mandarin", "integralBread", "semiIntegralArtisanBread", "whiteBread", "hamSlice", "cheeseSlice", "avocado", "premiumSausage", "granola", "nuts", "cerealBar", "proteinDrink"];
 const main = ["rice", "chicken", "beef", "pasta", "potato", "fish", "pork", "premiumSausage", "tomatoSauce", "bolognese", "vegetables", "tomato", "mandarin", "egg", "integralBread", "semiIntegralArtisanBread"];
 
-export function foodsForSlot(slotId, query = "") {
-  const preferred = slotId === "breakfast" ? breakfast : ["morning", "pre", "snack", "during"].includes(slotId) ? snack : main;
+export function nutritionSlotFamily(slotId) {
+  if (slotId === "breakfast") return "breakfast";
+  if (["morning", "pre", "snack", "during"].includes(slotId)) return "snack";
+  if (["lunch", "dinner", "post"].includes(slotId)) return "main";
+  return "other";
+}
+
+const slotName = slotId => ({
+  breakfast: "el desayuno", morning: "la merienda de mañana", lunch: "el almuerzo",
+  pre: "la merienda", snack: "la merienda", during: "la actividad",
+  dinner: "la cena", post: "la cena post-tenis", other: "tus comidas"
+})[slotId] || "tus comidas";
+
+const daysBetween = (referenceDate, dateISO) => {
+  const reference = Date.parse(`${referenceDate}T00:00:00Z`);
+  const date = Date.parse(`${dateISO}T00:00:00Z`);
+  return Number.isFinite(reference) && Number.isFinite(date) ? Math.max(0, Math.floor((reference - date) / 86400000)) : 999;
+};
+
+export function foodsForSlot(slotId, query = "", { history = [], selectedParts = {}, referenceDate = "" } = {}) {
+  const family = nutritionSlotFamily(slotId);
+  const preferred = family === "breakfast" ? breakfast : family === "snack" ? snack : main;
   const search = String(query).trim().toLocaleLowerCase("es-CL");
-  const ids = search ? Object.keys(foodCatalog) : [...preferred, ...customFoodIds];
+  const selectedIds = Object.keys(selectedParts || {}).filter(id => Number(selectedParts[id]) > 0);
+  const scores = new Map();
+  const stats = new Map();
+  const learnedIds = [];
+  const meals = (Array.isArray(history) ? history : []).filter(entry => !entry?.deleted && entry?.kind === "meal" && entry?.parts);
+  for (const entry of meals) {
+    const exactSlot = entry.slotId === slotId;
+    const sameFamily = nutritionSlotFamily(entry.slotId) === family;
+    if (!exactSlot && !sameFamily) continue;
+    const relation = exactSlot ? 8 : 3;
+    const age = daysBetween(referenceDate, entry.dateISO);
+    const recency = age <= 7 ? 1.8 : age <= 30 ? 1.4 : age <= 90 ? 1.1 : 0.8;
+    const entryIds = Object.keys(entry.parts).filter(id => Number(entry.parts[id]) > 0 && isSelectableFood(id));
+    for (const id of entryIds) {
+      if (!learnedIds.includes(id)) learnedIds.push(id);
+      const paired = selectedIds.some(selectedId => selectedId !== id && entryIds.includes(selectedId));
+      scores.set(id, (scores.get(id) || 0) + relation * recency + (paired ? relation * 2.5 : 0));
+      const current = stats.get(id) || { exact: 0, family: 0, paired: 0, recent: false };
+      current[exactSlot ? "exact" : "family"] += 1;
+      if (paired) current.paired += 1;
+      if (age <= 14) current.recent = true;
+      stats.set(id, current);
+    }
+  }
+  const ids = search ? Object.keys(foodCatalog) : [...new Set([...learnedIds, ...preferred, ...customFoodIds])];
+  const defaultOrder = new Map([...preferred, ...customFoodIds].map((id, index) => [id, index]));
   return ids.filter(id => isSelectableFood(id) && (!search || `${foodCatalog[id].name} ${foodCatalog[id].portion}`.toLocaleLowerCase("es-CL").includes(search)))
-    .map(id => ({ id, ...foodCatalog[id] }));
+    .sort((a, b) => (scores.get(b) || 0) - (scores.get(a) || 0)
+      || (defaultOrder.get(a) ?? 9999) - (defaultOrder.get(b) ?? 9999)
+      || foodCatalog[a].name.localeCompare(foodCatalog[b].name, "es"))
+    .map(id => {
+      const learned = stats.get(id);
+      const suggestion = learned?.paired ? "Suele acompañar tu selección"
+        : learned?.exact >= 2 ? `Frecuente en ${slotName(slotId)}`
+          : learned?.family >= 2 ? "Frecuente en comidas similares"
+            : learned?.recent ? "Elegido recientemente" : "";
+      return { id, ...foodCatalog[id], suggestion };
+    });
 }
 
 export function describeParts(parts) {
