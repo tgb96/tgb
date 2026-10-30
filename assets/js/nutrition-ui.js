@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=100";
 import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, nutritionSlotFamily, summarizeParts } from "./nutrition-presets.js?v=106";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=75";
@@ -8,11 +8,27 @@ const newId = () => `nutrition-${crypto.randomUUID?.() || `${Date.now()}-${Math.
 const localTime = () => new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
 const numberValue = id => byId(id).value === "" ? null : Number(byId(id).value);
 const label = text => { const element = document.createElement("span"); element.textContent = text; return element; };
-const DAILY_SUPPLEMENTS = [
-  { id: "creatine", name: "Creatina", dose: "5 g diarios" },
-  { id: "centrum-men", name: "Centrum Hombre", dose: "Dosis diaria indicada en el envase" },
-  { id: "omega-3", name: "Omega-3", dose: "Dosis diaria indicada en el envase" }
+export const DAILY_INTAKE_ITEMS = [
+  { id: "creatine", name: "Creatina", dose: "5 g diarios", type: "supplement" },
+  { id: "centrum-men", name: "Centrum Hombre", dose: "Dosis diaria indicada en el envase", type: "supplement" },
+  { id: "omega-3", name: "Omega-3", dose: "Dosis diaria indicada en el envase", type: "supplement" },
+  { id: "minoxidil", name: "Minoxidil", dose: "Según indicación médica", type: "medication" }
 ];
+
+export function dailyIntakeRecord(dateISO, item, previous, { now = new Date().toISOString(), time = "" } = {}) {
+  return {
+    id: `supplement-${dateISO}-${item.id}`,
+    dateISO,
+    kind: "supplement",
+    supplementId: item.id,
+    supplementName: item.name,
+    doseLabel: item.dose,
+    time: previous && !previous.deleted ? previous.time : time,
+    deleted: Boolean(previous && !previous.deleted),
+    createdAt: previous?.createdAt || now,
+    updatedAt: now
+  };
+}
 
 export function createNutritionUI(repository, {
   showToast = () => {},
@@ -515,18 +531,7 @@ export function createNutritionUI(repository, {
     const id = `supplement-${selectedDate}-${supplement.id}`;
     const previous = repository.getNutritionEntry(id);
     const now = new Date().toISOString();
-    repository.saveNutritionEntry({
-      id,
-      dateISO: selectedDate,
-      kind: "supplement",
-      supplementId: supplement.id,
-      supplementName: supplement.name,
-      doseLabel: supplement.dose,
-      time: previous && !previous.deleted ? previous.time : localTime(),
-      deleted: Boolean(previous && !previous.deleted),
-      createdAt: previous?.createdAt || now,
-      updatedAt: now
-    });
+    repository.saveNutritionEntry(dailyIntakeRecord(selectedDate, supplement, previous, { now, time: localTime() }));
     render();
     showToast(previous && !previous.deleted ? `${supplement.name} quedó sin marcar.` : `${supplement.name} registrada para el día seleccionado.`);
   }
@@ -767,17 +772,17 @@ export function createNutritionUI(repository, {
     const supplementTracker = byId("nutritionSupplements");
     supplementTracker.replaceChildren();
     const supplementTitle = document.createElement("strong");
-    supplementTitle.textContent = "Suplementos de este día";
+    supplementTitle.textContent = "Rutina diaria";
     const supplementHelp = document.createElement("small");
-    supplementHelp.textContent = "Márcalos después de tomarlos. No modifican las kcal ni los macronutrientes registrados.";
+    supplementHelp.textContent = "Marca creatina, vitaminas y medicamento después de tomarlos. Minoxidil: según indicación médica. No modifican las kcal ni los macronutrientes.";
     const supplementOptions = document.createElement("div");
     supplementOptions.className = "nutrition-supplement-options";
     const takenSupplements = new Set(allEntries.filter(entry => entry.kind === "supplement").map(entry => entry.supplementId));
-    DAILY_SUPPLEMENTS.forEach(supplement => {
+    DAILY_INTAKE_ITEMS.forEach(supplement => {
       const taken = takenSupplements.has(supplement.id);
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `nutrition-supplement-button${taken ? " taken" : ""}`;
+      button.className = `nutrition-supplement-button${taken ? " taken" : ""}${supplement.type === "medication" ? " medication" : ""}`;
       button.setAttribute("aria-pressed", String(taken));
       const check = document.createElement("span"); check.textContent = "✓";
       const copy = document.createElement("div");

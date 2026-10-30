@@ -98,6 +98,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hero-planned-activity small { display: block; margin-top: 5px; color: rgba(255,255,255,.7); font-size: 11px; line-height: 1.4; }
 .hero-planned-activity button { width: 100%; min-height: 48px; padding: 10px 14px; border: 0; border-radius: 13px; background: var(--lime); color: var(--night); font-size: 13px; font-weight: 900; }
 .hero-planned-activity button:hover { background: #d9ff8d; }
+.home-intake-card { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 24px rgba(17,21,34,.06); }
+.home-intake-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.home-intake-heading .eyebrow { margin: 0 0 2px; }
+.home-intake-heading strong { display: block; font-size: 13px; }
+.home-intake-heading > span { flex: 0 0 auto; padding: 5px 8px; border-radius: 999px; background: #eef2ff; color: var(--blue-dark); font-size: 10px; font-weight: 900; }
+.home-intake-heading > span.complete { background: #e7f9bd; color: #2f4210; }
+.home-intake-buttons { display: flex; gap: 6px; margin-top: 9px; overflow-x: auto; scrollbar-width: none; }
+.home-intake-buttons::-webkit-scrollbar { display: none; }
+.home-intake-button { flex: 0 0 auto; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font-size: 10px; font-weight: 850; white-space: nowrap; }
+.home-intake-button.taken { border-color: #bde65b; background: #e7f9bd; color: #2f4210; }
+.home-intake-button.medication:not(.taken) { border-color: #cdd7ff; background: #f3f5ff; color: var(--blue-dark); }
 
 .wearable-card { margin-top: 18px; padding: 19px; border: 1px solid var(--line); border-radius: 25px; background: var(--surface); box-shadow: 0 10px 25px rgba(17, 21, 34, .06); }
 .wearable-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }

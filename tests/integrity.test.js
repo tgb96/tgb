@@ -75,6 +75,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.doesNotMatch(html, /id="openCoachProfileButton"|id="coachProfileDialog"|id="coachProfileText"/);
   assert.match(html, /id="homeCoachFeedback"/);
   assert.match(html, /id="homeDailyBrief"/);
+  assert.match(html, /id="homeDailyIntakeButtons"/);
   assert.match(html, /Ajuste recomendado/);
   assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
@@ -555,6 +556,8 @@ test("Gemini propone memoria aprobable y TGTrain registra suplementos diarios", 
   assert.match(nutrition, /5 g diarios/);
   assert.match(nutrition, /Centrum Hombre/);
   assert.match(nutrition, /Omega-3/);
+  assert.match(nutrition, /Minoxidil/);
+  assert.match(nutrition, /Según indicación médica/);
   assert.match(html, /nutritionSupplements/);
   assert.match(html, /coachAutoSpeak/);
 });
@@ -615,7 +618,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=145/);
+  assert.match(html, /assets\/js\/app\.js\?v=146/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

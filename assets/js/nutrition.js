@@ -148,7 +148,7 @@ export function nutritionPlanForDate(dateISO, mode = "default") {
 export function normalizeNutritionEntries(value) {
   const entries = Array.isArray(value) ? value : Object.values(value || {});
   const insightKinds = ["nutrition-analysis", "monthly-summary", "daily-coach", "weekly-review"];
-  const supplementIds = ["creatine", "centrum-men", "omega-3"];
+  const supplementIds = ["creatine", "centrum-men", "omega-3", "minoxidil"];
   return Object.fromEntries(entries.flatMap(item => {
     const id = String(item?.id || "").slice(0, 120);
     const dateISO = String(item?.dateISO || "");

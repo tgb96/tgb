@@ -26,10 +26,10 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=117";
+import { createRepository } from "./storage.js?v=118";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI } from "./nutrition-ui.js?v=120";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=99";
+import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=121";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=100";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
 import { createGuidedUI } from "./guided-ui.js?v=101";
 import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=113";
@@ -2270,6 +2270,40 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
       : brief.hasTodayActivity ? "Ver actividad de hoy" : "Registrar lo que hice";
 }
 
+function toggleHomeDailyIntake(item, dateISO) {
+  const id = `supplement-${dateISO}-${item.id}`;
+  const previous = repository.getNutritionEntry(id);
+  const now = new Date().toISOString();
+  const time = new Intl.DateTimeFormat("es-CL", { timeZone: "America/Santiago", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  repository.saveNutritionEntry(dailyIntakeRecord(dateISO, item, previous, { now, time }));
+  renderHome();
+  nutritionUI.render();
+  showToast(previous && !previous.deleted ? `${item.name} quedó pendiente.` : `${item.name} marcado como tomado.`);
+}
+
+function renderHomeDailyIntake(dateISO) {
+  const taken = new Set(repository.listNutritionEntries(dateISO)
+    .filter(entry => !entry.deleted && entry.kind === "supplement")
+    .map(entry => entry.supplementId));
+  const status = $("homeDailyIntakeStatus");
+  status.textContent = `${taken.size}/${DAILY_INTAKE_ITEMS.length} tomados`;
+  status.classList.toggle("complete", taken.size === DAILY_INTAKE_ITEMS.length);
+  const container = $("homeDailyIntakeButtons");
+  container.replaceChildren();
+  DAILY_INTAKE_ITEMS.forEach(item => {
+    const isTaken = taken.has(item.id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `home-intake-button${isTaken ? " taken" : ""}${item.type === "medication" ? " medication" : ""}`;
+    button.setAttribute("aria-pressed", String(isTaken));
+    button.setAttribute("aria-label", `${isTaken ? "Marcar pendiente" : "Marcar tomado"}: ${item.name}`);
+    button.title = item.dose;
+    button.textContent = `${isTaken ? "✓" : "○"} ${item.name}`;
+    button.addEventListener("click", () => toggleHomeDailyIntake(item, dateISO));
+    container.append(button);
+  });
+}
+
 function renderHome() {
   const todayISO = getChileDateISO();
   const block = activeTrainingBlock();
@@ -2295,6 +2329,7 @@ function renderHome() {
   $("heroWeekTheme").textContent = "";
   $("heroWeekTheme").classList.add("hidden");
   renderHeroEvolution(allRecords);
+  renderHomeDailyIntake(todayISO);
   const plannedPanel = $("heroPlannedActivity");
   const plannedInProgress = Boolean(todayPlan && activePlanned?.session.id === todayPlan.id);
   const showPlannedPanel = Boolean(todayPlan && (plannedInProgress || !todayMainRecords.length));

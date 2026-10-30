@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=117">
+  <link rel="stylesheet" href="assets/css/styles.css?v=118">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -55,6 +55,14 @@
           <button id="startPlannedActivityButton" type="button">Iniciar actividad programada</button>
         </div>
       </div>
+
+      <section class="home-intake-card" aria-labelledby="homeDailyIntakeTitle">
+        <div class="home-intake-heading">
+          <div><p class="eyebrow dark">Rutina diaria</p><strong id="homeDailyIntakeTitle">Lo que debes tomar hoy</strong></div>
+          <span id="homeDailyIntakeStatus">0/4 tomados</span>
+        </div>
+        <div id="homeDailyIntakeButtons" class="home-intake-buttons" aria-label="Recordatorios diarios"></div>
+      </section>
 
       <section id="homeDailyBrief" class="daily-brief-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
         <div class="daily-brief-heading">
@@ -605,6 +613,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=145"></script>
+<script type="module" src="assets/js/app.js?v=146"></script>
 </body>
 </html>
