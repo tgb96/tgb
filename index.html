@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=120">
+  <link rel="stylesheet" href="assets/css/styles.css?v=121">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -72,32 +72,33 @@
       <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
       <div id="wearableSessions" class="wearable-sessions" aria-label="Entrenamientos de la pulsera pendientes de vincular"></div>
 
-      <section id="homeDailyBrief" class="daily-brief-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
+      <section id="homeDailyBrief" class="daily-brief-card coach-overview-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
         <div class="daily-brief-heading">
-          <div><p class="eyebrow dark">Ajuste recomendado</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
+          <div><p class="eyebrow dark">Tu entrenador · hoy</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
           <span id="dailyBriefStatus" class="daily-brief-status neutral">Contexto parcial</span>
         </div>
         <p id="dailyBriefSummary"></p>
         <ul id="dailyBriefSignals"></ul>
         <small id="dailyBriefAiMeta" class="daily-brief-ai-meta"></small>
+        <div class="coach-latest-feedback">
+          <div class="coach-latest-feedback-heading">
+            <strong>Comentario del entrenamiento</strong>
+            <small>Se muestra el de hoy; si aún no entrenaste, el último disponible.</small>
+          </div>
+          <div id="homeCoachFeedback" aria-live="polite"></div>
+        </div>
         <div class="daily-brief-actions">
           <button id="dailyBriefAction" type="button">Continuar mi día</button>
-          <button id="dailyBriefAiAction" class="secondary" type="button"><span aria-hidden="true">✦</span> Actualizar con Gemini</button>
+          <button id="dailyBriefAiAction" class="secondary" type="button"><span aria-hidden="true">✦</span> Revisar el día con Gemini</button>
+          <button id="coachWeekReviewButton" class="secondary coach-week-review-button" type="button"><span aria-hidden="true">✦</span> Revisar y adaptar los próximos 7 días</button>
         </div>
+        <small class="coach-review-help"><b>Revisar el día</b> actualiza tu estado y recomendación de hoy. <b>Próximos 7 días</b> evalúa la planificación y solo propone cambios concretos cuando corresponden.</small>
+        <p id="coachWeekReviewStatus" class="coach-question-status" role="status"></p>
       </section>
 
-      <div class="section-title-row coach-home-title">
-        <div>
-          <p class="eyebrow dark">Entrenamiento · nutrición · recuperación</p>
-          <h2>Tu entrenador</h2>
-        </div>
-      </div>
-      <div id="homeCoachFeedback" aria-live="polite"></div>
       <section class="coach-ask-card" aria-labelledby="coachAskTitle">
-        <p class="eyebrow dark">Tu entrenador IA</p>
+        <p class="eyebrow dark">Conversación</p>
         <h2 id="coachAskTitle">Habla con TGTrain</h2>
-        <button id="coachWeekReviewButton" class="coach-week-review-button" type="button"><span aria-hidden="true">✦</span> Revisar y adaptar los próximos 7 días</button>
-        <p id="coachWeekReviewStatus" class="coach-question-status" role="status"></p>
         <div id="coachFollowUp" class="coach-follow-up hidden"></div>
         <div id="coachQuestionHistory" class="coach-question-history" role="log" aria-label="Conversación reciente con TGTrain"></div>
         <button id="coachHistoryToggle" class="coach-history-toggle hidden" type="button"></button>
@@ -597,6 +598,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=149"></script>
+<script type="module" src="assets/js/app.js?v=150"></script>
 </body>
 </html>

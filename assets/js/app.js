@@ -157,6 +157,7 @@ let coachQuestionDraftSource = "text";
 let dailyCoachInFlight = false;
 let weeklyCoachInFlight = false;
 let automaticCoachChecksQueued = false;
+let dailyCoachRefreshTimer = null;
 
 const ROUTINE_PROGRESS_KEY = "tgb-routine-progress-v1";
 const ROUTINE_SETTINGS_KEY = "tgb-routine-settings-v1";
@@ -1880,8 +1881,17 @@ async function requestDailyCoachInsight({ interactive = true, force = true } = {
   } finally {
     dailyCoachInFlight = false;
     button.disabled = false;
-    button.innerHTML = '<span aria-hidden="true">✦</span> Actualizar con Gemini';
+    button.innerHTML = '<span aria-hidden="true">✦</span> Revisar el día con Gemini';
   }
+}
+
+function queueDailyCoachRefresh() {
+  if (!cloudSync.currentUser || dailyCoachInFlight || aiAnalysisInFlight.size) return;
+  if (dailyCoachRefreshTimer) clearTimeout(dailyCoachRefreshTimer);
+  dailyCoachRefreshTimer = setTimeout(() => {
+    dailyCoachRefreshTimer = null;
+    requestDailyCoachInsight({ interactive: false, force: false });
+  }, 600);
 }
 
 function validWeeklyAdjustments(adjustments, context) {
@@ -2221,7 +2231,12 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
     nutritionEntries: repository.listNutritionEntries(),
     recoveryContexts: recoveryContextsFromQuestions(repository.listCoachQuestions())
   });
-  const aiInsight = repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  const storedAiInsight = repository.getNutritionEntry(`daily-coach-${todayISO}`);
+  const storedSourceTime = Date.parse(storedAiInsight?.sourceUpdatedAt || "");
+  const currentSourceTime = Date.parse(dailyCoachSourceUpdatedAt({ todayISO }));
+  const aiInsightIsFresh = Boolean(storedAiInsight && Number.isFinite(storedSourceTime) && storedSourceTime >= currentSourceTime);
+  const aiInsight = aiInsightIsFresh ? storedAiInsight : null;
+  if (storedAiInsight && !aiInsightIsFresh) queueDailyCoachRefresh();
   const recommendedRoutine = physicalRoutineById(aiInsight?.stats?.recommendedRoutineId);
   const decision = aiInsight?.stats?.decision || "";
   const decisionView = {
@@ -2254,7 +2269,9 @@ function renderDailyBriefing(todayISO, todayPlan, records) {
   const aiGeneratedAt = new Date(aiInsight?.generatedAt || aiInsight?.updatedAt || "");
   $("dailyBriefAiMeta").textContent = aiInsight
     ? `Revisado por Gemini ${Number.isFinite(aiGeneratedAt.getTime()) ? aiGeneratedAt.toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "recientemente"} · incluye datos considerados y faltantes en Historial.`
-    : "Evaluación local provisional. Gemini la completará al sincronizar tu cuenta o cuando pulses Actualizar.";
+    : storedAiInsight
+      ? "Hay datos nuevos. Esta vista ya usa el contexto actualizado y Gemini está renovando el análisis en segundo plano."
+      : "Evaluación local provisional. Gemini la completará al sincronizar tu cuenta o cuando pulses Revisar el día.";
   $("dailyBriefAiAction").disabled = dailyCoachInFlight;
   const active = loadRoutineSession()?.status === "active" || guidedUI.hasPending() || Boolean(plannedActivityContext(loadPlannedActivity()));
   const button = $("dailyBriefAction");
@@ -2304,6 +2321,61 @@ function renderHomeDailyIntake(dateISO) {
   });
 }
 
+function createHomeCoachSnapshot(record, todayISO) {
+  if (!record.routineAiAnalysis) {
+    if (!aiAnalysisInFlight.has(record.id) && record.metricsPending && !record.wearableSessionId) {
+      const pending = document.createElement("article");
+      pending.className = "home-coach-snapshot";
+      const date = document.createElement("small");
+      date.textContent = `${formatShortDate(record.dateISO)} · ${recordTitle(record)}`;
+      const title = document.createElement("strong");
+      title.textContent = "Esperando las métricas de la pulsera";
+      const copy = document.createElement("p");
+      copy.textContent = "Al vincular la sesión, el entrenador evaluará automáticamente este entrenamiento con la duración, las calorías y los demás datos disponibles.";
+      pending.append(date, title, copy);
+      return pending;
+    }
+    return createRoutineAiCard(record, { compact: true });
+  }
+  const analysis = record.routineAiAnalysis;
+  const article = document.createElement("article");
+  article.className = "home-coach-snapshot";
+  const meta = document.createElement("small");
+  meta.textContent = `${record.dateISO === todayISO ? "Comentario de hoy" : "Último comentario"} · ${formatShortDate(record.dateISO)} · ${recordTitle(record)}`;
+  const title = document.createElement("strong");
+  title.textContent = analysis.headline || "Lectura de tu entrenamiento";
+  const summary = document.createElement("p");
+  summary.textContent = analysis.summary || "El análisis completo está guardado en tu historial.";
+  article.append(meta, title, summary);
+  if (analysis.decision) {
+    const labels = { progress: "Progresar", maintain: "Mantener", reduce: "Reducir carga", recover: "Priorizar recuperación" };
+    const decision = document.createElement("span");
+    decision.className = `routine-ai-decision ${analysis.decision}`;
+    decision.textContent = labels[analysis.decision] || analysis.decision;
+    article.append(decision);
+  }
+  const proposedChanges = actionableRoutineAiChanges(analysis);
+  if (proposedChanges.length) {
+    const changes = document.createElement("p");
+    changes.textContent = `${proposedChanges.length} ${proposedChanges.length === 1 ? "cambio concreto espera" : "cambios concretos esperan"} tu revisión en el historial.`;
+    article.append(changes);
+  }
+  const actions = document.createElement("div");
+  actions.className = "home-coach-snapshot-actions";
+  const history = document.createElement("button");
+  history.type = "button";
+  history.textContent = "Ver análisis completo";
+  history.addEventListener("click", () => showView("history"));
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.disabled = aiAnalysisInFlight.has(record.id);
+  refresh.textContent = refresh.disabled ? "Actualizando…" : "Actualizar comentario";
+  refresh.addEventListener("click", () => requestRoutineAiAnalysis(record.id));
+  actions.append(history, refresh);
+  article.append(actions);
+  return article;
+}
+
 function renderHome() {
   const todayISO = getChileDateISO();
   const block = activeTrainingBlock();
@@ -2336,27 +2408,21 @@ function renderHome() {
   $("weekProgressSummary").textContent = weekSummary.join(" · ");
   const feedback = $("homeCoachFeedback");
   feedback.replaceChildren();
+  const todayCoachRecord = todayRecords
+    .filter(record => isMainDayRecord(record) && record.category !== "rest")
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))[0];
   const lastAnalyzed = allRecords
     .filter(record => record.routineAiAnalysis)
-    .sort((a, b) => String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
-      .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
-  if (lastAnalyzed) {
-    const disclosure = document.createElement("details");
-    disclosure.className = "home-coach-disclosure";
-    const summary = document.createElement("summary");
-    const summaryCopy = document.createElement("span");
-    const date = document.createElement("small");
-    date.textContent = `${formatShortDate(lastAnalyzed.dateISO)} · ${recordTitle(lastAnalyzed)}`;
-    const headline = document.createElement("strong");
-    headline.textContent = lastAnalyzed.routineAiAnalysis.headline || "Último comentario del entrenador";
-    summaryCopy.append(date, headline);
-    summary.append(summaryCopy, document.createElement("span"));
-    disclosure.append(summary, createRoutineAiCard(lastAnalyzed));
-    feedback.append(disclosure);
+    .sort((a, b) => String(b.dateISO).localeCompare(String(a.dateISO))
+      || String(b.routineAiAnalysis.generatedAt || b.updatedAt || b.createdAt || "")
+        .localeCompare(String(a.routineAiAnalysis.generatedAt || a.updatedAt || a.createdAt || "")))[0];
+  const feedbackRecord = todayCoachRecord || lastAnalyzed;
+  if (feedbackRecord) {
+    feedback.append(createHomeCoachSnapshot(feedbackRecord, todayISO));
   } else {
     const empty = document.createElement("p");
     empty.className = "coach-home-empty";
-    empty.textContent = "Tu último comentario de la guía aparecerá aquí cuando analices un entrenamiento. Puedes hacerle una pregunta mientras tanto.";
+    empty.textContent = "Cuando registres un entrenamiento, aquí aparecerá su comentario. El análisis completo también quedará guardado en el historial.";
     feedback.append(empty);
   }
   renderCoachQuestions();

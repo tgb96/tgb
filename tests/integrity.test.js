@@ -76,7 +76,10 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="homeCoachFeedback"/);
   assert.match(html, /id="homeDailyBrief"/);
   assert.match(html, /id="homeDailyIntakeButtons"/);
-  assert.match(html, /Ajuste recomendado/);
+  assert.match(html, /Tu entrenador · hoy/);
+  assert.match(html, /Comentario del entrenamiento/);
+  assert.match(html, /Revisar el día con Gemini/);
+  assert.match(html, /Próximos 7 días/);
   assert.doesNotMatch(html, /Tu pulsera en TGTrain|id="wearableSteps"|id="wearableSleep"/);
   assert.match(html, /id="weekLedger"[\s\S]+id="homeDailyBrief"/);
   assert.match(html, /id="activeSessionDock"/);
@@ -221,7 +224,8 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   assert.match(app, /revertCoachPlanAdjustment/);
   assert.match(app, /wearableInbox/);
   assert.match(app, /history-record-disclosure/);
-  assert.match(app, /home-coach-disclosure/);
+  assert.match(app, /home-coach-snapshot/);
+  assert.match(app, /todayCoachRecord \|\| lastAnalyzed/);
   assert.match(app, /Guardar ajustes editados para la próxima rutina/);
   assert.match(app, /No hay cambios concretos para aplicar/);
   assert.match(app, /Descartar/);
@@ -432,6 +436,8 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /strongestRecoveryImpact/);
   assert.match(app, /Contexto de recuperación guardado/);
   assert.match(app, /requestDailyCoachInsight/);
+  assert.match(app, /aiInsightIsFresh/);
+  assert.match(app, /queueDailyCoachRefresh/);
   assert.match(app, /requestWeeklyCoachReview/);
   assert.match(app, /recommended-routine/);
   assert.match(app, /physicalRoutineById\(insight\.recommendedRoutineId\)/);
@@ -620,7 +626,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=149/);
+  assert.match(html, /assets\/js\/app\.js\?v=150/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {
