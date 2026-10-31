@@ -89,9 +89,9 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /Enviar a TGTrain/);
   assert.doesNotMatch(html, /¿Qué quieres preguntarle\?|Preguntar a la guía/);
   assert.match(html, /id="coachVoiceButton"[^>]+type="button"/);
-  assert.match(html, /id="coachVoiceFallbackButton"[^>]+type="button"/);
-  assert.match(html, /id="coachAudioFile"[^>]+type="file"[^>]+accept="audio\/\*"[^>]+capture/);
-  assert.match(html, /Gemini transcribe el audio para que lo revises/);
+  assert.doesNotMatch(html, /coachVoiceFallbackButton|Usar la grabadora del teléfono/);
+  assert.match(html, /id="coachAudioFile"[^>]+type="file"[^>]+accept="audio\/\*"[^>]+capture="user"/);
+  assert.match(html, /Gemini interpreta el audio y responde directamente/);
   assert.match(html, /id="coachHistoryToggle"/);
   assert.doesNotMatch(html, /Tus preguntas quedan guardadas hasta que las limpies/);
   assert.doesNotMatch(html, /Graba hasta 30 segundos/);
@@ -380,7 +380,7 @@ test("la IA usa el nivel gratuito de Firebase sin Cloud Functions", async () => 
   assert.match(ai, /firebase-app-check\.js/);
   assert.match(ai, /async estimateFoodNutrition\(name, context/);
   assert.match(ai, /async estimateMealDescription\(description, context/);
-  assert.match(ai, /async transcribeCoachAudio\(audioBlob\)/);
+  assert.match(ai, /async function coachAudioPart\(audioBlob\)/);
   assert.match(ai, /async analyzeDailyCoach\(context/);
   assert.match(ai, /async reviewCoachWeek\(context/);
   assert.match(ai, /recommendedRoutineId/);
@@ -516,21 +516,24 @@ test("la guía no repite que su comentario ya está guardado", async () => {
   assert.doesNotMatch(app, /Comentario guardado en tu historial/);
 });
 
-test("la app graba una nota de voz real y Gemini la transcribe antes de enviarla", async () => {
+test("la app envía la voz directamente al entrenador Gemini y conserva solo la transcripción", async () => {
   const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
   const ai = await readFile(resolve(root, "assets/js/ai.js"), "utf8");
   assert.match(app, /navigator\.mediaDevices\.getUserMedia/);
   assert.match(app, /new MediaRecorder/);
   assert.match(app, /coachAudioAutoStop = setTimeout\(stopCoachVoiceRecording, 60000\)/);
-  assert.match(app, /aiClient\.transcribeCoachAudio\(audioBlob\)/);
+  assert.match(app, /aiClient\.askCoach\("", coachQuestionContext\(\), audioBlob\)/);
   assert.match(app, /navigator\.permissions\?\.query\(\{ name: "microphone" \}\)/);
   assert.match(app, /coachAudioFile"\)\.addEventListener\("change", importCoachAudioFile\)/);
-  assert.match(app, /transcribeCoachRecording\(file\)/);
+  assert.match(app, /submitCoachAudio\(file\)/);
+  assert.match(app, /coachVoiceUseDeviceRecorder/);
   assert.match(app, /permiso está concedido, pero no pudo abrir el micrófono/);
-  assert.match(app, /Transcripción lista\. Revísala y luego pulsa Enviar a TGTrain/);
+  assert.match(app, /Mensaje de voz respondido y guardado como transcripción/);
+  assert.doesNotMatch(app, /transcribeCoachRecording|transcribeCoachAudio/);
   assert.match(ai, /inlineData: \{ data, mimeType \}/);
+  assert.match(ai, /questionMode: audioPart \? "audio-adjunto" : "texto"/);
+  assert.match(ai, /Devuelve transcript con una transcripción fiel/);
   assert.match(ai, /audio\/webm/);
-  assert.match(ai, /No respondas la pregunta, no aconsejes/);
 });
 
 test("TGTrain resuelve fechas chilenas y exige sesiones completas al responder", async () => {
@@ -626,7 +629,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=150/);
+  assert.match(html, /assets\/js\/app\.js\?v=151/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

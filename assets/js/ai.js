@@ -142,6 +142,7 @@ const analysisSchema = {
 const coachQuestionSchema = {
   type: "object",
   properties: {
+    transcript: stringSchema,
     answer: stringSchema,
     hasPlanAdjustment: { type: "boolean" },
     hasRecordAdjustment: { type: "boolean" },
@@ -210,7 +211,7 @@ const coachQuestionSchema = {
       required: ["targetRecordId", "targetDateISO", "expectedUpdatedAt", "title", "reason", "restTypeId", "restDetail", "sensationsAppend", "routineEffort", "routinePain", "routinePainDetail", "activityStartTime"]
     }
   },
-  required: ["answer", "hasPlanAdjustment", "hasRecordAdjustment", "hasRecoveryContext", "memorySuggestions"]
+  required: ["transcript", "answer", "hasPlanAdjustment", "hasRecordAdjustment", "hasRecoveryContext", "memorySuggestions"]
 };
 
 const coachInsightSchema = {
@@ -275,12 +276,6 @@ const mealDescriptionSchema = {
     confidence: { type: "string", enum: ["low", "medium", "high"] }
   },
   required: ["summary", "portionNotes", "caloriesKcal", "proteinG", "carbsG", "fatG", "confidence"]
-};
-
-const audioTranscriptionSchema = {
-  type: "object",
-  properties: { transcript: stringSchema },
-  required: ["transcript"]
 };
 
 const dailyCoachSchema = {
@@ -397,6 +392,28 @@ export function createAiClient() {
     }
   }
 
+  async function coachAudioPart(audioBlob) {
+    if (!(audioBlob instanceof Blob)) throw new Error("No se recibió una grabación válida.");
+    if (!audioBlob.size) throw new Error("La grabación quedó vacía. Vuelve a intentarlo.");
+    if (audioBlob.size > 8 * 1024 * 1024) throw new Error("La grabación es demasiado grande. Habla durante un máximo de 60 segundos.");
+    const aliases = { "audio/x-m4a": "audio/m4a", "audio/x-wav": "audio/wav", "audio/x-aac": "audio/aac" };
+    const extension = String(audioBlob.name || "").toLowerCase().split(".").pop();
+    const extensionTypes = { aac: "audio/aac", flac: "audio/flac", m4a: "audio/m4a", mp3: "audio/mp3", mp4: "audio/mp4", ogg: "audio/ogg", opus: "audio/opus", wav: "audio/wav", webm: "audio/webm" };
+    const declaredType = String(audioBlob.type || "").toLowerCase().split(";")[0];
+    const rawMimeType = declaredType.startsWith("audio/") ? declaredType : extensionTypes[extension] || "";
+    const mimeType = aliases[rawMimeType] || rawMimeType;
+    const supported = new Set(["audio/aac", "audio/flac", "audio/mp3", "audio/m4a", "audio/mpeg", "audio/mp4", "audio/ogg", "audio/opus", "audio/wav", "audio/webm"]);
+    if (!supported.has(mimeType)) throw new Error("El teléfono generó un formato de audio que Gemini no puede leer.");
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("No se pudo leer la grabación."));
+      reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.readAsDataURL(audioBlob);
+    });
+    if (!data) throw new Error("No se pudo preparar la grabación para Gemini.");
+    return { inlineData: { data, mimeType } };
+  }
+
   return {
     async estimateFoodNutrition(name, context = {}) {
       const foodName = String(name || "").trim().slice(0, 100);
@@ -510,36 +527,6 @@ export function createAiClient() {
         model: MODEL_NAME
       };
     },
-    async transcribeCoachAudio(audioBlob) {
-      if (!(audioBlob instanceof Blob)) throw new Error("No se recibió una grabación válida.");
-      if (!audioBlob.size) throw new Error("La grabación quedó vacía. Vuelve a intentarlo.");
-      if (audioBlob.size > 8 * 1024 * 1024) throw new Error("La grabación es demasiado grande. Habla durante un máximo de 60 segundos.");
-      const aliases = { "audio/x-m4a": "audio/m4a", "audio/x-wav": "audio/wav" };
-      const rawMimeType = String(audioBlob.type || "audio/webm").toLowerCase().split(";")[0];
-      const mimeType = aliases[rawMimeType] || rawMimeType;
-      const supported = new Set(["audio/aac", "audio/flac", "audio/mp3", "audio/m4a", "audio/mpeg", "audio/mp4", "audio/ogg", "audio/opus", "audio/wav", "audio/webm"]);
-      if (!supported.has(mimeType)) throw new Error("El teléfono generó un formato de audio que Gemini no puede leer.");
-      const data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error("No se pudo leer la grabación."));
-        reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
-        reader.readAsDataURL(audioBlob);
-      });
-      const result = await generateJson({
-        instructions: [
-          "Transcribe fielmente esta nota de voz en español para que el usuario pueda revisarla antes de enviarla a su entrenador de TGTrain.",
-          "Conserva síntomas, fechas, horas, cantidades, ejercicios, cargas, nombres y negaciones. No respondas la pregunta, no aconsejes y no agregues información.",
-          "Corrige únicamente puntuación y muletillas evidentes para que el texto sea legible. Devuelve solo la transcripción en transcript."
-        ].join("\n"),
-        input: "Transcribe la nota de voz.",
-        parts: [{ inlineData: { data, mimeType } }],
-        schema: audioTranscriptionSchema,
-        maxOutputTokens: 1200
-      });
-      const transcript = String(result?.transcript || "").trim().slice(0, 2000);
-      if (!transcript) throw new Error("No pude reconocer palabras en la grabación. Inténtalo de nuevo hablando cerca del teléfono.");
-      return { transcript, model: MODEL_NAME };
-    },
     async analyzeDailyCoach(context = {}) {
       const catalog = {
         routines: physicalRoutines.map(item => ({
@@ -598,7 +585,8 @@ export function createAiClient() {
       });
       return { review, model: MODEL_NAME };
     },
-    async askCoach(question, context = {}) {
+    async askCoach(question, context = {}, audioBlob = null) {
+      const audioPart = audioBlob ? await coachAudioPart(audioBlob) : null;
       const catalog = {
         routines: physicalRoutines.map(item => ({
           id: item.id,
@@ -617,6 +605,7 @@ export function createAiClient() {
       };
       const instructions = [
         "Eres la guía personal de TGTrain, enfocada en mejorar el rendimiento para tenis con el perfil y las limitaciones del usuario.",
+        "El mensaje puede venir como texto o como audio adjunto. Devuelve transcript con una transcripción fiel y legible del audio; si el mensaje fue escrito, copia la pregunta textual en transcript. Conserva negaciones, síntomas, fechas, horas, cantidades, ejercicios y cargas. Responde el contenido del mensaje directamente, sin pedir que el usuario lo transcriba ni mencionar este proceso.",
         "El perfil maestro entregado en context.coachProfile define tu identidad, filosofía, prioridades, progresión y estilo de comunicación. Debes pensar y decidir desde ese perfil completo en cada respuesta, no tratarlo como contexto decorativo ni sustituirlo por consejos genéricos.",
         "Responde la pregunta concreta en español claro y cercano, usando solo los registros, plan y perfil entregados como datos; distingue hechos, inferencias e información que falta.",
         "FECHA Y HORA: context.todayISO, todayWeekday, todayLabel, nowLocalTime y nextDates son la referencia temporal autoritativa de Chile. Antes de responder resuelve hoy, mañana, pasado mañana y los días de la semana a una fecha concreta. Comprueba la diferencia de días: nunca llames mañana a un lunes si todayWeekday es sábado. Cuando ayude, escribe el día y la fecha para eliminar ambigüedad.",
@@ -642,15 +631,17 @@ export function createAiClient() {
         "Sé específico, breve y práctico. Termina con una nota positiva sobria vinculada al tenis o a la recuperación cuando corresponda. No inventes marcas, cargas, ritmos ni fechas."
       ].join("\n");
       const questionText = String(question || "").trim().slice(0, 1000);
+      if (!questionText && !audioPart) throw new Error("Escribe un mensaje o graba una nota de voz.");
       const request = {
         instructions,
-        input: JSON.stringify({ question: questionText, catalog, context }),
+        input: JSON.stringify({ question: questionText, questionMode: audioPart ? "audio-adjunto" : "texto", catalog, context }),
+        parts: audioPart ? [audioPart] : [],
         schema: coachQuestionSchema,
         maxOutputTokens: 2600
       };
       let response = await generateJson(request);
       const normalized = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      const questionNormalized = normalized(questionText);
+      const questionNormalized = normalized(audioPart ? response?.transcript : questionText);
       const answerNeedsTemporalCorrection = () => {
         const answerNormalized = normalized(response?.answer);
         if (!/\b(?:partido|encuentro)\b/.test(questionNormalized) || !/\bmanana\b/.test(answerNormalized)) return false;
@@ -678,7 +669,10 @@ export function createAiClient() {
       }
       const answer = String(response.answer || "").trim();
       if (!answer) throw new Error("La guía no pudo preparar una respuesta. Inténtalo otra vez.");
+      const transcript = String(response.transcript || questionText).trim().slice(0, 2000);
+      if (!transcript) throw new Error("Gemini no pudo reconocer palabras en la grabación. Inténtalo nuevamente hablando cerca del teléfono.");
       return {
+        transcript,
         answer,
         planAdjustment: response.hasPlanAdjustment ? response.planAdjustment : null,
         recordAdjustment: response.hasRecordAdjustment ? response.recordAdjustment : null,

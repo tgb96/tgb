@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=121">
+  <link rel="stylesheet" href="assets/css/styles.css?v=122">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -107,12 +107,11 @@
           <label for="coachQuestionText">Tu mensaje</label>
           <textarea id="coachQuestionText" rows="3" maxlength="1000" placeholder="Cuéntale cómo estás, informa un cambio o pídele adaptar tu plan."></textarea>
           <div class="coach-ask-actions">
-            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-pressed="false">🎙 Hablar</button>
+            <button id="coachVoiceButton" class="coach-voice-button" type="button" aria-pressed="false">🎙 Hablar con TGTrain</button>
             <button id="coachAskButton" class="coach-ask-button" type="submit">Enviar a TGTrain →</button>
           </div>
-          <button id="coachVoiceFallbackButton" class="coach-voice-fallback" type="button">Usar la grabadora del teléfono</button>
-          <input id="coachAudioFile" type="file" accept="audio/*" capture hidden>
-          <small class="coach-voice-help">Graba hasta 60 segundos. Si Chrome no abre el micrófono, usa la grabadora del teléfono. Gemini transcribe el audio para que lo revises; TGTrain no guarda la grabación.</small>
+          <input id="coachAudioFile" type="file" accept="audio/*" capture="user" hidden>
+          <small class="coach-voice-help">Graba hasta 60 segundos. Al detenerte, Gemini interpreta el audio y responde directamente; TGTrain guarda la transcripción, no la grabación. Si Chrome bloquea el micrófono, el mismo botón cambiará para abrir la grabadora del teléfono.</small>
           <label class="coach-auto-speak"><input id="coachAutoSpeak" type="checkbox"> Leer automáticamente las respuestas en voz alta</label>
           <p id="coachQuestionStatus" class="coach-question-status" role="status"></p>
         </form>
@@ -598,6 +597,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=150"></script>
+<script type="module" src="assets/js/app.js?v=151"></script>
 </body>
 </html>
