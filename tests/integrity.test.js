@@ -77,6 +77,8 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="homeDailyBrief"/);
   assert.match(html, /id="homeDailyIntakeButtons"/);
   assert.match(html, /Ajuste recomendado/);
+  assert.doesNotMatch(html, /Tu pulsera en TGTrain|id="wearableSteps"|id="wearableSleep"/);
+  assert.match(html, /id="weekLedger"[\s\S]+id="homeDailyBrief"/);
   assert.match(html, /id="activeSessionDock"/);
   assert.match(html, /id="coachQuestionForm"/);
   assert.match(html, /Habla con TGTrain/);
@@ -435,7 +437,7 @@ test("la guía integra sueño y nutrición y exige confirmar los cambios del pla
   assert.match(app, /physicalRoutineById\(insight\.recommendedRoutineId\)/);
   assert.match(app, /sourceNutritionKinds\.has\(item\.kind\)/);
   assert.match(app, /speechSynthesis\.speak/);
-  assert.match(html, /wearableSleepDetails/);
+  assert.match(html, /id="wearableSessions"/);
   assert.match(html, /dailyBriefAiAction/);
   assert.match(html, /coachWeekReviewButton/);
   assert.match(html, /coachFollowUp/);
@@ -618,7 +620,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=148/);
+  assert.match(html, /assets\/js\/app\.js\?v=149/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

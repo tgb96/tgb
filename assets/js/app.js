@@ -3842,58 +3842,7 @@ function currentExerciseSettings(routine, exercise, settings) {
 }
 
 function renderWearable() {
-  const today = getChileDateISO();
-  const days = wearableData.days || [];
   const sessions = wearableData.sessions || [];
-  const todayData = days.find(day => day.dateISO === today);
-  const lastSleep = days.filter(day => day.dateISO >= addDaysISO(today, -1) && day.dateISO <= today && Number(day.sleepMinutes) > 0)
-    .sort((a, b) => String(b.dateISO).localeCompare(String(a.dateISO)))[0];
-  $("wearableSteps").textContent = todayData ? new Intl.NumberFormat("es-CL").format(Number(todayData.steps) || 0) : "—";
-  if (lastSleep) {
-    const minutes = Number(lastSleep.sleepMinutes) || 0;
-    $("wearableSleep").textContent = `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
-    $("wearableSleepDate").textContent = formatShortDate(lastSleep.dateISO);
-  } else {
-    $("wearableSleep").textContent = "—";
-    $("wearableSleepDate").textContent = days.length ? "Sin sueño reciente compartido por Mi Fitness" : "";
-  }
-  const sleepDetails = $("wearableSleepDetails");
-  sleepDetails.replaceChildren();
-  const stageLabels = { light: "Ligero", deep: "Profundo", rem: "REM", awake: "Despierto", awakeInBed: "Despierto en cama", outOfBed: "Fuera de cama", sleeping: "Sueño sin fase" };
-  const stages = lastSleep?.sleepStagesMinutes && typeof lastSleep.sleepStagesMinutes === "object" ? lastSleep.sleepStagesMinutes : null;
-  const stageEntries = stages ? Object.entries(stageLabels).map(([key, label]) => [label, Number(stages[key]) || 0]).filter(([, minutes]) => minutes > 0) : [];
-  if (stageEntries.length) {
-    const title = document.createElement("strong"); title.textContent = "Distribución estimada por Mi Fitness";
-    const grid = document.createElement("div");
-    stageEntries.forEach(([label, minutes]) => {
-      const item = document.createElement("span");
-      item.innerHTML = `<b>${label}</b><small>${Math.floor(minutes / 60) ? `${Math.floor(minutes / 60)} h ` : ""}${String(minutes % 60).padStart(2, "0")} min</small>`;
-      grid.append(item);
-    });
-    sleepDetails.append(title, grid);
-  }
-  const signals = [];
-  if (Number(lastSleep?.sleepHeartRateAvgBpm) > 0) signals.push(`${Math.round(lastSleep.sleepHeartRateAvgBpm)} lpm promedio durmiendo`);
-  if (Number(lastSleep?.sleepOxygenAvgPercent) > 0) signals.push(`${Number(lastSleep.sleepOxygenAvgPercent).toLocaleString("es-CL", { maximumFractionDigits: 1 })}% SpO₂ promedio`);
-  if (signals.length) {
-    const line = document.createElement("p"); line.textContent = signals.join(" · "); sleepDetails.append(line);
-  }
-  if (lastSleep && !stageEntries.length) {
-    const unavailable = document.createElement("small");
-    unavailable.textContent = "Mi Fitness compartió la duración, pero no las fases de sueño en Health Connect.";
-    sleepDetails.append(unavailable);
-  }
-  sleepDetails.classList.toggle("hidden", !lastSleep);
-  const newestSync = [...days.map(day => day.syncedAt), wearableData.status?.syncedAt].filter(Boolean).sort().at(-1);
-  const syncAgeMinutes = newestSync ? Math.max(0, Math.round((Date.now() - Date.parse(newestSync)) / 60000)) : null;
-  const syncLabel = $("wearableSyncTime");
-  syncLabel.textContent = newestSync
-    ? `Actualizado ${new Date(newestSync).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}${syncAgeMinutes > 30 ? " · datos atrasados" : ""}`
-    : "Sin sincronizar";
-  syncLabel.classList.toggle("stale", syncAgeMinutes === null || syncAgeMinutes > 30);
-  $("wearableHelp").textContent = days.length
-    ? "Datos medidos por la pulsera. Las sesiones detectadas no se suman automáticamente al historial para evitar duplicados."
-    : "Instala TGTrain Sync, elige Mi Fitness y sincroniza una vez; después se actualizará automáticamente si concedes el permiso de segundo plano.";
   const list = $("wearableSessions");
   list.replaceChildren();
   const records = repository.list();

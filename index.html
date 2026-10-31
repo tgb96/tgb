@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=119">
+  <link rel="stylesheet" href="assets/css/styles.css?v=120">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -60,6 +60,18 @@
         <div id="homeDailyIntakeButtons" class="home-intake-buttons" aria-label="Recordatorios diarios"></div>
       </section>
 
+      <div class="section-title-row">
+        <div>
+          <p class="eyebrow dark">Esta semana</p>
+          <h2>Tu actividad, día por día</h2>
+          <p id="weekProgressSummary" class="week-progress-summary"></p>
+        </div>
+        <span id="weekProgress" class="progress-pill"></span>
+      </div>
+
+      <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
+      <div id="wearableSessions" class="wearable-sessions" aria-label="Entrenamientos de la pulsera pendientes de vincular"></div>
+
       <section id="homeDailyBrief" class="daily-brief-card" aria-labelledby="dailyBriefTitle" aria-live="polite">
         <div class="daily-brief-heading">
           <div><p class="eyebrow dark">Ajuste recomendado</p><h2 id="dailyBriefTitle">Preparando tu contexto diario</h2></div>
@@ -74,30 +86,6 @@
         </div>
       </section>
 
-      <section class="wearable-card" aria-labelledby="wearableTitle">
-        <div class="wearable-heading">
-          <div><p class="eyebrow dark">Smart Band · Health Connect</p><h2 id="wearableTitle">Tu pulsera en TGTrain</h2></div>
-          <span id="wearableSyncTime">Sin sincronizar</span>
-        </div>
-        <div class="wearable-metrics">
-          <div><strong id="wearableSteps">—</strong><span>Pasos de hoy</span></div>
-          <div><strong id="wearableSleep">—</strong><span>Última noche</span><small id="wearableSleepDate"></small></div>
-        </div>
-        <div id="wearableSleepDetails" class="wearable-sleep-details hidden"></div>
-        <p id="wearableHelp" class="wearable-help">Instala TGTrain Sync para traer los datos de Mi Fitness.</p>
-        <div id="wearableSessions" class="wearable-sessions"></div>
-      </section>
-
-      <div class="section-title-row">
-        <div>
-          <p class="eyebrow dark">Esta semana</p>
-          <h2>Tu actividad, día por día</h2>
-          <p id="weekProgressSummary" class="week-progress-summary"></p>
-        </div>
-        <span id="weekProgress" class="progress-pill"></span>
-      </div>
-
-      <div id="weekLedger" class="week-ledger" aria-label="Actividades de la semana actual"></div>
       <div class="section-title-row coach-home-title">
         <div>
           <p class="eyebrow dark">Entrenamiento · nutrición · recuperación</p>
@@ -609,6 +597,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=148"></script>
+<script type="module" src="assets/js/app.js?v=149"></script>
 </body>
 </html>

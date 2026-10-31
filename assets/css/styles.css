@@ -104,25 +104,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .home-intake-button.taken { border-color: #bde65b; background: #e7f9bd; color: #2f4210; }
 .home-intake-button.medication:not(.taken) { border-color: #cdd7ff; background: #f3f5ff; color: var(--blue-dark); }
 
-.wearable-card { margin-top: 18px; padding: 19px; border: 1px solid var(--line); border-radius: 25px; background: var(--surface); box-shadow: 0 10px 25px rgba(17, 21, 34, .06); }
-.wearable-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.wearable-heading h2 { margin: 0; font-size: 21px; letter-spacing: -.6px; }
-.wearable-heading > span { max-width: 90px; color: var(--muted); font-size: 10px; line-height: 1.3; text-align: right; }
-.wearable-heading > span.stale { color: #9a5200; font-weight: 850; }
-.wearable-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 17px; }
-.wearable-metrics > div { min-width: 0; padding: 14px; border-radius: 17px; background: var(--paper); }
-.wearable-metrics strong, .wearable-metrics span, .wearable-metrics small { display: block; }
-.wearable-metrics strong { font-size: clamp(19px, 5vw, 25px); letter-spacing: -.7px; }
-.wearable-metrics span { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 750; }
-.wearable-metrics small { margin-top: 3px; color: var(--blue); font-size: 10px; }
-.wearable-sleep-details { margin-top: 10px; padding: 12px; border-radius: 16px; background: #f3f5ff; }
-.wearable-sleep-details > strong { display: block; margin-bottom: 8px; font-size: 11px; }
-.wearable-sleep-details > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.wearable-sleep-details span { min-width: 0; padding: 8px; border-radius: 10px; background: white; }
-.wearable-sleep-details b, .wearable-sleep-details small { display: block; font-size: 9px; }
-.wearable-sleep-details small { margin-top: 3px; color: var(--muted); }
-.wearable-sleep-details p { margin: 9px 0 0; color: var(--muted); font-size: 10px; }
-.wearable-help { margin: 13px 1px 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .wearable-sessions { display: grid; gap: 7px; margin-top: 14px; }
 .wearable-sessions:empty { display: none; }
 .wearable-sessions > strong { margin-bottom: 3px; font-size: 12px; }
@@ -1169,7 +1150,7 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
   .nutrition-entry small, .nutrition-entry-details summary, .nutrition-entry-details p { font-size: 11px; }
   .nutrition-entry-dialog input, .nutrition-entry-dialog textarea, .history-controls select { font-size: 16px; }
   .wearable-session strong, .planned-activity-line strong, .history-entry h3 { font-size: 14px; }
-  .wearable-session span, .wearable-session small, .wearable-help, .planned-activity-line small, .history-entry p { font-size: 12px; }
+  .wearable-session span, .wearable-session small, .planned-activity-line small, .history-entry p { font-size: 12px; }
 }
 
 @media (max-width: 390px) {
