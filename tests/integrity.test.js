@@ -99,7 +99,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="weekBestAbsDelta"/);
   assert.match(html, /Calorías quemadas/);
   assert.match(html, /Récord abdominales/);
-  assert.match(html, /id="startPlannedActivityButton"/);
+  assert.doesNotMatch(html, /id="heroPlannedActivity"|id="startPlannedActivityButton"/);
   assert.doesNotMatch(html, /id="homeRegisterButton"|id="evolutionMetrics"/);
   assert.match(html, /id="exerciseProgress"/);
   assert.match(html, /id="historyCategoryFilter"/);
@@ -618,7 +618,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=147/);
+  assert.match(html, /assets\/js\/app\.js\?v=148/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

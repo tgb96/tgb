@@ -2315,10 +2315,8 @@ function renderHome() {
   const registeredDays = new Set(records.filter(isMainDayRecord).map(record => record.dateISO)).size;
   const restDays = new Set(records.filter(record => record.category === "rest").map(record => record.dateISO)).size;
   const pendingWearable = records.filter(record => record.metricsPending && !record.wearableSessionId && record.category !== "rest").length;
-  const todayMainRecords = todayRecords.filter(isMainDayRecord);
   const plannedWeek = coachWeekForDate(todayISO, block);
-  const plannedState = loadPlannedActivity();
-  const activePlanned = plannedActivityContext(plannedState);
+  const activePlanned = plannedActivityContext(loadPlannedActivity());
   const todayPlan = activePlanned?.session || coachSessionForDate(todayISO, block);
 
   $("currentWeekBadge").textContent = plannedWeek
@@ -2330,24 +2328,6 @@ function renderHome() {
   $("heroWeekTheme").classList.add("hidden");
   renderHeroEvolution(allRecords);
   renderHomeDailyIntake(todayISO);
-  const plannedPanel = $("heroPlannedActivity");
-  const plannedInProgress = Boolean(todayPlan && activePlanned?.session.id === todayPlan.id);
-  const showPlannedPanel = Boolean(todayPlan && (plannedInProgress || !todayMainRecords.length));
-  plannedPanel.classList.toggle("hidden", !showPlannedPanel);
-  if (todayPlan) {
-    const option = coachOption(todayPlan, todayPlan.primaryOptionId) || todayPlan.options[0];
-    const overview = dayPlanOverview(todayPlan, todayMainRecords);
-    const inProgress = plannedInProgress;
-    $("heroPlannedLabel").textContent = inProgress ? "Actividad en curso" : todayMainRecords.length ? "Actividad de hoy" : "Plan de hoy";
-    $("heroPlannedTitle").textContent = !inProgress && todayMainRecords.length ? todayMainRecords.map(recordTitle).join(" · ") : option.title;
-    $("heroPlannedSummary").textContent = inProgress ? todayPlan.objective : todayMainRecords.length
-      ? `${overview.reason} Plan previsto: ${option.title}.`
-      : todayPlan.objective || option.summary;
-    $("startPlannedActivityButton").textContent = inProgress
-      ? plannedState.status === "active" ? "Continuar actividad en curso" : "Completar registro programado"
-      : todayMainRecords.length ? "Ver registro en historial"
-        : "Iniciar actividad programada";
-  }
   renderDailyBriefing(todayISO, todayPlan, allRecords);
   $("weekProgress").textContent = `${registeredDays}/7 registrados`;
   const weekSummary = [`${activeDays} ${activeDays === 1 ? "día activo" : "días activos"}`];
@@ -6907,12 +6887,6 @@ function bindEvents() {
     if (target === "register") openRegistrationOrActiveRoutine();
     else showView(target);
   }));
-  $("startPlannedActivityButton").addEventListener("click", () => {
-    const block = activeTrainingBlock();
-    const session = coachSessionForDate(getChileDateISO(), block);
-    if (session && !plannedActivityContext(loadPlannedActivity()) && repository.list().some(record => record.dateISO === session.dateISO && isMainDayRecord(record))) return showView("history");
-    openTodayPlannedActivity();
-  });
   $("heroWeekTheme").addEventListener("click", openCoachPlanDialog);
   $("plannedActivityDialogClose").addEventListener("click", () => $("plannedActivityDialog").close());
   $("plannedActivityDialog").addEventListener("close", () => {

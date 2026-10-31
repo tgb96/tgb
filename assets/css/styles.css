@@ -92,12 +92,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hero-stats div { min-width: 0; }
 .hero-stats strong { overflow-wrap: anywhere; font-size: clamp(18px, 5vw, 23px); }
 .hero-stats small { display: block; margin-top: 8px; color: var(--lime); font-size: 10px; font-weight: 750; line-height: 1.25; }
-.hero-planned-activity { display: grid; gap: 12px; margin-top: 16px; padding: 15px; border: 1px solid rgba(200,255,77,.3); border-radius: 18px; background: rgba(255,255,255,.09); }
-.hero-planned-activity span { display: block; margin-bottom: 5px; color: var(--lime); font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-.hero-planned-activity strong { display: block; font-size: 16px; line-height: 1.25; }
-.hero-planned-activity small { display: block; margin-top: 5px; color: rgba(255,255,255,.7); font-size: 11px; line-height: 1.4; }
-.hero-planned-activity button { width: 100%; min-height: 48px; padding: 10px 14px; border: 0; border-radius: 13px; background: var(--lime); color: var(--night); font-size: 13px; font-weight: 900; }
-.hero-planned-activity button:hover { background: #d9ff8d; }
 .home-intake-card { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; background: white; box-shadow: 0 10px 24px rgba(17,21,34,.06); }
 .home-intake-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .home-intake-heading .eyebrow { margin: 0 0 2px; }
