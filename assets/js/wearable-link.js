@@ -63,6 +63,39 @@ function startInstants(session) {
     .filter(Number.isFinite);
 }
 
+export function wearableSessionAllowed(session) {
+  return !/strava/i.test(String(session?.originPackage || ""));
+}
+
+function wearableActivityKey(value) {
+  const dateISO = String(value?.dateISO || "");
+  if (!dateISO) return "";
+  if (value?.category === "tennis") return `${dateISO}|tennis`;
+  if (value?.category === "physical") return `${dateISO}|physical`;
+  if (value?.category === "cardio") {
+    const subtype = String(value.cardioTypeId || "cardio").replace(/^bike-.*/, "bike");
+    return `${dateISO}|cardio:${subtype}`;
+  }
+  const title = String(value?.title || "").toLowerCase();
+  if (/tenis/.test(title)) return `${dateISO}|tennis`;
+  if (/físico|fisico|fuerza|pesas/.test(title)) return `${dateISO}|physical`;
+  if (/trote|correr/.test(title)) return `${dateISO}|cardio:running`;
+  if (/bicicleta/.test(title)) return `${dateISO}|cardio:bike`;
+  if (/trekking|senderismo/.test(title)) return `${dateISO}|cardio:trekking`;
+  if (/caminata/.test(title)) return `${dateISO}|cardio:walking`;
+  return "";
+}
+
+function groupByActivity(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = wearableActivityKey(item);
+    if (!key) continue;
+    groups.set(key, [...(groups.get(key) || []), item]);
+  }
+  return groups;
+}
+
 export function wearableSessionsEquivalent(left, right) {
   if (!left || !right) return false;
   if (left.id && right.id && left.id === right.id) return true;
@@ -81,7 +114,7 @@ export function wearableSessionsEquivalent(left, right) {
 }
 
 export function deduplicateWearableSessions(sessions = []) {
-  const preferred = [...sessions].filter(session => session?.id)
+  const preferred = [...sessions].filter(session => session?.id && wearableSessionAllowed(session))
     .sort((left, right) => wearableSessionQuality(right) - wearableSessionQuality(left)
       || String(right.syncedAt || "").localeCompare(String(left.syncedAt || ""))
       || String(left.id).localeCompare(String(right.id)));
@@ -92,10 +125,34 @@ export function deduplicateWearableSessions(sessions = []) {
   return unique;
 }
 
+export function wearableAutolinks(sessions = [], records = []) {
+  const liveSessions = deduplicateWearableSessions(sessions).filter(session => {
+    const linkedElsewhere = records.some(record => record.wearableSnapshot
+      && wearableSessionAllowed(record.wearableSnapshot)
+      && (record.wearableSessionId === session.id || wearableSessionsEquivalent(record.wearableSnapshot, session)));
+    return !linkedElsewhere && wearableActivityKey(session);
+  });
+  const sessionGroups = groupByActivity(liveSessions);
+  const recordGroups = groupByActivity(records.filter(record => record.category !== "rest"
+    && (!record.wearableSessionId || !wearableSessionAllowed(record.wearableSnapshot))
+    && wearableActivityKey(record)));
+  const links = [];
+  for (const [key, groupedSessions] of sessionGroups) {
+    const groupedRecords = recordGroups.get(key) || [];
+    if (groupedSessions.length !== 1 || groupedRecords.length !== 1) continue;
+    const session = groupedSessions[0];
+    const record = groupedRecords[0];
+    const match = wearableMatch(record, session);
+    if (!match) continue;
+    links.push({ record, session, match });
+  }
+  return links;
+}
+
 export function refreshedWearableLink(record, sessions = []) {
   const current = normalizeWearableSnapshot(record?.wearableSnapshot);
   if (!current || !record?.wearableSessionId) return null;
-  const equivalents = sessions.filter(session => session?.id
+  const equivalents = sessions.filter(session => session?.id && wearableSessionAllowed(session)
     && (session.id === record.wearableSessionId || wearableSessionsEquivalent(session, current)));
   if (!equivalents.length) return null;
   const best = equivalents.sort((left, right) => wearableSessionQuality(right) - wearableSessionQuality(left)

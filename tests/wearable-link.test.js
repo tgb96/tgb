@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deduplicateWearableSessions, normalizeWearableSnapshot, refreshedWearableLink, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "../assets/js/wearable-link.js";
+import { deduplicateWearableSessions, normalizeWearableSnapshot, refreshedWearableLink, wearableAutolinks, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "../assets/js/wearable-link.js";
 import { groupRecordsByWeek, normalizeRecord, recordsToCSV, weeklyReport } from "../assets/js/utils.js";
 import { createRepository } from "../assets/js/storage.js";
 
@@ -95,6 +95,28 @@ test("oculta una copia duplicada de una actividad ya vinculada y enriquece el v�
   const refresh = refreshedWearableLink(record, [linkedCopy, richerCopy]);
   assert.equal(refresh.sessionId, "tennis-copy");
   assert.equal(refresh.snapshot.activeCaloriesKcal, 1284);
+});
+
+test("ignora sesiones reflejadas por Strava y vincula internamente la única sesión de Mi Fitness del día", () => {
+  const strava = {
+    ...band, id: "strava-copy", dateISO: "2026-10-31", title: "Entrenamiento físico",
+    startTime: "2026-10-31T15:59:00Z", endTime: "2026-10-31T18:19:00Z",
+    durationSeconds: 8400, originPackage: "com.strava"
+  };
+  const tennis = {
+    ...band, id: "mi-tennis", dateISO: "2026-10-31", title: "Tenis",
+    startTime: "2026-10-31T14:59:00Z", endTime: "2026-10-31T17:19:00Z",
+    durationSeconds: 8400, caloriesKcal: 1284, originPackage: "com.xiaomi.wearable"
+  };
+  const match = {
+    ...manual, id: "match-31", dateISO: "2026-10-31", category: "tennis",
+    wearableSessionId: strava.id, wearableSnapshot: normalizeWearableSnapshot(strava)
+  };
+  assert.deepEqual(deduplicateWearableSessions([strava]), []);
+  const links = wearableAutolinks([strava, tennis], [match]);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].record.id, "match-31");
+  assert.equal(links[0].session.id, "mi-tennis");
 });
 
 test("la hora manual de inicio prioriza la sesión correcta de la pulsera", () => {

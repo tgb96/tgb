@@ -40,7 +40,7 @@ import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recove
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
-import { normalizeWearableSnapshot, refreshedWearableLink, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=71";
+import { normalizeWearableSnapshot, refreshedWearableLink, wearableAutolinks, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=72";
 import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=3";
 import { createBikeIntervalGuide } from "./bike-interval-guide.js?v=1";
 import {
@@ -100,6 +100,26 @@ const cloudSync = createCloudSync({
 
 function refreshEquivalentWearableLinks(sessions) {
   let updated = 0;
+  for (const { record, session, match } of wearableAutolinks(sessions, repository.list())) {
+    const snapshot = normalizeWearableSnapshot({
+      ...session,
+      clockAdjustmentMinutes: Number(session.clockAdjustmentMinutes) || Number(match?.timeAdjustmentMinutes) || 0,
+      clockAdjustmentReason: session.clockAdjustmentReason || (match?.timeAdjustmentMinutes ? "matched_one_hour_dst_skew" : "")
+    });
+    if (!snapshot) continue;
+    try {
+      repository.upsert({
+        ...record,
+        wearableSessionId: session.id,
+        wearableSnapshot: snapshot,
+        wearableLinkedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      updated++;
+    } catch {
+      // Si la asociación automática no es inequívoca, el registro queda intacto.
+    }
+  }
   for (const record of repository.list()) {
     const refresh = refreshedWearableLink(record, sessions);
     if (!refresh) continue;

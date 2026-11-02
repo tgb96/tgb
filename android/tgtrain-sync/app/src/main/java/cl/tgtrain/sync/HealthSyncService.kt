@@ -100,12 +100,13 @@ class HealthSyncService(private val context: Context) {
             val packageName = record.metadata.dataOrigin.packageName
             packageName == sourcePackage || (isMiFitnessSource(sourcePackage) && isMiFitnessSource(packageName))
         }
-        // ExerciseSessionRecord can arrive under a different Health Connect
-        // origin than steps or sleep, even when all data came from Mi Fitness.
-        // Read the sessions independently and keep the real origin of each one.
-        // If another app mirrored the same workout, prefer the selected source
-        // (or Mi Fitness) so TGTrain does not offer a duplicate link.
-        val workoutRecords = readAll(ExerciseSessionRecord::class, start, end)
+        // ExerciseSessionRecord can use another Xiaomi package than steps or
+        // sleep. Keep the selected source and its Mi Fitness aliases, but do
+        // not import mirrored copies written by Strava or another provider.
+        val workoutRecords = readAll(ExerciseSessionRecord::class, start, end).filter { record ->
+            val packageName = record.metadata.dataOrigin.packageName
+            packageName == sourcePackage || (isMiFitnessSource(sourcePackage) && isMiFitnessSource(packageName))
+        }
         val workouts = workoutRecords
             .groupBy { "${it.startTime}|${it.endTime}|${it.exerciseType}" }
             .values
