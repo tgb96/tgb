@@ -43,6 +43,72 @@ function sessionWindow(session) {
   return Number.isFinite(start) && Number.isFinite(end) && end > start ? { start, end } : null;
 }
 
+function wearableSessionQuality(session) {
+  if (!session) return -1;
+  const title = String(session.title || "").toLowerCase();
+  let score = /entrenamiento detectado|^entrenamiento$/.test(title) ? 0 : 3;
+  if (numberOrNull(session.caloriesKcal) !== null || numberOrNull(session.activeCaloriesKcal) !== null) score += 5;
+  if (numberOrNull(session.heartRateAvgBpm) !== null) score += 4;
+  if (numberOrNull(session.heartRateMaxBpm) !== null) score += 2;
+  if (numberOrNull(session.distanceMeters) !== null) score += 2;
+  if (session.rawStartTime) score += 1;
+  if (numberOrNull(session.clockAdjustmentMinutes)) score += 1;
+  if (/xiaomi|mifitness/i.test(String(session.originPackage || ""))) score += 2;
+  return score;
+}
+
+function startInstants(session) {
+  return [session?.startTime, session?.rawStartTime]
+    .map(value => Date.parse(value || ""))
+    .filter(Number.isFinite);
+}
+
+export function wearableSessionsEquivalent(left, right) {
+  if (!left || !right) return false;
+  if (left.id && right.id && left.id === right.id) return true;
+  const leftSeconds = numberOrNull(left.durationSeconds);
+  const rightSeconds = numberOrNull(right.durationSeconds);
+  if (leftSeconds === null || rightSeconds === null || leftSeconds <= 0 || rightSeconds <= 0) return false;
+  const durationTolerance = Math.max(180, Math.max(leftSeconds, rightSeconds) * 0.04);
+  if (Math.abs(leftSeconds - rightSeconds) > durationTolerance) return false;
+  const startsClose = startInstants(left).some(leftStart => startInstants(right)
+    .some(rightStart => Math.abs(leftStart - rightStart) <= 5 * 60_000));
+  if (!startsClose) return false;
+  const leftDate = String(left.dateISO || "");
+  const rightDate = String(right.dateISO || "");
+  return !leftDate || !rightDate || leftDate === rightDate
+    || Math.abs((Date.parse(`${leftDate}T12:00:00Z`) || 0) - (Date.parse(`${rightDate}T12:00:00Z`) || 0)) <= 24 * 60 * 60_000;
+}
+
+export function deduplicateWearableSessions(sessions = []) {
+  const preferred = [...sessions].filter(session => session?.id)
+    .sort((left, right) => wearableSessionQuality(right) - wearableSessionQuality(left)
+      || String(right.syncedAt || "").localeCompare(String(left.syncedAt || ""))
+      || String(left.id).localeCompare(String(right.id)));
+  const unique = [];
+  for (const session of preferred) {
+    if (!unique.some(saved => wearableSessionsEquivalent(saved, session))) unique.push(session);
+  }
+  return unique;
+}
+
+export function refreshedWearableLink(record, sessions = []) {
+  const current = normalizeWearableSnapshot(record?.wearableSnapshot);
+  if (!current || !record?.wearableSessionId) return null;
+  const equivalents = sessions.filter(session => session?.id
+    && (session.id === record.wearableSessionId || wearableSessionsEquivalent(session, current)));
+  if (!equivalents.length) return null;
+  const best = equivalents.sort((left, right) => wearableSessionQuality(right) - wearableSessionQuality(left)
+    || Number(right.id === record.wearableSessionId) - Number(left.id === record.wearableSessionId)
+    || String(left.id).localeCompare(String(right.id)))[0];
+  const bestSnapshot = normalizeWearableSnapshot(best);
+  if (!bestSnapshot) return null;
+  const changedId = best.id !== record.wearableSessionId;
+  if (changedId && wearableSessionQuality(best) <= wearableSessionQuality(current)) return null;
+  if (!changedId && JSON.stringify(bestSnapshot) === JSON.stringify(current)) return null;
+  return { sessionId: best.id, snapshot: bestSnapshot };
+}
+
 export function wearableMatch(record, session) {
   if (!record || record.category === "rest" || !session?.id) return null;
   const own = recordWindow(record);
@@ -68,6 +134,10 @@ export function wearableMatch(record, session) {
           : record.cardioTypeId?.startsWith("bik") ? /bicicleta/.test(title) : false;
   let score = (sameType ? 20 : 0) + Math.round((1 - durationDifference) * 20);
   let reason = "Mismo día; confirma que sea la misma actividad";
+  if (sameType && recordedSeconds > 0 && bandSeconds > 0 && durationDifference <= 0.15) {
+    score += 30;
+    reason = "Mismo día, tipo y duración muy similar";
+  }
   let timeAdjustmentMinutes = numberOrNull(session.clockAdjustmentMinutes) || 0;
   if (own && band) {
     const shorter = Math.min(own.end - own.start, band.end - band.start);
@@ -124,7 +194,10 @@ export function wearableMatch(record, session) {
 export function wearableCandidates(record, sessions, records = []) {
   const used = new Set(records.filter(item => item.id !== record.id && item.wearableSessionId)
     .map(item => item.wearableSessionId));
-  return (sessions || []).filter(session => !used.has(session.id))
+  const linkedSnapshots = records.filter(item => item.id !== record.id && item.wearableSnapshot)
+    .map(item => item.wearableSnapshot);
+  return deduplicateWearableSessions(sessions).filter(session => !used.has(session.id)
+      && !linkedSnapshots.some(snapshot => wearableSessionsEquivalent(session, snapshot)))
     .map(session => ({ session, match: wearableMatch(record, session) }))
     .filter(item => item.match)
     .sort((a, b) => b.match.score - a.match.score || String(a.session.startTime).localeCompare(String(b.session.startTime)))
@@ -133,8 +206,11 @@ export function wearableCandidates(record, sessions, records = []) {
 
 export function wearableInbox(sessions = [], records = []) {
   const linked = new Set(records.map(record => record.wearableSessionId).filter(Boolean));
+  const linkedSnapshots = records.map(record => record.wearableSnapshot).filter(Boolean);
   const availableRecords = records.filter(record => !record.wearableSessionId && record.category !== "rest");
-  return sessions.filter(session => session?.id && session.startTime && session.endTime && !linked.has(session.id))
+  return deduplicateWearableSessions(sessions)
+    .filter(session => session?.id && session.startTime && session.endTime && !linked.has(session.id)
+      && !linkedSnapshots.some(snapshot => wearableSessionsEquivalent(session, snapshot)))
     .map(session => {
       const candidates = availableRecords.map(record => ({ record, match: wearableMatch(record, session) }))
         .filter(item => item.match)

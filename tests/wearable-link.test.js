@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "../assets/js/wearable-link.js";
+import { deduplicateWearableSessions, normalizeWearableSnapshot, refreshedWearableLink, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "../assets/js/wearable-link.js";
 import { groupRecordsByWeek, normalizeRecord, recordsToCSV, weeklyReport } from "../assets/js/utils.js";
 import { createRepository } from "../assets/js/storage.js";
 
@@ -45,6 +45,56 @@ test("la bandeja de la pulsera separa coincidencias recomendadas, ambiguas y sin
   assert.equal(ambiguous[0].state, "ambiguous");
   const unmatched = wearableInbox([{ ...band, dateISO: "2026-09-25", startTime: "2026-09-25T14:00:00Z", endTime: "2026-09-25T15:00:00Z" }], [manual]);
   assert.equal(unmatched[0].state, "unmatched");
+});
+
+test("fusiona copias de Mi Fitness y Strava y conserva la sesión con más métricas", () => {
+  const physicalCopy = {
+    ...band, id: "physical-copy", title: "Entrenamiento físico", dateISO: "2026-10-31",
+    startTime: "2026-10-31T15:59:00Z", endTime: "2026-10-31T18:19:00Z",
+    durationSeconds: 8400, caloriesKcal: null, originPackage: "com.strava"
+  };
+  const tennisCopy = {
+    ...band, id: "tennis-copy", title: "Tenis", dateISO: "2026-10-31",
+    startTime: "2026-10-31T14:59:00Z", endTime: "2026-10-31T17:19:00Z",
+    rawStartTime: "2026-10-31T15:59:00Z", rawEndTime: "2026-10-31T18:19:00Z",
+    clockAdjustmentMinutes: -60, durationSeconds: 8400, caloriesKcal: 1284,
+    originPackage: "com.xiaomi.wearable"
+  };
+  const unique = deduplicateWearableSessions([physicalCopy, tennisCopy]);
+  assert.equal(unique.length, 1);
+  assert.equal(unique[0].id, "tennis-copy");
+
+  const match = {
+    ...manual, id: "match-31", dateISO: "2026-10-31", category: "tennis",
+    durationSeconds: 8400, durationMinutes: 140, routineStartedAt: "", routineEndedAt: ""
+  };
+  const inbox = wearableInbox([physicalCopy, tennisCopy], [match]);
+  assert.equal(inbox.length, 1);
+  assert.equal(inbox[0].session.id, "tennis-copy");
+  assert.equal(inbox[0].recommended.record.id, "match-31");
+});
+
+test("oculta una copia duplicada de una actividad ya vinculada y enriquece el vínculo", () => {
+  const linkedCopy = {
+    ...band, id: "physical-copy", title: "Entrenamiento físico", dateISO: "2026-10-31",
+    startTime: "2026-10-31T15:59:00Z", endTime: "2026-10-31T18:19:00Z",
+    durationSeconds: 8400, caloriesKcal: null, originPackage: "com.strava"
+  };
+  const richerCopy = {
+    ...band, id: "tennis-copy", title: "Tenis", dateISO: "2026-10-31",
+    startTime: "2026-10-31T14:59:00Z", endTime: "2026-10-31T17:19:00Z",
+    rawStartTime: "2026-10-31T15:59:00Z", rawEndTime: "2026-10-31T18:19:00Z",
+    clockAdjustmentMinutes: -60, durationSeconds: 8400, caloriesKcal: 1284,
+    originPackage: "com.xiaomi.wearable"
+  };
+  const record = {
+    ...manual, id: "match-31", dateISO: "2026-10-31", category: "tennis",
+    wearableSessionId: linkedCopy.id, wearableSnapshot: normalizeWearableSnapshot(linkedCopy)
+  };
+  assert.equal(wearableInbox([linkedCopy, richerCopy], [record]).length, 0);
+  const refresh = refreshedWearableLink(record, [linkedCopy, richerCopy]);
+  assert.equal(refresh.sessionId, "tennis-copy");
+  assert.equal(refresh.snapshot.activeCaloriesKcal, 1284);
 });
 
 test("la hora manual de inicio prioriza la sesión correcta de la pulsera", () => {

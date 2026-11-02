@@ -40,7 +40,7 @@ import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recove
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
 import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
-import { normalizeWearableSnapshot, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=70";
+import { normalizeWearableSnapshot, refreshedWearableLink, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=71";
 import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=3";
 import { createBikeIntervalGuide } from "./bike-interval-guide.js?v=1";
 import {
@@ -80,19 +80,44 @@ const cloudSync = createCloudSync({
   onStatus: updateCloudStatus,
   onWearableChanged: data => {
     wearableData = data;
+    const refreshedLinks = refreshEquivalentWearableLinks(data.sessions || []);
     renderWearable();
     renderWearableSyncStatus();
     renderHistory();
+    if (refreshedLinks) renderHome();
     nutritionUI.render();
     if (loadRoutineSession()?.status === "complete") renderRoutines();
   },
   onDataChanged: () => {
+    refreshEquivalentWearableLinks(wearableData.sessions || []);
     renderHome();
+    renderWearable();
     renderHistory();
     nutritionUI.render();
     renderCoachPlanDialog();
   }
 });
+
+function refreshEquivalentWearableLinks(sessions) {
+  let updated = 0;
+  for (const record of repository.list()) {
+    const refresh = refreshedWearableLink(record, sessions);
+    if (!refresh) continue;
+    try {
+      repository.upsert({
+        ...record,
+        wearableSessionId: refresh.sessionId,
+        wearableSnapshot: refresh.snapshot,
+        wearableLinkedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      updated++;
+    } catch {
+      // Mantén el vínculo confirmado anterior si la copia enriquecida no se puede guardar.
+    }
+  }
+  return updated;
+}
 const nutritionUI = createNutritionUI(repository, {
   showToast: message => showToast(message),
   getWearableData: () => wearableData,
