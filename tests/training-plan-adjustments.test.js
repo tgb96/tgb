@@ -84,3 +84,32 @@ test("la alternativa cubierta más reciente conserva una rutina física reducida
   assert.equal(selected.prefill.settings["front-plank"].sets, 2);
   assert.deepEqual(selected.prefill.omitExerciseIds, ["split-step-short"]);
 });
+
+test("un partido futuro amplía el plan y conserva su hora aunque el sábado aún no exista", () => {
+  const block = normalizeTrainingBlock({
+    id: "plan-octubre",
+    title: "Plan de octubre",
+    weeks: [{ weekKey: "2026-W44", sessions: [{ dateISO: "2026-10-30", primaryOptionId: "physical", options: [{ ...option("physical", "Potencia", "physical"), routineId: "agility" }] }] }]
+  });
+  const adjusted = withCoachPlanAdjustments(block, [{
+    id: "question-interclubes",
+    adjustmentStatus: "applied",
+    appliedAt: "2026-11-02T21:00:00.000Z",
+    planAdjustment: {
+      targetDateISO: "2026-11-07",
+      startTime: "14:30",
+      title: "Partido de interclubes",
+      reason: "Partido confirmado",
+      category: "tennis",
+      summary: "Competencia",
+      details: [],
+      tennisTypeId: "match",
+      exerciseSettings: []
+    }
+  }]);
+  const session = adjusted.weeks.flatMap(week => week.sessions).find(item => item.dateISO === "2026-11-07");
+  assert.ok(session);
+  assert.equal(session.startTime, "14:30");
+  assert.equal(session.options.find(item => item.id === session.primaryOptionId).title, "Partido de interclubes");
+  assert.equal(adjusted.endISO, "2026-11-08");
+});

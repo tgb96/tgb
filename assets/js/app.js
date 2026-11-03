@@ -25,14 +25,14 @@ import {
   withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=99";
-import { createRepository } from "./storage.js?v=118";
+} from "./coach-plan.js?v=100";
+import { createRepository } from "./storage.js?v=119";
 import { createCloudSync } from "./cloud.js?v=76";
 import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=122";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=100";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
 import { createGuidedUI } from "./guided-ui.js?v=101";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=114";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=115";
 import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=101";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
@@ -1161,6 +1161,12 @@ function resolveCoachMemorySuggestion(item, suggestion, status) {
   showToast(status === "applied" ? "Dato guardado en la memoria de TGTrain." : "Ese dato no se guardará como memoria.");
 }
 
+function supportedCoachMemorySuggestion(item, memory) {
+  if (memory?.category !== "schedule") return true;
+  const recurrence = /\b(?:siempre|cada|todos? los|habitual(?:mente)?|normalmente|recurrente|suelo)\b/i;
+  return !recurrence.test(String(memory.text || "")) || recurrence.test(String(item?.question || ""));
+}
+
 function renderCoachFollowUp(allQuestions) {
   const container = $("coachFollowUp");
   container.replaceChildren();
@@ -1261,7 +1267,7 @@ function renderCoachQuestions() {
       recovery.append(heading, detail, note);
       exchange.append(recovery);
     }
-    (item.memorySuggestions || []).forEach(memory => {
+    (item.memorySuggestions || []).filter(memory => supportedCoachMemorySuggestion(item, memory)).forEach(memory => {
       const proposal = document.createElement("div");
       proposal.className = `coach-plan-proposal coach-memory-proposal ${memory.status || "pending"}`;
       const heading = document.createElement("strong");
@@ -1721,12 +1727,58 @@ function revertCoachRecordAdjustment(item) {
   }
 }
 
+function coachAdjustmentStartTime(item) {
+  const explicit = String(item?.planAdjustment?.startTime || "");
+  if (/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(explicit)) return explicit;
+  const text = [item?.question, item?.answer, item?.planAdjustment?.reason, item?.planAdjustment?.summary, item?.planAdjustment?.nutritionReason]
+    .filter(Boolean).join(" ");
+  const match = text.match(/(?:^|\D)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/);
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : "";
+}
+
+function ensureCoachAdjustmentSession(block, adjustment) {
+  let week = block.weeks.find(candidate => adjustment.targetDateISO >= candidate.startISO && adjustment.targetDateISO <= candidate.endISO);
+  if (!week) {
+    const info = isoWeekInfo(adjustment.targetDateISO);
+    week = {
+      weekKey: info.key,
+      number: info.weekNumber,
+      startISO: info.startISO,
+      endISO: info.endISO,
+      label: "Semana ajustada por el entrenador",
+      context: "Semana ampliada al confirmar una modificación futura con el entrenador.",
+      objective: adjustment.reason || adjustment.summary,
+      sessions: []
+    };
+    block.weeks.push(week);
+    block.weeks.sort((left, right) => left.startISO.localeCompare(right.startISO));
+    block.startISO = [block.startISO, info.startISO].filter(Boolean).sort()[0];
+    block.endISO = [block.endISO, info.endISO].filter(Boolean).sort().at(-1);
+  }
+  week.sessions = Array.isArray(week.sessions) ? week.sessions : [];
+  let session = week.sessions.find(candidate => candidate.dateISO === adjustment.targetDateISO);
+  const createdSession = !session;
+  if (!session) {
+    session = {
+      id: `coach-session-${adjustment.targetDateISO}`,
+      dateISO: adjustment.targetDateISO,
+      startTime: adjustment.startTime || "",
+      objective: adjustment.reason || adjustment.summary,
+      primaryOptionId: "",
+      options: []
+    };
+    week.sessions.push(session);
+    week.sessions.sort((left, right) => left.dateISO.localeCompare(right.dateISO));
+  }
+  if (adjustment.startTime) session.startTime = adjustment.startTime;
+  return { week, session, createdSession };
+}
+
 function applyCoachPlanAdjustment(item) {
-  const adjustment = item.planAdjustment;
+  const adjustment = { ...item.planAdjustment, startTime: coachAdjustmentStartTime(item) };
   const block = activeTrainingBlock(adjustment.targetDateISO);
   const copy = JSON.parse(JSON.stringify(block));
-  const session = copy.weeks.flatMap(week => week.sessions || []).find(candidate => candidate.dateISO === adjustment.targetDateISO);
-  if (!session) { showToast("Esa fecha ya no está en el plan activo. Pídele una nueva propuesta a la guía."); return; }
+  const { session, createdSession } = ensureCoachAdjustmentSession(copy, adjustment);
   const category = adjustment.category;
   const valid = category === "physical" ? physicalRoutineById(adjustment.routineId)
     : category === "cardio" ? cardioTypeById(adjustment.cardioTypeId)
@@ -1736,6 +1788,7 @@ function applyCoachPlanAdjustment(item) {
   const originalOption = coachOption(session, session.primaryOptionId) || session.options?.[0];
   const previewLines = [
     `Fecha: ${formatShortDate(adjustment.targetDateISO)}`,
+    adjustment.startTime ? `Hora: ${adjustment.startTime}` : "",
     `Plan actual: ${originalOption?.title || "Sin actividad principal"}`,
     `Nuevo plan: ${adjustment.title}`,
     adjustment.summary ? `Detalle: ${adjustment.summary}` : ""
@@ -1743,7 +1796,7 @@ function applyCoachPlanAdjustment(item) {
   if (!window.confirm(`Revisa el cambio antes de aplicarlo:\n\n${previewLines}\n\nTambién se coordinará la guía de alimentación de ese día. Podrás deshacer el ajuste.`)) return;
   const optionId = `coach-${adjustment.targetDateISO}-${item.id.slice(0, 12)}`;
   const option = {
-    id: optionId, title: adjustment.title, category, summary: adjustment.summary,
+    id: optionId, title: adjustment.title, category, startTime: adjustment.startTime || "", summary: adjustment.summary,
     details: adjustment.details,
     routineId: category === "physical" ? adjustment.routineId : "",
     cardioTypeId: category === "cardio" ? adjustment.cardioTypeId : "",
@@ -1754,6 +1807,31 @@ function applyCoachPlanAdjustment(item) {
   session.options = [...session.options.filter(candidate => candidate.id !== optionId), option];
   const originalOptionId = session.primaryOptionId;
   session.primaryOptionId = optionId;
+  let supportingSessionId = "";
+  let supportingOptionId = "";
+  let supportingOriginalOptionId = "";
+  if (category === "tennis" && adjustment.tennisTypeId === "match") {
+    const previousDateISO = addDaysISO(adjustment.targetDateISO, -1);
+    const supportingSession = copy.weeks.flatMap(week => week.sessions || [])
+      .find(candidate => candidate.dateISO === previousDateISO);
+    if (supportingSession) {
+      supportingSessionId = supportingSession.id;
+      supportingOptionId = `coach-prematch-${adjustment.targetDateISO}-${item.id.slice(0, 8)}`;
+      supportingOriginalOptionId = supportingSession.primaryOptionId;
+      const supportingOption = {
+        id: supportingOptionId,
+        title: "Activación prepartido",
+        category: "physical",
+        summary: "Movilidad y reacción suave · sin fuerza pesada",
+        details: ["Rutina breve de activación prepartido", "RPE 4–5/10", "Terminar con sensación de frescura"],
+        routineId: "prematch-activation",
+        exerciseSettings: []
+      };
+      supportingSession.options = [...supportingSession.options.filter(candidate => candidate.id !== supportingOptionId), supportingOption];
+      supportingSession.primaryOptionId = supportingOptionId;
+      supportingSession.objective = "Llegar al partido con movilidad y reacción, sin fatiga residual.";
+    }
+  }
   try {
     repository.saveTrainingBlock({ ...copy, updatedAt: new Date().toISOString() });
     const planId = `nutrition-plan-${adjustment.targetDateISO}`;
@@ -1762,7 +1840,7 @@ function applyCoachPlanAdjustment(item) {
       id: planId, dateISO: adjustment.targetDateISO, kind: "plan", planMode: adjustment.nutritionMode || "default",
       createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString()
     });
-    repository.saveCoachQuestion({ ...item, adjustmentStatus: "applied", appliedOptionId: optionId, originalOptionId, originalNutritionMode: previous?.planMode || "", appliedAt: new Date().toISOString(), revertedAt: "", updatedAt: new Date().toISOString() });
+    repository.saveCoachQuestion({ ...item, planAdjustment: adjustment, adjustmentStatus: "applied", appliedOptionId: optionId, originalOptionId, createdPlanSession: createdSession, supportingSessionId, supportingOptionId, supportingOriginalOptionId, originalNutritionMode: previous?.planMode || "", appliedAt: new Date().toISOString(), revertedAt: "", updatedAt: new Date().toISOString() });
     renderHome(); renderCoachPlanDialog(); nutritionUI.render();
     showToast("Ajuste aplicado al entrenamiento y a la guía de alimentación.");
   } catch (error) {
@@ -1774,12 +1852,26 @@ function revertCoachPlanAdjustment(item) {
   const adjustment = item.planAdjustment;
   const block = activeTrainingBlock(adjustment?.targetDateISO);
   const copy = JSON.parse(JSON.stringify(block));
-  const session = copy.weeks.flatMap(week => week.sessions || []).find(candidate => candidate.dateISO === adjustment?.targetDateISO);
+  const week = copy.weeks.find(candidate => adjustment?.targetDateISO >= candidate.startISO && adjustment?.targetDateISO <= candidate.endISO);
+  const session = week?.sessions?.find(candidate => candidate.dateISO === adjustment?.targetDateISO);
   const original = session?.options?.find(option => option.id === item.originalOptionId);
-  if (!session || !original) return showToast("El plan cambió y ya no se puede restaurar automáticamente esa versión.");
-  if (!window.confirm(`Se restaurará ${original.title} para ${formatShortDate(adjustment.targetDateISO)}. ¿Continuar?`)) return;
-  session.primaryOptionId = original.id;
-  session.options = session.options.filter(option => option.id !== item.appliedOptionId);
+  if (!session || (!item.createdPlanSession && !original)) return showToast("El plan cambió y ya no se puede restaurar automáticamente esa versión.");
+  const restoreLabel = item.createdPlanSession ? "se quitará la sesión agregada" : `se restaurará ${original.title}`;
+  if (!window.confirm(`Para ${formatShortDate(adjustment.targetDateISO)} ${restoreLabel}. ¿Continuar?`)) return;
+  if (item.createdPlanSession) week.sessions = week.sessions.filter(candidate => candidate.id !== session.id);
+  else {
+    session.primaryOptionId = original.id;
+    session.options = session.options.filter(option => option.id !== item.appliedOptionId);
+  }
+  if (item.supportingSessionId && item.supportingOptionId) {
+    const supportingSession = copy.weeks.flatMap(candidate => candidate.sessions || [])
+      .find(candidate => candidate.id === item.supportingSessionId);
+    const supportingOriginal = supportingSession?.options?.find(option => option.id === item.supportingOriginalOptionId);
+    if (supportingSession) {
+      supportingSession.options = supportingSession.options.filter(option => option.id !== item.supportingOptionId);
+      if (supportingOriginal) supportingSession.primaryOptionId = supportingOriginal.id;
+    }
+  }
   const timestamp = new Date().toISOString();
   try {
     repository.saveTrainingBlock({ ...copy, updatedAt: timestamp });

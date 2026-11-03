@@ -83,6 +83,8 @@ export function normalizeCoachQuestions(value) {
     if (!id || !question) return [];
     const rawAdjustment = item?.planAdjustment;
     const targetDateISO = String(rawAdjustment?.targetDateISO || "");
+    const adjustmentStartTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(rawAdjustment?.startTime || ""))
+      ? String(rawAdjustment.startTime) : "";
     const category = ["physical", "cardio", "tennis", "rest"].includes(rawAdjustment?.category) ? rawAdjustment.category : "";
     const exerciseSettings = (Array.isArray(rawAdjustment?.exerciseSettings) ? rawAdjustment.exerciseSettings : []).slice(0, 30).flatMap(setting => {
       const exerciseId = String(setting?.exerciseId || "").slice(0, 100);
@@ -101,6 +103,7 @@ export function normalizeCoachQuestions(value) {
     });
     const planAdjustment = isValidISODate(targetDateISO) && category ? {
       targetDateISO,
+      startTime: adjustmentStartTime,
       title: String(rawAdjustment?.title || "Ajuste propuesto").trim().slice(0, 200),
       reason: String(rawAdjustment?.reason || "").trim().slice(0, 1000),
       category,
@@ -184,6 +187,10 @@ export function normalizeCoachQuestions(value) {
       appliedOptionId: String(item?.appliedOptionId || "").slice(0, 120),
       originalOptionId: String(item?.originalOptionId || "").slice(0, 120),
       originalNutritionMode: nutritionModes.includes(item?.originalNutritionMode) ? item.originalNutritionMode : "",
+      createdPlanSession: Boolean(item?.createdPlanSession),
+      supportingSessionId: String(item?.supportingSessionId || "").slice(0, 120),
+      supportingOptionId: String(item?.supportingOptionId || "").slice(0, 120),
+      supportingOriginalOptionId: String(item?.supportingOriginalOptionId || "").slice(0, 120),
       appliedAt: String(item?.appliedAt || ""),
       revertedAt: String(item?.revertedAt || ""),
       createdAt: String(item?.createdAt || ""),

@@ -223,6 +223,11 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   assert.match(app, /actionableRoutineAiChanges/);
   assert.match(app, /undoRoutineAiChanges/);
   assert.match(app, /revertCoachPlanAdjustment/);
+  assert.match(app, /ensureCoachAdjustmentSession/);
+  assert.match(app, /coachAdjustmentStartTime/);
+  assert.match(app, /prematch-activation/);
+  assert.match(app, /supportedCoachMemorySuggestion/);
+  assert.doesNotMatch(app, /Esa fecha ya no está en el plan activo/);
   assert.match(app, /wearableInbox/);
   assert.match(app, /history-record-disclosure/);
   assert.match(app, /home-coach-snapshot/);
@@ -635,7 +640,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=153/);
+  assert.match(html, /assets\/js\/app\.js\?v=154/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

@@ -398,6 +398,7 @@ function adjustmentOption(item) {
     id: optionId,
     title: adjustment.title,
     category: adjustment.category,
+    startTime: adjustment.startTime || "",
     summary: adjustment.summary,
     details: adjustment.details || [],
     prefill: {
@@ -428,8 +429,25 @@ export function withCoachPlanAdjustments(sourceBlock, questions = []) {
   const block = structuredClone(sourceBlock);
   for (const item of applied) {
     const adjustment = item.planAdjustment;
-    const week = block.weeks.find(candidate => adjustment.targetDateISO >= candidate.startISO && adjustment.targetDateISO <= candidate.endISO);
-    if (!week) continue;
+    let week = block.weeks.find(candidate => adjustment.targetDateISO >= candidate.startISO && adjustment.targetDateISO <= candidate.endISO);
+    if (!week) {
+      const info = cadenceWeekInfo(adjustment.targetDateISO);
+      if (!info) continue;
+      week = {
+        weekKey: info.weekKey,
+        number: info.weekNumber,
+        startISO: info.startISO,
+        endISO: info.endISO,
+        label: "Semana ajustada por el entrenador",
+        context: "Semana ampliada al confirmar una modificación futura con el entrenador.",
+        objective: adjustment.reason || adjustment.summary,
+        sessions: []
+      };
+      block.weeks.push(week);
+      block.weeks.sort((left, right) => left.startISO.localeCompare(right.startISO));
+      block.startISO = [block.startISO, info.startISO].filter(Boolean).sort()[0];
+      block.endISO = [block.endISO, info.endISO].filter(Boolean).sort().at(-1);
+    }
     let session = (week.sessions || []).find(candidate => candidate.dateISO === adjustment.targetDateISO);
     if (!session) {
       session = { id: `coach-session-${adjustment.targetDateISO}`, dateISO: adjustment.targetDateISO, objective: adjustment.reason, options: [] };
@@ -438,6 +456,7 @@ export function withCoachPlanAdjustments(sourceBlock, questions = []) {
     const option = adjustmentOption(item);
     session.options = [...(session.options || []).filter(candidate => candidate.id !== option.id), option];
     session.primaryOptionId = option.id;
+    if (adjustment.startTime) session.startTime = adjustment.startTime;
     session.objective = adjustment.reason || option.summary;
   }
   return block;
