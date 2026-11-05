@@ -1,5 +1,5 @@
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=100";
-import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, nutritionSlotFamily, summarizeParts } from "./nutrition-presets.js?v=106";
+import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=106";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=75";
 
@@ -45,6 +45,7 @@ export function createNutritionUI(repository, {
   let editingId = "";
   let selectedSlot = "other";
   let selectedParts = {};
+  let draftMealNote = "";
   let estimateSource = "";
   let selectedPhotoFile = null;
   let photoAnalysisLoading = false;
@@ -265,7 +266,7 @@ export function createNutritionUI(repository, {
 
   function applyMealDraft(entry) {
     selectedParts = { ...(entry.parts || {}) };
-    byId("nutritionMealText").value = entry.note || (Object.keys(selectedParts).length ? "" : entry.text || "");
+    draftMealNote = entry.note || (Object.keys(selectedParts).length ? "" : entry.text || "");
     for (const [field, key] of [["nutritionMealCalories", "caloriesKcal"], ["nutritionMealProtein", "proteinG"], ["nutritionMealCarbs", "carbsG"], ["nutritionMealFat", "fatG"]]) {
       byId(field).value = entry[key] ?? "";
     }
@@ -273,41 +274,6 @@ export function createNutritionUI(repository, {
     renderSelectedParts({ updateEstimate: false });
     byId("nutritionMacrosDetails").open = true;
     byId("nutritionEstimateNote").textContent = `${mealSourceLabel(estimateSource)}. Revisa las cantidades antes de guardar.`;
-  }
-
-  function renderRecentMeals() {
-    const container = byId("nutritionRecentMeals");
-    container.replaceChildren();
-    const seen = new Set();
-    const recent = repository.listNutritionEntries()
-      .filter(entry => !entry.deleted && entry.kind === "meal" && entry.id !== editingId)
-      .sort((a, b) => {
-        const affinity = entry => entry.slotId === selectedSlot ? 2
-          : nutritionSlotFamily(entry.slotId) === nutritionSlotFamily(selectedSlot) ? 1 : 0;
-        return affinity(b) - affinity(a)
-          || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
-      })
-      .filter(entry => {
-        const key = `${summarizeParts(entry.parts || {})}|${entry.note || entry.text || ""}`.toLowerCase();
-        if (!key.replace("|", "") || seen.has(key)) return false;
-        seen.add(key); return true;
-      }).slice(0, 3);
-    if (!recent.length) {
-      const empty = document.createElement("small");
-      empty.textContent = "Tus comidas habituales aparecerán aquí después del primer registro.";
-      container.append(empty); return;
-    }
-    recent.forEach(entry => {
-      const button = document.createElement("button"); button.type = "button";
-      const title = document.createElement("strong");
-      title.textContent = summarizeParts(entry.parts || {}) || entry.note || entry.text;
-      const detail = document.createElement("small");
-      const metrics = nutritionEntryWithEstimate(entry);
-      detail.textContent = [entry.dateISO, metrics.caloriesKcal !== null ? `${Math.round(metrics.caloriesKcal)} kcal` : ""].filter(Boolean).join(" · ");
-      button.append(title, detail);
-      button.addEventListener("click", () => applyMealDraft(entry));
-      container.append(button);
-    });
   }
 
   async function analyzeSelectedPhoto() {
@@ -443,7 +409,7 @@ export function createNutritionUI(repository, {
       selectedParts,
       referenceDate: selectedDate
     });
-    if (!foods.length) list.append(label("No encontré ese alimento. Puedes describirlo en la nota."));
+    if (!foods.length) list.append(label("No encontré ese alimento. Puedes agregarlo desde Administrar alimentos o estimar la comida con Gemini."));
     for (const item of foods) {
       const button = document.createElement("button"); button.type = "button";
       const name = document.createElement("strong"); name.textContent = item.name;
@@ -464,10 +430,10 @@ export function createNutritionUI(repository, {
     selectedSlot = slotId;
     editingId = entry?.id || "";
     selectedParts = { ...(entry?.parts || initialParts) };
+    draftMealNote = entry ? (entry.parts && Object.keys(entry.parts).length ? entry.note || "" : entry.text || "") : "";
     byId("nutritionEntryTitle").textContent = entry ? "Editar comida registrada" : "Registrar lo que comiste";
     byId("nutritionEntryMessage").classList.add("hidden");
     byId("nutritionMealTime").value = entry?.time || localTime();
-    byId("nutritionMealText").value = entry ? (entry.parts && Object.keys(entry.parts).length ? entry.note || "" : entry.text) : "";
     byId("nutritionIngredientSearch").value = "";
     selectedPhotoFile = null;
     byId("nutritionMealCamera").value = "";
@@ -480,7 +446,6 @@ export function createNutritionUI(repository, {
     descriptionButton.disabled = false;
     descriptionButton.textContent = "Estimar solo la descripción";
     setMealDescriptionStatus(typeof estimateMealDescription === "function" ? "La descripción solo se envía a Gemini al pulsar Estimar." : "La estimación requiere iniciar sesión y tener Gemini configurado.");
-    renderRecentMeals();
     renderIngredientChoices();
     renderSelectedParts({ updateEstimate: false });
     const estimate = estimateParts(selectedParts);
@@ -496,10 +461,10 @@ export function createNutritionUI(repository, {
 
   function saveMeal(event) {
     event.preventDefault();
-    const note = byId("nutritionMealText").value.trim();
+    const note = draftMealNote.trim();
     const text = [describeParts(selectedParts), note].filter(Boolean).join(" · ");
     if (!text) {
-      byId("nutritionEntryMessage").textContent = "Agrega al menos un ingrediente o describe lo que comiste en la nota.";
+      byId("nutritionEntryMessage").textContent = "Agrega al menos un ingrediente o estima la comida con Gemini.";
       byId("nutritionEntryMessage").classList.remove("hidden");
       return;
     }

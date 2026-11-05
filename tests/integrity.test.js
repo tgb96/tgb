@@ -116,6 +116,7 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /id="nutritionAnalyzePhoto"/);
   assert.match(html, /id="nutritionAiMealDescription"/);
   assert.match(html, /id="nutritionEstimateMeal"/);
+  assert.doesNotMatch(html, /Registro rápido|nutritionRecentMeals|nutritionMealText|Nota adicional/);
   assert.match(html, /<details class="exercise-progress-card"/);
   assert.doesNotMatch(html, /coach(?:Send|Share|Conversation|Confirm|Baseline)/);
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
@@ -367,6 +368,8 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.match(ui, /slotId: selectedSlot, userContext/);
   assert.match(ui, /ai-photo-description/);
   assert.doesNotMatch(ui, /analysis\?\.catalogParts/);
+  assert.doesNotMatch(ui, /renderRecentMeals|nutritionRecentMeals|nutritionMealText/);
+  assert.match(ui, /draftMealNote/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
@@ -640,7 +643,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=154/);
+  assert.match(html, /assets\/js\/app\.js\?v=155/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

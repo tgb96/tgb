@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=122">
+  <link rel="stylesheet" href="assets/css/styles.css?v=123">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -492,9 +492,7 @@
       </div>
       <label for="nutritionMealTime">Hora</label>
       <input id="nutritionMealTime" type="time" required>
-      <section class="nutrition-fast-entry" aria-labelledby="nutritionFastEntryTitle">
-        <div><strong id="nutritionFastEntryTitle">Registro rápido</strong><small>Reutiliza una comida o deja que Gemini combine una foto con tu descripción.</small></div>
-        <div id="nutritionRecentMeals" class="nutrition-recent-meals"></div>
+      <section class="nutrition-fast-entry" aria-label="Registrar con foto o Gemini">
         <div class="nutrition-photo-actions">
           <label class="nutrition-photo-button" for="nutritionMealCamera">Sacar foto</label>
           <label class="nutrition-photo-button" for="nutritionMealPhoto">Elegir de galería</label>
@@ -515,8 +513,6 @@
       <div id="nutritionIngredientChoices" class="nutrition-ingredient-choices" aria-label="Ingredientes disponibles"></div>
       <p class="nutrition-selected-title">Tu comida</p>
       <div id="nutritionSelectedIngredients" class="nutrition-selected-ingredients" aria-live="polite"></div>
-      <label for="nutritionMealText">Nota adicional <small>(opcional)</small></label>
-      <textarea id="nutritionMealText" rows="3" maxlength="1000" placeholder="Marca, preparación, aceite, cantidades distintas o algo que no está en la lista"></textarea>
       <p id="nutritionEstimateNote" class="nutrition-estimate-note">Las porciones y sus kcal son aproximadas salvo que usemos una etiqueta concreta.</p>
       <details id="nutritionMacrosDetails" class="nutrition-macros"><summary>Revisar kcal y macros (opcional)</summary>
         <div class="nutrition-macro-grid">
@@ -597,6 +593,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=154"></script>
+<script type="module" src="assets/js/app.js?v=155"></script>
 </body>
 </html>

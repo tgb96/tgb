@@ -319,7 +319,13 @@ export function recordDetails(record, { durationFormat = "readable" } = {}) {
   const displayedDuration = durationFormat === "clock"
     ? timing.durationSeconds === null
       ? "—"
-      : `${String(Math.floor(timing.durationSeconds / 3600)).padStart(2, "0")}:${String(Math.floor(timing.durationSeconds % 3600 / 60)).padStart(2, "0")}`
+      : (() => {
+          const totalMinutes = Math.round(timing.durationSeconds / 60);
+          if (totalMinutes < 60) return `${totalMinutes} minutos`;
+          const hours = Math.floor(totalMinutes / 60);
+          const minutes = totalMinutes % 60;
+          return `${hours}:${String(minutes).padStart(2, "0")} ${hours === 1 ? "hora" : "horas"}`;
+        })()
     : normalized.category === "cardio"
       ? formatDuration({ ...displayRecord, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
       : formatDuration(displayRecord);
