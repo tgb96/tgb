@@ -436,7 +436,7 @@ test("Inicio completa tiempo y calorías del tenis desde la pulsera vinculada", 
     }
   };
   assert.equal(recordDetails(tennis), "90 min · 612 kcal · Club Open Tenis · Arcilla");
-  assert.equal(recordDetails(tennis, { durationFormat: "clock" }), "1:30 hora · 612 kcal · Club Open Tenis · Arcilla");
+  assert.equal(recordDetails(tennis, { durationFormat: "clock" }), "1h 30min · 612 kcal · Club Open Tenis · Arcilla");
   assert.equal(recordDetails({ ...tennis, durationMinutes: 45, durationSeconds: 2700 }, { durationFormat: "clock" }), "45 minutos · 612 kcal · Club Open Tenis · Arcilla");
 });
 

@@ -324,7 +324,7 @@ export function recordDetails(record, { durationFormat = "readable" } = {}) {
           if (totalMinutes < 60) return `${totalMinutes} minutos`;
           const hours = Math.floor(totalMinutes / 60);
           const minutes = totalMinutes % 60;
-          return `${hours}:${String(minutes).padStart(2, "0")} ${hours === 1 ? "hora" : "horas"}`;
+          return `${hours}h ${String(minutes).padStart(2, "0")}min`;
         })()
     : normalized.category === "cardio"
       ? formatDuration({ ...displayRecord, durationPrecision: normalized.cardioTypeId === "running" ? "hms" : "hm" })
