@@ -500,6 +500,12 @@ export function withMatchCalendar(sourceBlock, events = sourceBlock?.matchCalend
         if (!week.sessions.some(item => item.dateISO === dateISO)) week.sessions.push(supportingSession(event, offset));
       }
     }
+    const manualOverride = existingAlternatives.find(option => option.manualOverride);
+    if (manualOverride) {
+      session.primaryOptionId = manualOverride.id;
+      session.objective = manualOverride.summary;
+      session.startTime = manualOverride.startTime || "";
+    }
     week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
     ensureWeeklyCadence(week, event);
     week.sessions.sort((a, b) => a.dateISO.localeCompare(b.dateISO));

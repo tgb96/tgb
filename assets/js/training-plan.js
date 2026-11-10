@@ -112,6 +112,7 @@ function normalizeOption(raw, index, sessionId) {
     id,
     title,
     category,
+    manualOverride: Boolean(raw?.manualOverride),
     startTime,
     summary: text(raw?.summary, 300) || title,
     details: list(raw?.details, 20, 500),
@@ -190,6 +191,90 @@ export function normalizeTrainingBlock(raw) {
     createdAt: text(raw.createdAt, 40) || new Date().toISOString(),
     updatedAt: text(raw.updatedAt, 40) || new Date().toISOString()
   };
+}
+
+const quickMatchPeriods = {
+  morning: { label: "por la mañana", nutritionMode: "early" },
+  afternoon: { label: "por la tarde", nutritionMode: "late" },
+  night: { label: "por la noche", nutritionMode: "late" }
+};
+
+function physicalNutritionMode(routineId) {
+  if (routineId === "legs") return "physicalLegs";
+  if (["upper", "right-upper-maintenance"].includes(routineId)) return "physicalUpper";
+  if (["agility", "indoor-power", "deceleration-direction"].includes(routineId)) return "physicalPower";
+  if (routineId === "mobility-recovery") return "recovery";
+  return "physical";
+}
+
+export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod = "afternoon", opponent = "", startTime = "" } = {}) {
+  if (!isValidISODate(dateISO)) return null;
+  const cleanTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(startTime || "")) ? String(startTime) : "";
+  const base = { id: `quick-${dateISO}-${scenario}`, manualOverride: true, startTime: cleanTime, details: [], prefill: {} };
+  if (scenario === "rest") return {
+    scenario, nutritionMode: "recovery", objective: "Recuperar y mantener disponibilidad para la siguiente sesión.",
+    option: { ...base, title: "Día de descanso", category: "rest", summary: "Recuperación planificada", details: ["Priorizar sueño, hidratación y comidas regulares"], prefill: { restTypeId: "planned" } }
+  };
+  if (scenario === "physical") {
+    const routine = physicalRoutineById(routineId);
+    if (!routine) return null;
+    return {
+      scenario, nutritionMode: physicalNutritionMode(routine.id), objective: routine.objective,
+      option: { ...base, title: routine.name, category: "physical", summary: routine.focus, details: [routine.objective, `Duración estimada: ${routine.expectedDurationMinutes} min`], prefill: { routineId: routine.id, settings: {}, omitExerciseIds: [] } }
+    };
+  }
+  if (scenario === "tennis") return {
+    scenario, nutritionMode: "tennis", objective: "Entrenar timing, desplazamientos y consistencia en cancha.",
+    option: { ...base, title: "Entrenamiento grupal", category: "tennis", summary: "Tenis y desplazamientos moderados", details: ["Ajustar intensidad según fatiga y próximo partido"], prefill: { tennisTypeId: "group-training" } }
+  };
+  if (scenario === "tennisLight") return {
+    scenario, nutritionMode: "tennisLight", objective: "Mantener contacto con la pelota sin carga de partido.",
+    option: { ...base, title: "Tenis suave / peloteo", category: "tennis", summary: "Sesión técnica de carga moderada", details: ["Priorizar técnica, timing y terminar con energía"], prefill: { tennisTypeId: "friendly-hitting" } }
+  };
+  if (scenario === "match") {
+    const period = quickMatchPeriods[matchPeriod] || quickMatchPeriods.afternoon;
+    const cleanOpponent = text(opponent, 100);
+    return {
+      scenario, nutritionMode: period.nutritionMode, objective: `Competir ${period.label} y llegar con energía sin fatiga residual.`,
+      option: { ...base, title: cleanOpponent ? `Partido vs. ${cleanOpponent}` : "Partido", category: "tennis", summary: `Partido programado ${period.label}${cleanTime ? ` · ${cleanTime}` : ""}`, details: ["Coordinar alimentación, hidratación y activación según el horario"], prefill: { tennisTypeId: "match" } }
+    };
+  }
+  if (scenario === "cardioSoft") return {
+    scenario, nutritionMode: "cardioSoft", objective: "Sumar cardio suave sin comprometer la recuperación.",
+    option: { ...base, title: "Cardio suave", category: "cardio", summary: "Bicicleta estática o actividad suave", details: ["Ritmo conversable y sin buscar fatiga"], prefill: { cardioTypeId: "stationary-bike", distanceKm: "" } }
+  };
+  if (scenario === "trekking") return {
+    scenario, nutritionMode: "trekking", objective: "Realizar trekking ajustando esfuerzo, hidratación y recuperación.",
+    option: { ...base, title: "Trekking", category: "cardio", summary: "Salida larga según ruta y desnivel", details: ["Ajustar duración a la recuperación y al calendario de tenis"], prefill: { cardioTypeId: "trekking", distanceKm: "" } }
+  };
+  return null;
+}
+
+export function applyQuickPlanDraft(sourceBlock, dateISO, draft, updatedAt = new Date().toISOString()) {
+  if (!sourceBlock?.weeks || !isValidISODate(dateISO) || !draft?.option) return null;
+  const block = structuredClone(sourceBlock);
+  const info = isoWeekInfo(dateISO);
+  let week = block.weeks.find(candidate => candidate.weekKey === info.key || (dateISO >= candidate.startISO && dateISO <= candidate.endISO));
+  if (!week) {
+    week = { weekKey: info.key, number: info.weekNumber, startISO: info.startISO, endISO: info.endISO,
+      label: "Semana ajustada manualmente", context: "Planificación modificada desde Inicio.", objective: draft.objective, sessions: [] };
+    block.weeks.push(week);
+  }
+  let session = week.sessions.find(candidate => candidate.dateISO === dateISO);
+  if (!session) {
+    session = { id: `quick-session-${dateISO}`, dateISO, startTime: "", objective: draft.objective, primaryOptionId: "", options: [] };
+    week.sessions.push(session);
+  }
+  session.options = [...(session.options || []).filter(option => !String(option.id || "").startsWith(`quick-${dateISO}-`) && option.id !== draft.option.id), draft.option];
+  session.primaryOptionId = draft.option.id;
+  session.startTime = draft.option.startTime || "";
+  session.objective = draft.objective;
+  week.sessions.sort((left, right) => left.dateISO.localeCompare(right.dateISO));
+  block.weeks.sort((left, right) => left.startISO.localeCompare(right.startISO));
+  block.startISO = [block.startISO, info.startISO].filter(Boolean).sort()[0];
+  block.endISO = [block.endISO, info.endISO].filter(Boolean).sort().at(-1);
+  block.updatedAt = updatedAt;
+  return block;
 }
 
 export function normalizeTrainingBlocks(value) {

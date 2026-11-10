@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=124">
+  <link rel="stylesheet" href="assets/css/styles.css?v=125">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -459,6 +459,50 @@
     <button id="plannedActivityFullPlanButton" class="planned-activity-full-plan" type="button">Ver planificación completa</button>
   </dialog>
 
+  <dialog id="quickPlanDialog" class="coach-plan-dialog quick-plan-dialog" aria-labelledby="quickPlanDialogTitle">
+    <div class="coach-dialog-heading">
+      <div>
+        <p class="eyebrow dark">Editar lo previsto</p>
+        <h2 id="quickPlanDialogTitle">Cambiar planificación</h2>
+        <p id="quickPlanDialogDescription">El cambio se aplicará al calendario semanal y a la pauta nutricional de ese día.</p>
+      </div>
+      <button id="quickPlanDialogClose" class="cloud-dialog-close" type="button" aria-label="Cerrar">×</button>
+    </div>
+    <form id="quickPlanForm" class="quick-plan-form">
+      <label for="quickPlanScenario">¿Qué queda previsto?
+        <select id="quickPlanScenario" required>
+          <option value="rest">Descanso / recuperación</option>
+          <option value="physical">Entrenamiento físico</option>
+          <option value="tennis">Tenis grupal</option>
+          <option value="tennisLight">Tenis suave / peloteo</option>
+          <option value="match">Partido</option>
+          <option value="cardioSoft">Cardio suave</option>
+          <option value="trekking">Trekking largo</option>
+        </select>
+      </label>
+      <label id="quickPlanRoutineRow" for="quickPlanRoutine">Rutina física
+        <select id="quickPlanRoutine"></select>
+      </label>
+      <div id="quickPlanMatchFields" class="quick-plan-match-fields">
+        <label for="quickPlanMatchPeriod">Horario del partido
+          <select id="quickPlanMatchPeriod">
+            <option value="morning">Por la mañana</option>
+            <option value="afternoon">Por la tarde</option>
+            <option value="night">Por la noche</option>
+          </select>
+        </label>
+        <label for="quickPlanTime">Hora exacta (opcional)
+          <input id="quickPlanTime" type="time">
+        </label>
+        <label for="quickPlanOpponent">Rival (opcional)
+          <input id="quickPlanOpponent" type="text" maxlength="100" placeholder="Nombre del rival">
+        </label>
+      </div>
+      <div id="quickPlanPreview" class="quick-plan-preview" aria-live="polite"></div>
+      <button class="quick-plan-save" type="submit">Guardar cambio semanal</button>
+    </form>
+  </dialog>
+
   <dialog id="aiPlanDialog" class="coach-plan-dialog ai-plan-dialog" aria-labelledby="aiPlanDialogTitle">
     <div class="coach-dialog-heading">
       <div>
@@ -597,6 +641,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=158"></script>
+<script type="module" src="assets/js/app.js?v=159"></script>
 </body>
 </html>

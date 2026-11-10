@@ -26,14 +26,14 @@ import {
   withMatchCalendar,
   withWeeklyCadenceForDate
 } from "./coach-plan.js?v=100";
-import { createRepository } from "./storage.js?v=120";
+import { createRepository } from "./storage.js?v=121";
 import { createCloudSync } from "./cloud.js?v=76";
 import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=124";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=101";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
 import { createGuidedUI } from "./guided-ui.js?v=101";
 import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=116";
-import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=101";
+import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=102";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
@@ -185,6 +185,7 @@ let openRoutineId = "";
 let currentCloudStatus = { state: "unconfigured", user: null };
 let plannedRegistrationContext = null;
 let plannedActivityTicker = null;
+let quickPlanDateISO = "";
 let aiPlanCandidate = null;
 const aiAnalysisInFlight = new Set();
 const nutritionAnalysisInFlight = new Set();
@@ -654,6 +655,110 @@ function openTodayPlannedActivity() {
   if (!session) return;
   renderPlannedActivityDialog(session, block);
   if (!$("plannedActivityDialog").open) $("plannedActivityDialog").showModal();
+}
+
+function quickScenarioForOption(option) {
+  if (option?.category === "rest") return "rest";
+  if (option?.category === "physical") return "physical";
+  if (option?.category === "cardio") return option.prefill?.cardioTypeId === "trekking" ? "trekking" : "cardioSoft";
+  if (option?.category === "tennis" && option.prefill?.tennisTypeId === "match") return "match";
+  if (option?.category === "tennis" && option.prefill?.tennisTypeId === "friendly-hitting") return "tennisLight";
+  if (option?.category === "tennis") return "tennis";
+  return "rest";
+}
+
+function matchPeriodForOption(option, session) {
+  const source = `${option?.summary || ""} ${option?.title || ""}`.toLocaleLowerCase("es");
+  if (/noche/.test(source)) return "night";
+  if (/mañana/.test(source)) return "morning";
+  if (/tarde/.test(source)) return "afternoon";
+  const time = option?.startTime || session?.startTime || "";
+  const hour = Number(String(time).slice(0, 2));
+  if (Number.isFinite(hour) && hour < 12) return "morning";
+  if (Number.isFinite(hour) && hour >= 19) return "night";
+  return "afternoon";
+}
+
+function updateQuickPlanPreview() {
+  const scenario = $("quickPlanScenario").value;
+  $("quickPlanRoutineRow").hidden = scenario !== "physical";
+  $("quickPlanMatchFields").hidden = scenario !== "match";
+  const draft = quickPlanDraft({
+    dateISO: quickPlanDateISO,
+    scenario,
+    routineId: $("quickPlanRoutine").value,
+    matchPeriod: $("quickPlanMatchPeriod").value,
+    opponent: $("quickPlanOpponent").value,
+    startTime: $("quickPlanTime").value
+  });
+  const preview = $("quickPlanPreview");
+  preview.replaceChildren();
+  if (!draft) {
+    preview.textContent = "Selecciona una alternativa válida.";
+    return;
+  }
+  const title = document.createElement("strong");
+  title.textContent = draft.option.title;
+  const summary = document.createElement("span");
+  summary.textContent = `${draft.option.summary}. También se usará la guía nutricional correspondiente.`;
+  preview.append(title, summary);
+}
+
+function openQuickPlanEditor(dateISO, session) {
+  if (dateISO < getChileDateISO()) {
+    showToast("La planificación pasada se conserva como historial. Puedes cambiar hoy o los próximos días.");
+    return;
+  }
+  quickPlanDateISO = dateISO;
+  const primary = coachOption(session, session.primaryOptionId) || session.options?.[0];
+  const routineSelect = $("quickPlanRoutine");
+  routineSelect.replaceChildren();
+  physicalRoutines.forEach(routine => {
+    const option = document.createElement("option");
+    option.value = routine.id;
+    option.textContent = `${routine.name} · ${routine.expectedDurationMinutes} min`;
+    routineSelect.append(option);
+  });
+  $("quickPlanDialogTitle").textContent = `Cambiar ${formatLongDate(dateISO)}`;
+  $("quickPlanScenario").value = quickScenarioForOption(primary);
+  routineSelect.value = physicalRoutineById(primary?.prefill?.routineId)?.id || "legs";
+  $("quickPlanMatchPeriod").value = matchPeriodForOption(primary, session);
+  $("quickPlanTime").value = primary?.startTime || session?.startTime || "";
+  $("quickPlanOpponent").value = primary?.prefill?.tennisTypeId === "match"
+    ? String(primary.title || "").replace(/^partido\s+vs\.?\s*/i, "").replace(/^partido$/i, "") : "";
+  updateQuickPlanPreview();
+  $("quickPlanDialog").showModal();
+}
+
+function saveQuickPlanChange(event) {
+  event.preventDefault();
+  const draft = quickPlanDraft({
+    dateISO: quickPlanDateISO,
+    scenario: $("quickPlanScenario").value,
+    routineId: $("quickPlanRoutine").value,
+    matchPeriod: $("quickPlanMatchPeriod").value,
+    opponent: $("quickPlanOpponent").value,
+    startTime: $("quickPlanTime").value
+  });
+  const adjusted = applyQuickPlanDraft(activeTrainingBlock(quickPlanDateISO), quickPlanDateISO, draft);
+  if (!adjusted) return showToast("No se pudo preparar ese cambio de planificación.");
+  try {
+    const now = new Date().toISOString();
+    repository.listCoachQuestions().filter(item => item.adjustmentStatus === "applied" && item.planAdjustment?.targetDateISO === quickPlanDateISO)
+      .forEach(item => repository.saveCoachQuestion({ ...item, adjustmentStatus: "reverted", revertedAt: now, updatedAt: now }));
+    repository.saveTrainingBlock(adjusted);
+    const planId = `nutrition-plan-${quickPlanDateISO}`;
+    const previous = repository.getNutritionEntry(planId);
+    repository.saveNutritionEntry({ id: planId, dateISO: quickPlanDateISO, kind: "plan", planMode: draft.nutritionMode,
+      createdAt: previous?.createdAt || now, updatedAt: now });
+    $("quickPlanDialog").close();
+    renderHome();
+    renderCoachPlanDialog();
+    nutritionUI.render();
+    showToast("Plan semanal y pauta nutricional actualizados.");
+  } catch (error) {
+    showToast(error.message || "No se pudo guardar el cambio.");
+  }
 }
 
 function createPlanOptionButton(session, option, records, { compact = false } = {}) {
@@ -2634,9 +2739,16 @@ function renderHome() {
       const mainDayRecords = dayRecords.filter(isMainDayRecord);
       if (plannedSession && planNeedsSeparateLine(plannedSession, mainDayRecords, block)) {
         const primary = coachOption(plannedSession, plannedSession.primaryOptionId) || plannedSession.options[0];
-        const planLine = document.createElement("div");
+        const editable = dateISO >= todayISO;
+        const planLine = document.createElement(editable ? "button" : "div");
         const overview = dayPlanOverview(plannedSession, mainDayRecords);
         planLine.className = `planned-activity-line ${overview.status}`;
+        if (editable) {
+          planLine.type = "button";
+          planLine.classList.add("quick-plan-edit-trigger");
+          planLine.setAttribute("aria-label", `Cambiar lo previsto para ${formatLongDate(dateISO)}: ${primary.title}`);
+          planLine.addEventListener("click", () => openQuickPlanEditor(dateISO, plannedSession));
+        }
         const planBadge = document.createElement("span");
         planBadge.textContent = mainDayRecords.length ? "Plan original" : overview.label;
         const planCopy = document.createElement("div");
@@ -2646,6 +2758,12 @@ function renderHome() {
         planMeta.textContent = plannedSession.options.length > 1 ? `${primary.summary} · con alternativas` : primary.summary;
         planCopy.append(planTitle, planMeta);
         planLine.append(planBadge, planCopy);
+        if (editable) {
+          const hint = document.createElement("b");
+          hint.className = "planned-edit-hint";
+          hint.textContent = "Cambiar";
+          planLine.append(hint);
+        }
         activities.append(planLine);
       }
       const orderedRecords = [...dayRecords.filter(isMainDayRecord), ...dayRecords.filter(record => !isMainDayRecord(record))];
@@ -7090,6 +7208,11 @@ function bindEvents() {
     $("plannedActivityDialog").close();
     openCoachPlanDialog();
   });
+  $("quickPlanDialogClose").addEventListener("click", () => $("quickPlanDialog").close());
+  $("quickPlanForm").addEventListener("submit", saveQuickPlanChange);
+  for (const id of ["quickPlanScenario", "quickPlanRoutine", "quickPlanMatchPeriod", "quickPlanTime", "quickPlanOpponent"]) {
+    $(id).addEventListener(id === "quickPlanOpponent" ? "input" : "change", updateQuickPlanPreview);
+  }
   $("openAiPlanButton").addEventListener("click", openAiPlanDialog);
   $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());
   $("aiPlanDialogClose").addEventListener("click", () => $("aiPlanDialog").close());

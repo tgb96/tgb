@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { withCoachPlanAdjustments } from "../assets/js/coach-plan.js";
-import { normalizeTrainingBlock } from "../assets/js/training-plan.js";
+import { withCoachPlanAdjustments, withMatchCalendar } from "../assets/js/coach-plan.js";
+import { applyQuickPlanDraft, normalizeTrainingBlock, quickPlanDraft } from "../assets/js/training-plan.js";
 
 const option = (id, title, category = "tennis") => ({
   id,
@@ -112,4 +112,64 @@ test("un partido futuro amplía el plan y conserva su hora aunque el sábado aú
   assert.equal(session.startTime, "14:30");
   assert.equal(session.options.find(item => item.id === session.primaryOptionId).title, "Partido de interclubes");
   assert.equal(adjusted.endISO, "2026-11-08");
+});
+
+test("Inicio cambia lo previsto y coordina el escenario nutricional", () => {
+  const block = normalizeTrainingBlock({
+    id: "plan-noviembre",
+    title: "Plan de noviembre",
+    weeks: [{ weekKey: "2026-W46", sessions: [{ dateISO: "2026-11-10", primaryOptionId: "tennis", options: [option("tennis", "Entrenamiento grupal")] }] }]
+  });
+  const restDraft = quickPlanDraft({ dateISO: "2026-11-10", scenario: "rest" });
+  const adjusted = normalizeTrainingBlock(applyQuickPlanDraft(block, "2026-11-10", restDraft, "2026-11-10T20:00:00.000Z"));
+  const session = adjusted.weeks[0].sessions[0];
+  assert.equal(restDraft.nutritionMode, "recovery");
+  assert.equal(session.options.find(item => item.id === session.primaryOptionId).prefill.restTypeId, "planned");
+  const matchDraft = quickPlanDraft({ dateISO: "2026-11-14", scenario: "match", matchPeriod: "night", opponent: "Nicolás", startTime: "20:30" });
+  const withMatch = normalizeTrainingBlock(applyQuickPlanDraft(adjusted, "2026-11-14", matchDraft, "2026-11-10T20:05:00.000Z"));
+  const match = withMatch.weeks.flatMap(week => week.sessions).find(item => item.dateISO === "2026-11-14");
+  assert.equal(matchDraft.nutritionMode, "late");
+  assert.equal(match.startTime, "20:30");
+  assert.equal(match.options.find(item => item.id === match.primaryOptionId).title, "Partido vs. Nicolás");
+});
+
+test("el editor rápido ofrece rutinas físicas concretas y no solo una categoría genérica", () => {
+  const legs = quickPlanDraft({ dateISO: "2026-11-11", scenario: "physical", routineId: "legs" });
+  const upper = quickPlanDraft({ dateISO: "2026-11-11", scenario: "physical", routineId: "upper" });
+  const power = quickPlanDraft({ dateISO: "2026-11-11", scenario: "physical", routineId: "agility" });
+  assert.equal(legs.nutritionMode, "physicalLegs");
+  assert.equal(upper.nutritionMode, "physicalUpper");
+  assert.equal(power.nutritionMode, "physicalPower");
+  assert.equal(power.option.prefill.routineId, "agility");
+});
+
+test("un cambio manual en Inicio prevalece sobre un partido importado al volver a cargar", () => {
+  const block = normalizeTrainingBlock({
+    id: "plan-noviembre",
+    title: "Plan de noviembre",
+    weeks: [{
+      weekKey: "2026-W46",
+      startISO: "2026-11-09",
+      endISO: "2026-11-15",
+      sessions: [{ dateISO: "2026-11-14", primaryOptionId: "tennis", options: [option("tennis", "Entrenamiento grupal")] }]
+    }]
+  });
+  const restDraft = quickPlanDraft({ dateISO: "2026-11-14", scenario: "rest" });
+  const saved = normalizeTrainingBlock(applyQuickPlanDraft(block, "2026-11-14", restDraft, "2026-11-10T20:00:00.000Z"));
+  const restored = withMatchCalendar(saved, [{
+    id: "match-14",
+    weekKey: "2026-W46",
+    dateISO: "2026-11-14",
+    startTime: "14:30",
+    endTime: "16:00",
+    court: 1,
+    category: "A",
+    opponent: "Nicolás Collao",
+    status: "scheduled"
+  }]);
+  const session = restored.weeks.flatMap(week => week.sessions).find(item => item.dateISO === "2026-11-14");
+  const primary = session.options.find(item => item.id === session.primaryOptionId);
+  assert.equal(primary.title, "Día de descanso");
+  assert.equal(primary.manualOverride, true);
+  assert.equal(session.options.some(item => item.title === "Partido vs. Nicolás Collao"), true);
 });
