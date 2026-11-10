@@ -998,6 +998,7 @@ body.has-active-session { padding-bottom: calc(188px + env(safe-area-inset-botto
 .nutrition-day-card .eyebrow { color: var(--lime); }
 .nutrition-day-card h2 { margin: 5px 0 7px; font-size: 25px; letter-spacing: -.7px; }
 .nutrition-day-card > p:not(.eyebrow) { margin: 0; color: #d2d6df; font-size: 13px; line-height: 1.5; }
+.nutrition-day-card .nutrition-fuel-focus { margin-top: 10px !important; padding: 10px 12px; border-radius: 13px; background: rgba(255,255,255,.07); color: #f4f6fb !important; }
 .nutrition-day-card .nutrition-hydration-tip { margin-top: 12px !important; color: #f0f3f8 !important; }
 .nutrition-context-card { margin-top: 13px; padding: 17px; border: 1px solid var(--line); border-radius: 22px; background: white; }
 .nutrition-context-card h2 { margin: 4px 0 10px; font-size: 19px; }

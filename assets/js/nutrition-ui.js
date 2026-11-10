@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=100";
+import { nutritionDayTotals, nutritionModeForPhysicalRoutine, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=101";
 import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=106";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=75";
@@ -606,6 +606,7 @@ export function createNutritionUI(repository, {
         ? [plannedActivity.summary, `Pauta ajustada a tu partido programado${plannedActivity.time ? ` a las ${plannedActivity.time}` : ""}.`].filter(Boolean).join(" · ")
         : [plannedActivity.summary, plan.detail].filter(Boolean).join(" · ")
       : plan.detail;
+    byId("nutritionFuelFocus").textContent = `Prioridad nutricional: ${plan.fuelFocus}`;
     const calorieRange = `${plan.caloriesMinKcal.toLocaleString("es-CL")}–${plan.caloriesMaxKcal.toLocaleString("es-CL")} kcal`;
     byId("nutritionCalorieTarget").textContent = calorieRange;
     byId("nutritionProteinTarget").textContent = "Guía del plan: 110–125 g de proteína/día";
@@ -654,13 +655,14 @@ export function createNutritionUI(repository, {
     caveat.textContent = "Estos datos de la pulsera son contexto: no se descuentan de las comidas ni cambian por sí solos tu pauta de alimentación o hidratación.";
     context.append(caveat);
     const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
-    const expected = plannedActivity?.mode || ["cardioSoft", "physical", "tennis", "physical", "tennis", "physical", "other"][day];
+    const expected = plannedActivity?.mode || ["recovery", "physicalLegs", "tennis", "physicalUpper", "tennis", "physicalPower", "other"][day];
     const actual = mainActivity?.category === "rest" ? "recovery"
       : mainActivity?.cardioTypeId === "trekking" ? "trekking"
         : mainActivity?.category === "cardio" ? "cardioSoft"
           : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId !== "match" ? "tennisLight"
             : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId === "match" ? ""
-            : ["physical", "tennis"].includes(mainActivity?.category) ? mainActivity.category : "";
+            : mainActivity?.category === "physical" ? nutritionModeForPhysicalRoutine(mainActivity.routineId)
+              : mainActivity?.category === "tennis" ? "tennis" : "";
     if (actual && actual !== expected && planMode === "default") {
       const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
       const message = document.createElement("span");

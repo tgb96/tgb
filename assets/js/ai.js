@@ -188,7 +188,7 @@ const coachQuestionSchema = {
         tennisTypeId: stringSchema,
         restTypeId: stringSchema,
         exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
-        nutritionMode: { type: "string", enum: ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+        nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
         nutritionReason: stringSchema
       },
       required: ["targetDateISO", "startTime", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]
@@ -309,7 +309,7 @@ const weeklyAdjustmentSchema = {
     tennisTypeId: stringSchema,
     restTypeId: stringSchema,
     exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
-    nutritionMode: { type: "string", enum: ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+    nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
     nutritionReason: stringSchema
   },
   required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]

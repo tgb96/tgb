@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=123">
+  <link rel="stylesheet" href="assets/css/styles.css?v=124">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -210,16 +210,20 @@
         <p class="eyebrow">Plan del entrenador</p>
         <h2 id="nutritionDayTitle"></h2>
         <p id="nutritionDayDescription"></p>
+        <p id="nutritionFuelFocus" class="nutrition-fuel-focus"></p>
         <label class="nutrition-saturday-row" for="nutritionDayMode">Ajustar guía si cambió el entrenamiento
           <select id="nutritionDayMode">
             <option value="default">Según tu planificación deportiva</option>
-            <option value="physical">Entrenamiento físico</option>
+            <option value="physical">Físico (genérico)</option>
+            <option value="physicalLegs">Físico · piernas y fuerza</option>
+            <option value="physicalUpper">Físico · tren superior</option>
+            <option value="physicalPower">Físico · potencia y desplazamientos</option>
             <option value="tennis">Tenis grupal</option>
             <option value="recovery">Descanso / recuperación</option>
             <option value="match">Partido (sin hora definida)</option>
             <option value="early">Partido temprano</option>
             <option value="late">Partido en la tarde</option>
-            <option value="other">Trekking / cardio sin partido</option>
+            <option value="other">Día normal / otra actividad</option>
             <option value="tennisLight">Tenis suave sin partido</option>
             <option value="trekking">Trekking largo</option>
             <option value="cardioSoft">Cardio suave</option>
@@ -593,6 +597,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=157"></script>
+<script type="module" src="assets/js/app.js?v=158"></script>
 </body>
 </html>

@@ -12,16 +12,23 @@ function memoryStorage() {
 
 test("guía de tenis, físico y escenarios de sábado conserva las alternativas del entrenador", () => {
   const tuesday = nutritionPlanForDate("2026-09-22");
-  assert.equal(tuesday.waterMaxMl, 3000);
+  assert.equal(tuesday.waterMaxMl, 3200);
   assert.ok(tuesday.slots.some(slot => slot.id === "post" && slot.time.includes("22:15")));
   assert.ok(nutritionPlanForDate("2026-09-21").slots.some(slot => slot.id === "pre"));
-  assert.equal(nutritionPlanForDate("2026-09-26").name, "Sin partido · trekking o cardio");
+  assert.equal(nutritionPlanForDate("2026-09-26").name, "Día normal / otra actividad");
   assert.equal(nutritionPlanForDate("2026-09-26", "late").name, "Partido en la tarde");
   assert.doesNotMatch(nutritionPlanForDate("2026-09-26", "early").detail, /ejemplo|no un partido programado/);
   assert.ok(nutritionPlanForDate("2026-09-21").slots.find(slot => slot.id === "breakfast").options.includes("Pan integral con jamón y queso"));
   assert.ok(nutritionPlanForDate("2026-09-22").slots.find(slot => slot.id === "morning").options.includes("Pan integral pequeño con jamón y queso"));
-  for (const mode of ["default", "physical", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
+  const rest = nutritionPlanForDate("2026-11-10", "recovery");
+  assert.ok(rest.slots.some(slot => slot.id === "afternoon" && slot.title === "Merienda de tarde"));
+  assert.doesNotMatch(JSON.stringify(rest), /trekking|después del cardio/i);
+  assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-11-10", "cardioSoft")), /trekking/i);
+  assert.ok(nutritionPlanForDate("2026-11-10", "trekking").slots.some(slot => slot.id === "during"));
+  assert.ok(nutritionPlanForDate("2026-11-10", "trekking").slots.some(slot => slot.id === "post"));
+  for (const mode of ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
     assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún|avena|miel|kiwi/i);
+    assert.ok(nutritionPlanForDate("2026-09-26", mode).fuelFocus);
   }
 });
 
@@ -38,8 +45,10 @@ test("la nutrición sigue la actividad y la hora de la planificación deportiva"
   assert.equal(plannedNutritionContext(coachSessionForDate("2026-10-03")).mode, "recovery");
   const coordinated = withWeeklyCadenceForDate({ id: "partial", startISO: "2026-09-14", endISO: "2026-10-25", weeks: [{ weekKey: "2026-W43", number: 43, startISO: "2026-10-19", endISO: "2026-10-25", sessions: [] }] }, "2026-10-21");
   assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-21", coordinated)), {
-    mode: "physical", title: "Día 2 · Tren superior + estabilidad", summary: "Físico de tren superior moderado", time: "", category: "physical", isMatch: false
+    mode: "physicalUpper", title: "Día 2 · Tren superior + estabilidad", summary: "Físico de tren superior moderado", time: "", category: "physical", isMatch: false
   });
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "legs", options: [{ id: "legs", category: "physical", prefill: { routineId: "legs" } }] }), "physicalLegs");
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "power", options: [{ id: "power", category: "physical", prefill: { routineId: "agility" } }] }), "physicalPower");
 });
 
 test("los rangos de kcal del entrenador dependen del día y del escenario real", () => {
@@ -51,16 +60,18 @@ test("los rangos de kcal del entrenador dependen del día y del escenario real",
   assert.deepEqual(target("2026-09-22"), [2400, 2600]);
   assert.deepEqual(target("2026-09-23"), [2100, 2300]);
   assert.deepEqual(target("2026-09-24"), [2400, 2600]);
-  assert.deepEqual(target("2026-09-25"), [2200, 2400]);
-  assert.deepEqual(target("2026-09-26", "early"), [2500, 2700]);
-  assert.deepEqual(target("2026-09-26", "late"), [2500, 2700]);
-  assert.deepEqual(target("2026-09-26", "tennisLight"), [2300, 2500]);
-  assert.deepEqual(target("2026-09-26", "trekking"), [2400, 2700]);
+  assert.deepEqual(target("2026-09-25"), [2250, 2450]);
+  assert.deepEqual(target("2026-09-26", "early"), [2500, 2750]);
+  assert.deepEqual(target("2026-09-26", "late"), [2500, 2750]);
+  assert.deepEqual(target("2026-09-26", "tennisLight"), [2250, 2450]);
+  assert.deepEqual(target("2026-09-26", "trekking"), [2500, 2800]);
   assert.deepEqual(target("2026-09-26", "recovery"), [2000, 2200]);
   assert.deepEqual(target("2026-09-27"), [2000, 2200]);
-  assert.deepEqual(target("2026-09-23", "physical"), [2100, 2300]);
-  assert.deepEqual(target("2026-09-22", "physical"), [2200, 2400]);
-  assert.deepEqual(target("2026-09-22", "cardioSoft"), [2000, 2200]);
+  assert.deepEqual(target("2026-09-23", "physical"), [2150, 2350]);
+  assert.deepEqual(target("2026-09-22", "physicalLegs"), [2200, 2400]);
+  assert.deepEqual(target("2026-09-22", "physicalUpper"), [2100, 2300]);
+  assert.deepEqual(target("2026-09-22", "physicalPower"), [2250, 2450]);
+  assert.deepEqual(target("2026-09-22", "cardioSoft"), [2100, 2300]);
   assert.equal(Object.values(normalizeNutritionEntries([{ id: "scenario", dateISO: "2026-09-26", kind: "plan", planMode: "trekking" }]))[0].planMode, "trekking");
 });
 
