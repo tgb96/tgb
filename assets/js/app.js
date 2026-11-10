@@ -37,7 +37,7 @@ import { newestTrainingBlock, normalizeTrainingBlock, summarizeTrainingBlock, we
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
-import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "./coach-tracking.js?v=76";
+import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordedRoutineForActiveSession, recordWorkflowState } from "./coach-tracking.js?v=77";
 import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=63";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, refreshedWearableLink, wearableAutolinks, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=72";
@@ -81,15 +81,17 @@ const cloudSync = createCloudSync({
   onWearableChanged: data => {
     wearableData = data;
     const refreshedLinks = refreshEquivalentWearableLinks(data.sessions || []);
+    const stoppedResidualTimer = stopResidualRoutineTimer();
     renderWearable();
     renderWearableSyncStatus();
     renderHistory();
-    if (refreshedLinks) renderHome();
+    if (refreshedLinks || stoppedResidualTimer) renderHome();
     nutritionUI.render();
     if (loadRoutineSession()?.status === "complete") renderRoutines();
   },
   onDataChanged: () => {
     refreshEquivalentWearableLinks(wearableData.sessions || []);
+    stopResidualRoutineTimer();
     renderHome();
     renderWearable();
     renderHistory();
@@ -3921,6 +3923,17 @@ function saveRoutineSession(session) {
   }
 }
 
+function stopResidualRoutineTimer() {
+  const activeSession = loadRoutineSession();
+  const completedRecord = recordedRoutineForActiveSession(activeSession, repository.list());
+  if (!completedRecord) return false;
+  saveRoutineSession(null);
+  if (routineSessionTicker) clearInterval(routineSessionTicker);
+  routineSessionTicker = null;
+  showToast("La pulsera ya cerró esta rutina. TGTrain detuvo el cronómetro que seguía corriendo.");
+  return true;
+}
+
 function routineSessionElapsedSeconds(session = loadRoutineSession()) {
   if (!session) return 0;
   if (session.status === "complete") return Math.max(0, Number(session.elapsedSeconds) || 0);
@@ -6692,6 +6705,7 @@ function linkWearableSession(recordId, sessionId) {
   };
   try { repository.upsert(updated); }
   catch (error) { return showToast(error.message || "No se pudo guardar el vínculo."); }
+  stopResidualRoutineTimer();
   renderHistory();
   renderHome();
   if (loadRoutineSession()?.status === "complete") renderRoutines();

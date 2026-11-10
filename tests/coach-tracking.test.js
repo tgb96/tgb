@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordWorkflowState } from "../assets/js/coach-tracking.js";
+import { canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedMatchForRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordedRoutineForActiveSession, recordWorkflowState } from "../assets/js/coach-tracking.js";
 import { coachTrainingBlock } from "../assets/js/coach-plan.js";
 import { normalizeRecord } from "../assets/js/utils.js";
 
@@ -19,6 +19,16 @@ test("el flujo del registro distingue pulsera y evaluación del cumplimiento del
   assert.equal(recordWorkflowState({ category: "tennis", metricsPending: true, wearableSessionId: "hc-1", routineAiAnalysis: { summary: "Bien" } }).label, "Evaluado");
   assert.equal(recordWorkflowState({ category: "warmup" }).label, "Complemento");
   assert.equal(recordWorkflowState({ category: "rest" }).label, "Descanso");
+});
+
+test("una rutina vinculada a la pulsera permite detener un cronómetro local residual", () => {
+  const session = { status: "active", dateISO: "2026-11-09", routineId: "legs", startedAt: "2026-11-09T22:11:40.000Z" };
+  const linked = { id: "real", category: "physical", dateISO: session.dateISO, routineId: "legs", wearableSessionId: "hc-1",
+    wearableSnapshot: { durationSeconds: 3145, endTime: "2026-11-09T23:59:25.000Z" } };
+  assert.equal(recordedRoutineForActiveSession(session, [linked]), linked);
+  assert.equal(recordedRoutineForActiveSession({ ...session, startedAt: "2026-11-10T00:05:00.000Z" }, [linked]), null);
+  assert.equal(recordedRoutineForActiveSession(session, [{ ...linked, wearableSessionId: "" }]), null);
+  assert.equal(recordedRoutineForActiveSession({ ...session, status: "complete" }, [linked]), null);
 });
 
 test("relaciona el trote manual de 5K con el plan del mismo día sin modificarlo", () => {

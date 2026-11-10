@@ -28,6 +28,22 @@ export function recordWorkflowState(record) {
   return { status: "registered", label: "Registrado" };
 }
 
+// Si la nube ya contiene una rutina física vinculada a la pulsera, esa
+// actividad es la evidencia de que una sesión local olvidada ya terminó.
+// Se exige que el término real sea posterior al inicio local para no cerrar
+// por error una segunda rutina igual realizada el mismo día.
+export function recordedRoutineForActiveSession(session, records = []) {
+  if (!session || session.status !== "active" || !session.dateISO || !session.routineId) return null;
+  const startedAt = Date.parse(session.startedAt || "");
+  if (!Number.isFinite(startedAt)) return null;
+  return records.find(record => {
+    if (record?.category !== "physical" || record.dateISO !== session.dateISO || record.routineId !== session.routineId) return false;
+    if (!record.wearableSessionId || !record.wearableSnapshot?.durationSeconds) return false;
+    const endedAt = Date.parse(record.wearableSnapshot.endTime || record.routineEndedAt || "");
+    return Number.isFinite(endedAt) && endedAt >= startedAt;
+  }) || null;
+}
+
 export function recordMatchesPlanOption(record, option) {
   if (!record || !option || record.category !== option.category) return false;
   const prefill = option.prefill || {};
