@@ -1,7 +1,7 @@
 import { firebaseConfig, firebaseConfigured } from "./firebase-config.js?v=35";
 import { cardioTypes, physicalRoutines, restTypes, tennisTypes } from "./data.js?v=72";
 import { activityTiming, validateAnalysisPaces } from "./training-metrics.js?v=63";
-import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=3";
+import { MASTER_COACH_PROFILE, MASTER_COACH_PROFILE_VERSION } from "./master-coach-profile.js?v=4";
 
 const FIREBASE_VERSION = "12.18.0";
 const FIREBASE_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
@@ -188,7 +188,7 @@ const coachQuestionSchema = {
         tennisTypeId: stringSchema,
         restTypeId: stringSchema,
         exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
-        nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+        nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft", "cardio", "cardioHigh"] },
         nutritionReason: stringSchema
       },
       required: ["targetDateISO", "startTime", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]
@@ -309,7 +309,7 @@ const weeklyAdjustmentSchema = {
     tennisTypeId: stringSchema,
     restTypeId: stringSchema,
     exerciseSettings: { type: "array", items: exerciseSettingSchema, maxItems: 30 },
-    nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"] },
+    nutritionMode: { type: "string", enum: ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft", "cardio", "cardioHigh"] },
     nutritionReason: stringSchema
   },
   required: ["targetDateISO", "title", "reason", "category", "summary", "details", "routineId", "cardioTypeId", "tennisTypeId", "restTypeId", "exerciseSettings", "nutritionMode", "nutritionReason"]

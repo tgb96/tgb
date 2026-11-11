@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=36">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=36">
-  <link rel="stylesheet" href="assets/css/styles.css?v=126">
+  <link rel="stylesheet" href="assets/css/styles.css?v=127">
   <title>TGTrain · Entrenamiento semanal</title>
 </head>
 
@@ -211,24 +211,7 @@
         <h2 id="nutritionDayTitle"></h2>
         <p id="nutritionDayDescription"></p>
         <p id="nutritionFuelFocus" class="nutrition-fuel-focus"></p>
-        <label class="nutrition-saturday-row" for="nutritionDayMode">Ajustar guía si cambió el entrenamiento
-          <select id="nutritionDayMode">
-            <option value="default">Según tu planificación deportiva</option>
-            <option value="physical">Físico (genérico)</option>
-            <option value="physicalLegs">Físico · piernas y fuerza</option>
-            <option value="physicalUpper">Físico · tren superior</option>
-            <option value="physicalPower">Físico · potencia y desplazamientos</option>
-            <option value="tennis">Tenis grupal</option>
-            <option value="recovery">Descanso / recuperación</option>
-            <option value="match">Partido (sin hora definida)</option>
-            <option value="early">Partido temprano</option>
-            <option value="late">Partido en la tarde</option>
-            <option value="other">Día normal / otra actividad</option>
-            <option value="tennisLight">Tenis suave sin partido</option>
-            <option value="trekking">Trekking</option>
-            <option value="cardioSoft">Cardio suave</option>
-          </select>
-        </label>
+        <p class="nutrition-plan-source">Esta pauta se actualiza automáticamente desde lo previsto en Inicio.</p>
         <div class="nutrition-calorie-target"><small>Objetivo calórico orientativo del día</small><strong id="nutritionCalorieTarget"></strong></div>
         <div class="nutrition-targets"><span id="nutritionProteinTarget"></span><span id="nutritionWaterTarget"></span></div>
         <p id="nutritionHydrationTip" class="nutrition-hydration-tip"></p>
@@ -476,7 +459,7 @@
           <option value="tennis">Tenis grupal</option>
           <option value="tennisLight">Tenis suave / peloteo</option>
           <option value="match">Partido</option>
-          <option value="cardioSoft">Cardio suave</option>
+          <option value="cardio">Cardio</option>
           <option value="trekking">Trekking</option>
         </select>
       </label>
@@ -496,6 +479,18 @@
         </label>
         <label for="quickPlanOpponent">Rival (opcional)
           <input id="quickPlanOpponent" type="text" maxlength="100" placeholder="Nombre del rival">
+        </label>
+      </div>
+      <div id="quickPlanCardioFields" class="quick-plan-match-fields">
+        <label for="quickPlanCardioType">Actividad
+          <select id="quickPlanCardioType"></select>
+        </label>
+        <label for="quickPlanCardioIntensity">Intensidad
+          <select id="quickPlanCardioIntensity">
+            <option value="low">Suave · recuperación activa</option>
+            <option value="moderate" selected>Moderada · trabajo sostenido</option>
+            <option value="high">Exigente · intervalos o esfuerzo alto</option>
+          </select>
         </label>
       </div>
       <div id="quickPlanPreview" class="quick-plan-preview" aria-live="polite"></div>
@@ -641,6 +636,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=160"></script>
+<script type="module" src="assets/js/app.js?v=161"></script>
 </body>
 </html>

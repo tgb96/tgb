@@ -57,9 +57,15 @@ test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async 
   assert.match(html, /assets\/css\/styles\.css/);
   assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
   assert.match(app, /\$\("quickPlanRoutine"\)\.disabled = !isPhysical/);
+  assert.match(app, /\$\("quickPlanCardioIntensity"\)\.disabled = !isCardio/);
   assert.match(styles, /\.quick-plan-form > \[hidden\].*display: none !important/);
   assert.match(html, /<option value="trekking">Trekking<\/option>/);
+  assert.match(html, /<option value="cardio">Cardio<\/option>/);
+  assert.match(html, /id="quickPlanCardioType"/);
+  assert.match(html, /id="quickPlanCardioIntensity"/);
+  assert.doesNotMatch(html, /id="nutritionDayMode"/);
   assert.doesNotMatch(html, /Trekking (?:corto|largo)/i);
+  assert.doesNotMatch(html, /Cardio suave/i);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
   assert.equal([...html.matchAll(/class="nav-item/g)].length, 5);
   assert.doesNotMatch(html, /class="nav-item"[^>]+data-view-target="routines"/);
@@ -376,6 +382,7 @@ test("la vista de nutrición enlaza todos sus controles", async () => {
   assert.doesNotMatch(ui, /analysis\?\.catalogParts/);
   assert.doesNotMatch(ui, /renderRecentMeals|nutritionRecentMeals|nutritionMealText/);
   assert.match(ui, /draftMealNote/);
+  assert.doesNotMatch(ui, /nutritionDayMode/);
   assert.match(ui, /changePart\(item\.id, 1\)/);
   assert.match(ui, /changePart\(id, -0\.5\)/);
   assert.match(ui, /name\.textContent = item\.name/);
@@ -483,7 +490,7 @@ test("el perfil maestro de Tomás guía siempre al entrenador y no depende de un
   assert.match(app, /coachProfilePrompt\(\)\.slice\(0, 40000\)/);
   assert.doesNotMatch(app, /Configura primero el perfil|openCoachProfileDialog/);
   assert.doesNotMatch(html, /Perfil del entrenador IA|coachProfileDialog|coachProfileText/);
-  assert.match(worker, /master-coach-profile\.js\?v=3/);
+  assert.match(worker, /master-coach-profile\.js\?v=4/);
 });
 
 test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
@@ -649,7 +656,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=160/);
+  assert.match(html, /assets\/js\/app\.js\?v=161/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

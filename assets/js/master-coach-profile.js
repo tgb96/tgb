@@ -76,7 +76,7 @@ Miércoles: Día 2, tren superior y estabilidad.
 Jueves: entrenamiento grupal de tenis.
 Viernes: Día 3, potencia, pliometría y desplazamientos.
 Sábado: partido de escalerilla, tenis, trekking o descanso.
-Domingo: cardio suave o recuperación.
+Domingo: cardio o recuperación.
 
 Las sesiones físicas de lunes, miércoles y viernes suelen comenzar cerca de las 18:30–19:00 y durar aproximadamente una hora. Los entrenamientos grupales de tenis son nocturnos, aproximadamente de 20:30 a 22:00, e incluyen canasto, ejercicios específicos, peloteos y rey de cancha. Algunos sábados hay partidos de escalerilla.
 

@@ -60,11 +60,32 @@ const recovery = {
 };
 
 const softCardio = {
-  name: "Cardio suave", detail: "Actividad liviana: conserva la estructura normal de comidas y ajusta solo si aparece hambre real.",
+  name: "Cardio", detail: "Intensidad suave: conserva la estructura normal de comidas y ajusta solo si aparece hambre real.",
   fuelFocus: "Carbohidrato moderado; una merienda normal suele bastar para una sesión suave y corta.",
   waterMinMl: 2100, waterMaxMl: 2700, caloriesMinKcal: 2100, caloriesMaxKcal: 2300,
   slots: [breakfast(), morning(), lunch(), afternoon(["Fruta + yogurt alto en proteína", "Pan pequeño + huevo, jamón o queso"], "16:30–18:00", "Merienda de tarde · antes o después del cardio"), dinner()],
-  hydration: "Para cardio suave de menos de 60–90 min suele bastar agua; aumenta según calor, sudor y duración."
+  hydration: "Para una sesión suave de menos de 60–90 min suele bastar agua; aumenta según calor, sudor y duración."
+};
+
+const moderateCardio = {
+  name: "Cardio", detail: "Intensidad moderada: asegura energía antes y una comida normal de recuperación después.",
+  fuelFocus: "Carbohidrato moderado antes de la sesión y proteína repartida durante el día.",
+  waterMinMl: 2300, waterMaxMl: 3000, caloriesMinKcal: 2200, caloriesMaxKcal: 2450,
+  slots: [breakfast(), morning(), lunch(),
+    afternoon(["Fruta + yogurt alto en proteína", "Pan + huevo, jamón o queso", "Plátano o barra simple"], "60–90 min antes", "Merienda de tarde · antes del cardio"),
+    dinner(["Proteína + arroz, papas o fideos + verduras"], "Después del cardio", "Comida postcardio")],
+  hydration: "Reparte agua durante el día y suma 500–750 ml alrededor de la sesión; ajusta por calor, sudor y duración."
+};
+
+const highCardio = {
+  name: "Cardio", detail: "Intensidad exigente: llega con combustible disponible y recupera carbohidratos, proteína y líquidos al terminar.",
+  fuelFocus: "Carbohidrato medio-alto antes y después; evita iniciar con hambre y no omitas la recuperación.",
+  waterMinMl: 2500, waterMaxMl: 3300, caloriesMinKcal: 2350, caloriesMaxKcal: 2600,
+  slots: [breakfast(), morning(), lunch(),
+    slot("pre", "60–90 min antes", "Merienda de tarde · antes del cardio", ["Pan + huevo, jamón o queso + fruta", "Yogurt alto en proteína + granola + plátano"]),
+    slot("during", "Durante", "Hidratación", ["Agua", "Electrolitos según calor y sudor", "Carbohidrato simple si supera 60–90 min"], "La comida durante no es obligatoria en sesiones más breves."),
+    dinner(["Proteína + arroz, papas o fideos + verduras"], "Dentro de 1–2 h", "Comida postcardio")],
+  hydration: "Llega hidratado y lleva agua; usa electrolitos según duración, calor y sudoración."
 };
 
 const tennis = {
@@ -152,7 +173,7 @@ const other = {
 
 const week = [recovery, physicalPlans.physicalLegs, tennis, physicalPlans.physicalUpper, tennis, physicalPlans.physicalPower, other];
 
-export const nutritionModes = ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"];
+export const nutritionModes = ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft", "cardio", "cardioHigh"];
 
 function primaryPlannedOption(session) {
   return session?.options?.find(option => option.id === session.primaryOptionId) || session?.options?.[0] || null;
@@ -180,7 +201,12 @@ export function nutritionModeForPlannedSession(session) {
   if (!option) return "";
   if (option.category === "rest") return "recovery";
   if (option.category === "physical") return nutritionModeForPhysicalRoutine(option.prefill?.routineId);
-  if (option.category === "cardio") return option.prefill?.cardioTypeId === "trekking" ? "trekking" : "cardioSoft";
+  if (option.category === "cardio") {
+    if (option.prefill?.cardioTypeId === "trekking") return "trekking";
+    if (option.prefill?.cardioIntensity === "high") return "cardioHigh";
+    if (option.prefill?.cardioIntensity === "low") return "cardioSoft";
+    return "cardio";
+  }
   if (option.category !== "tennis") return "";
   if (option.prefill?.tennisTypeId !== "match") return new Date(`${session.dateISO}T12:00:00Z`).getUTCDay() === 6 ? "tennisLight" : "tennis";
   const time = plannedActivityTime(session);
@@ -202,6 +228,8 @@ export function nutritionPlanForDate(dateISO, mode = "default") {
   if (mode === "tennis") return tennis;
   if (mode === "recovery") return recovery;
   if (mode === "cardioSoft") return softCardio;
+  if (mode === "cardio") return moderateCardio;
+  if (mode === "cardioHigh") return highCardio;
   if (mode === "tennisLight") return tennisLight;
   if (mode === "trekking") return trekking;
   if (["match", "early", "late"].includes(mode)) return matchPlans[mode];

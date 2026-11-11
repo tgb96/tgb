@@ -25,15 +25,15 @@ import {
   withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=101";
-import { createRepository } from "./storage.js?v=121";
+} from "./coach-plan.js?v=102";
+import { createRepository } from "./storage.js?v=122";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=124";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=102";
+import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=125";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=103";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
 import { createGuidedUI } from "./guided-ui.js?v=101";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=116";
-import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=102";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=117";
+import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=103";
 import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
@@ -660,7 +660,7 @@ function openTodayPlannedActivity() {
 function quickScenarioForOption(option) {
   if (option?.category === "rest") return "rest";
   if (option?.category === "physical") return "physical";
-  if (option?.category === "cardio") return option.prefill?.cardioTypeId === "trekking" ? "trekking" : "cardioSoft";
+  if (option?.category === "cardio") return option.prefill?.cardioTypeId === "trekking" ? "trekking" : "cardio";
   if (option?.category === "tennis" && option.prefill?.tennisTypeId === "match") return "match";
   if (option?.category === "tennis" && option.prefill?.tennisTypeId === "friendly-hitting") return "tennisLight";
   if (option?.category === "tennis") return "tennis";
@@ -682,16 +682,22 @@ function matchPeriodForOption(option, session) {
 function updateQuickPlanPreview() {
   const scenario = $("quickPlanScenario").value;
   const isPhysical = scenario === "physical";
+  const isCardio = scenario === "cardio";
   $("quickPlanRoutineRow").hidden = !isPhysical;
   $("quickPlanRoutine").disabled = !isPhysical;
   $("quickPlanMatchFields").hidden = scenario !== "match";
+  $("quickPlanCardioFields").hidden = !isCardio;
+  $("quickPlanCardioType").disabled = !isCardio;
+  $("quickPlanCardioIntensity").disabled = !isCardio;
   const draft = quickPlanDraft({
     dateISO: quickPlanDateISO,
     scenario,
     routineId: $("quickPlanRoutine").value,
     matchPeriod: $("quickPlanMatchPeriod").value,
     opponent: $("quickPlanOpponent").value,
-    startTime: $("quickPlanTime").value
+    startTime: $("quickPlanTime").value,
+    cardioTypeId: $("quickPlanCardioType").value,
+    cardioIntensity: $("quickPlanCardioIntensity").value
   });
   const preview = $("quickPlanPreview");
   preview.replaceChildren();
@@ -714,12 +720,20 @@ function openQuickPlanEditor(dateISO, session) {
   quickPlanDateISO = dateISO;
   const primary = coachOption(session, session.primaryOptionId) || session.options?.[0];
   const routineSelect = $("quickPlanRoutine");
+  const cardioSelect = $("quickPlanCardioType");
   routineSelect.replaceChildren();
   physicalRoutines.forEach(routine => {
     const option = document.createElement("option");
     option.value = routine.id;
     option.textContent = `${routine.name} · ${routine.expectedDurationMinutes} min`;
     routineSelect.append(option);
+  });
+  cardioSelect.replaceChildren();
+  cardioTypes.filter(type => type.id !== "trekking").forEach(type => {
+    const option = document.createElement("option");
+    option.value = type.id;
+    option.textContent = type.name;
+    cardioSelect.append(option);
   });
   $("quickPlanDialogTitle").textContent = `Cambiar ${formatLongDate(dateISO)}`;
   $("quickPlanScenario").value = quickScenarioForOption(primary);
@@ -728,6 +742,10 @@ function openQuickPlanEditor(dateISO, session) {
   $("quickPlanTime").value = primary?.startTime || session?.startTime || "";
   $("quickPlanOpponent").value = primary?.prefill?.tennisTypeId === "match"
     ? String(primary.title || "").replace(/^partido\s+vs\.?\s*/i, "").replace(/^partido$/i, "") : "";
+  cardioSelect.value = primary?.prefill?.cardioTypeId && primary.prefill.cardioTypeId !== "trekking"
+    ? primary.prefill.cardioTypeId : "stationary-bike";
+  $("quickPlanCardioIntensity").value = ["low", "moderate", "high"].includes(primary?.prefill?.cardioIntensity)
+    ? primary.prefill.cardioIntensity : "moderate";
   updateQuickPlanPreview();
   $("quickPlanDialog").showModal();
 }
@@ -740,7 +758,9 @@ function saveQuickPlanChange(event) {
     routineId: $("quickPlanRoutine").value,
     matchPeriod: $("quickPlanMatchPeriod").value,
     opponent: $("quickPlanOpponent").value,
-    startTime: $("quickPlanTime").value
+    startTime: $("quickPlanTime").value,
+    cardioTypeId: $("quickPlanCardioType").value,
+    cardioIntensity: $("quickPlanCardioIntensity").value
   });
   const adjusted = applyQuickPlanDraft(activeTrainingBlock(quickPlanDateISO), quickPlanDateISO, draft);
   if (!adjusted) return showToast("No se pudo preparar ese cambio de planificación.");
@@ -7212,7 +7232,7 @@ function bindEvents() {
   });
   $("quickPlanDialogClose").addEventListener("click", () => $("quickPlanDialog").close());
   $("quickPlanForm").addEventListener("submit", saveQuickPlanChange);
-  for (const id of ["quickPlanScenario", "quickPlanRoutine", "quickPlanMatchPeriod", "quickPlanTime", "quickPlanOpponent"]) {
+  for (const id of ["quickPlanScenario", "quickPlanRoutine", "quickPlanMatchPeriod", "quickPlanTime", "quickPlanOpponent", "quickPlanCardioType", "quickPlanCardioIntensity"]) {
     $(id).addEventListener(id === "quickPlanOpponent" ? "input" : "change", updateQuickPlanPreview);
   }
   $("openAiPlanButton").addEventListener("click", openAiPlanDialog);

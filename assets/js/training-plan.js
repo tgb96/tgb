@@ -89,6 +89,9 @@ function normalizeOption(raw, index, sessionId) {
   const routine = physicalRoutineById(routineId);
   const exerciseSettings = normalizeExerciseSettings(raw?.exerciseSettings || rawPrefill.settings, routine);
   const cardioTypeId = text(raw?.cardioTypeId || rawPrefill.cardioTypeId, 100);
+  const requestedCardioIntensity = text(raw?.cardioIntensity || rawPrefill.cardioIntensity, 20);
+  const cardioIntensity = ["low", "moderate", "high"].includes(requestedCardioIntensity)
+    ? requestedCardioIntensity : /suave/i.test(title) ? "low" : "moderate";
   const tennisTypeId = text(raw?.tennisTypeId || rawPrefill.tennisTypeId, 100);
   const restTypeId = text(raw?.restTypeId || rawPrefill.restTypeId, 100);
   const distance = raw?.distanceKm ?? rawPrefill.distanceKm ?? "";
@@ -101,6 +104,7 @@ function normalizeOption(raw, index, sessionId) {
       ...(Array.isArray(rawPrefill.omitExerciseIds) ? rawPrefill.omitExerciseIds.filter(idValue => routine?.exercises?.some(exercise => exercise.id === idValue)) : [])
     ])],
     cardioTypeId: cardioTypeById(cardioTypeId)?.id || "",
+    cardioIntensity: category === "cardio" ? cardioIntensity : "",
     tennisTypeId: tennisTypeById(tennisTypeId)?.id || "",
     restTypeId: restTypes.some(type => type.id === restTypeId) ? restTypeId : category === "rest" ? "planned" : "",
     distanceKm: Number.isFinite(distanceKm) && distanceKm >= 0 ? distanceKm : ""
@@ -199,6 +203,12 @@ const quickMatchPeriods = {
   night: { label: "por la noche", nutritionMode: "late" }
 };
 
+const quickCardioIntensities = {
+  low: { label: "Suave", nutritionMode: "cardioSoft", objective: "Sumar cardio de recuperación activa sin comprometer la siguiente sesión." },
+  moderate: { label: "Moderada", nutritionMode: "cardio", objective: "Desarrollar capacidad aeróbica con un esfuerzo sostenible y controlado." },
+  high: { label: "Exigente", nutritionMode: "cardioHigh", objective: "Realizar un estímulo cardiovascular exigente con recuperación y alimentación acordes." }
+};
+
 function physicalNutritionMode(routineId) {
   if (routineId === "legs") return "physicalLegs";
   if (["upper", "right-upper-maintenance"].includes(routineId)) return "physicalUpper";
@@ -207,7 +217,7 @@ function physicalNutritionMode(routineId) {
   return "physical";
 }
 
-export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod = "afternoon", opponent = "", startTime = "" } = {}) {
+export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod = "afternoon", opponent = "", startTime = "", cardioTypeId = "stationary-bike", cardioIntensity = "moderate" } = {}) {
   if (!isValidISODate(dateISO)) return null;
   const cleanTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(startTime || "")) ? String(startTime) : "";
   const base = { id: `quick-${dateISO}-${scenario}`, manualOverride: true, startTime: cleanTime, details: [], prefill: {} };
@@ -239,13 +249,18 @@ export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod 
       option: { ...base, title: cleanOpponent ? `Partido vs. ${cleanOpponent}` : "Partido", category: "tennis", summary: `Partido programado ${period.label}${cleanTime ? ` · ${cleanTime}` : ""}`, details: ["Coordinar alimentación, hidratación y activación según el horario"], prefill: { tennisTypeId: "match" } }
     };
   }
-  if (scenario === "cardioSoft") return {
-    scenario, nutritionMode: "cardioSoft", objective: "Sumar cardio suave sin comprometer la recuperación.",
-    option: { ...base, title: "Cardio suave", category: "cardio", summary: "Bicicleta estática o actividad suave", details: ["Ritmo conversable y sin buscar fatiga"], prefill: { cardioTypeId: "stationary-bike", distanceKm: "" } }
-  };
+  if (["cardio", "cardioSoft"].includes(scenario)) {
+    const activity = cardioTypeById(cardioTypeId);
+    const intensity = quickCardioIntensities[cardioIntensity] || quickCardioIntensities.moderate;
+    if (!activity || activity.id === "trekking") return null;
+    return {
+      scenario: "cardio", nutritionMode: intensity.nutritionMode, objective: intensity.objective,
+      option: { ...base, id: `quick-${dateISO}-cardio`, title: `Cardio · ${activity.name}`, category: "cardio", summary: `Intensidad ${intensity.label.toLocaleLowerCase("es")}`, details: [intensity.objective], prefill: { cardioTypeId: activity.id, cardioIntensity: cardioIntensity in quickCardioIntensities ? cardioIntensity : "moderate", distanceKm: "" } }
+    };
+  }
   if (scenario === "trekking") return {
     scenario, nutritionMode: "trekking", objective: "Realizar trekking ajustando esfuerzo, hidratación y recuperación.",
-    option: { ...base, title: "Trekking", category: "cardio", summary: "Salida larga según ruta y desnivel", details: ["Ajustar duración a la recuperación y al calendario de tenis"], prefill: { cardioTypeId: "trekking", distanceKm: "" } }
+    option: { ...base, title: "Trekking", category: "cardio", summary: "Ruta y desnivel por definir", details: ["Ajustar duración a la recuperación y al calendario de tenis"], prefill: { cardioTypeId: "trekking", cardioIntensity: "moderate", distanceKm: "" } }
   };
   return null;
 }

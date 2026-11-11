@@ -143,7 +143,7 @@ const baseCoachTrainingBlock = {
         { id: "w39-d1", dateISO: "2026-09-21", objective: "Activar sin dejar agujetas.", primaryOptionId: "legs-reduced", options: [physical("legs-reduced", "Día 1 reducido", "Piernas + core", "legs", ["Bicicleta estática 10 min", "Movilidad dinámica 5 min"], {
           "bodyweight-squat": { sets: 2, target: "12", weightKg: "" }, "unilateral-loaded-squat": { sets: 3, target: "10", weightKg: 10 }, "bulgarian-squat": { sets: 2, target: "8 por pierna", weightKg: 10 }, "romanian-deadlift": { sets: 3, target: "10", weightKg: 10 }, "step-up": { sets: 2, target: "10 por pierna", weightKg: 5 }, "front-plank": { sets: 3, target: "35 seg", weightKg: "" }, "dead-bug": { sets: 3, target: "10 por lado", weightKg: "" }, "wall-sit": { sets: 2, target: "30 seg", weightKg: "" }
         }, ["soft-split-step"])] },
-        { id: "w39-d2", dateISO: "2026-09-22", objective: "Cardio suave o timing técnico.", primaryOptionId: "run-soft", options: [
+        { id: "w39-d2", dateISO: "2026-09-22", objective: "Cardio o timing técnico.", primaryOptionId: "run-soft", options: [
           cardio("run-soft", "Trote suave", "4–5K máximo · sin buscar tiempo", ["Ritmo cómodo", "Sin progresiones"], "running", { distanceKm: 5 }),
           cardio("bike-zone2", "Bicicleta estática", "25–35 min · zona 2", ["Intensidad sostenible"], "stationary-bike"),
           tennis("technical-tennis", "Tenis o frontón técnico", "45–60 min · intensidad media", ["Timing, derecha, revés y movilidad", "Sin puntos largos intensos"], "wall")

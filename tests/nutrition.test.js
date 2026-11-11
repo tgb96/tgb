@@ -26,7 +26,7 @@ test("guía de tenis, físico y escenarios de sábado conserva las alternativas 
   assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-11-10", "cardioSoft")), /trekking/i);
   assert.ok(nutritionPlanForDate("2026-11-10", "trekking").slots.some(slot => slot.id === "during"));
   assert.ok(nutritionPlanForDate("2026-11-10", "trekking").slots.some(slot => slot.id === "post"));
-  for (const mode of ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft"]) {
+  for (const mode of ["default", "physical", "physicalLegs", "physicalUpper", "physicalPower", "tennis", "recovery", "match", "early", "late", "other", "tennisLight", "trekking", "cardioSoft", "cardio", "cardioHigh"]) {
     assert.doesNotMatch(JSON.stringify(nutritionPlanForDate("2026-09-26", mode)), /arepa|atún|avena|miel|kiwi/i);
     assert.ok(nutritionPlanForDate("2026-09-26", mode).fuelFocus);
   }
@@ -41,6 +41,9 @@ test("la nutrición sigue la actividad y la hora de la planificación deportiva"
   assert.deepEqual(plannedNutritionContext(match("13:45")), { mode: "early", title: "Partido de escalerilla", summary: undefined, time: "13:45", category: "tennis", isMatch: true });
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "rest", options: [{ id: "rest", category: "rest" }] }), "recovery");
   assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "trek", options: [{ id: "trek", category: "cardio", prefill: { cardioTypeId: "trekking" } }] }), "trekking");
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "bike", options: [{ id: "bike", category: "cardio", prefill: { cardioTypeId: "stationary-bike", cardioIntensity: "low" } }] }), "cardioSoft");
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "run", options: [{ id: "run", category: "cardio", prefill: { cardioTypeId: "running", cardioIntensity: "moderate" } }] }), "cardio");
+  assert.equal(nutritionModeForPlannedSession({ primaryOptionId: "intervals", options: [{ id: "intervals", category: "cardio", prefill: { cardioTypeId: "running", cardioIntensity: "high" } }] }), "cardioHigh");
   assert.deepEqual(plannedNutritionContext(coachSessionForDate("2026-10-17")), { mode: "early", title: "Partido vs. Felipe Reyes", summary: "13:45–15:15 · cancha 1 · categoría A", time: "13:45", category: "tennis", isMatch: true });
   assert.equal(plannedNutritionContext(coachSessionForDate("2026-10-03")).mode, "recovery");
   const coordinated = withWeeklyCadenceForDate({ id: "partial", startISO: "2026-09-14", endISO: "2026-10-25", weeks: [{ weekKey: "2026-W43", number: 43, startISO: "2026-10-19", endISO: "2026-10-25", sessions: [] }] }, "2026-10-21");
@@ -72,6 +75,8 @@ test("los rangos de kcal del entrenador dependen del día y del escenario real",
   assert.deepEqual(target("2026-09-22", "physicalUpper"), [2100, 2300]);
   assert.deepEqual(target("2026-09-22", "physicalPower"), [2250, 2450]);
   assert.deepEqual(target("2026-09-22", "cardioSoft"), [2100, 2300]);
+  assert.deepEqual(target("2026-09-22", "cardio"), [2200, 2450]);
+  assert.deepEqual(target("2026-09-22", "cardioHigh"), [2350, 2600]);
   assert.equal(Object.values(normalizeNutritionEntries([{ id: "scenario", dateISO: "2026-09-26", kind: "plan", planMode: "trekking" }]))[0].planMode, "trekking");
 });
 

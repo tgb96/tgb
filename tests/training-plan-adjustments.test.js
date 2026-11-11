@@ -143,6 +143,20 @@ test("el editor rápido ofrece rutinas físicas concretas y no solo una categor�
   assert.equal(power.option.prefill.routineId, "agility");
 });
 
+test("Inicio define actividad e intensidad del cardio y entrega el modo correcto a nutrición", () => {
+  const low = quickPlanDraft({ dateISO: "2026-11-12", scenario: "cardio", cardioTypeId: "walking", cardioIntensity: "low" });
+  const moderate = quickPlanDraft({ dateISO: "2026-11-12", scenario: "cardio", cardioTypeId: "stationary-bike", cardioIntensity: "moderate" });
+  const high = quickPlanDraft({ dateISO: "2026-11-12", scenario: "cardio", cardioTypeId: "running", cardioIntensity: "high" });
+  assert.equal(low.nutritionMode, "cardioSoft");
+  assert.equal(moderate.nutritionMode, "cardio");
+  assert.equal(high.nutritionMode, "cardioHigh");
+  assert.equal(high.option.title, "Cardio · Trote");
+  const block = normalizeTrainingBlock({ id: "cardio-plan", title: "Cardio", weeks: [{ weekKey: "2026-W46", sessions: [{ dateISO: "2026-11-12", primaryOptionId: high.option.id, options: [high.option] }] }] });
+  const option = block.weeks[0].sessions[0].options[0];
+  assert.equal(option.prefill.cardioTypeId, "running");
+  assert.equal(option.prefill.cardioIntensity, "high");
+});
+
 test("un cambio manual en Inicio prevalece sobre un partido importado al volver a cargar", () => {
   const block = normalizeTrainingBlock({
     id: "plan-noviembre",

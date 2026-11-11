@@ -1,4 +1,4 @@
-import { nutritionDayTotals, nutritionModeForPhysicalRoutine, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=101";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=103";
 import { configureFoodCatalog, defaultFoodCatalog, describeParts, estimateParts, foodCatalog, foodsForSlot, formatPortionCount, isRetiredFood, isSelectableFood, knownPartsSubtotal, nutritionEntryWithEstimate, summarizeParts } from "./nutrition-presets.js?v=106";
 import { isComplementaryActivity, isMainDayRecord } from "./coach-tracking.js?v=72";
 import { addDaysISO, getChileDateISO, recordTitle, weekDays } from "./utils.js?v=75";
@@ -596,12 +596,10 @@ export function createNutritionUI(repository, {
     const plannedActivity = plannedNutritionContext(getTrainingSession(selectedDate));
     const effectiveMode = planMode === "default" && plannedActivity?.mode ? plannedActivity.mode : planMode;
     const plan = nutritionPlanForDate(selectedDate, effectiveMode);
-    byId("nutritionDayMode").value = planMode;
     const plannedTitle = plannedActivity && plannedActivity.time && !plannedActivity.title.includes(plannedActivity.time)
       ? `${plannedActivity.title} · ${plannedActivity.time}` : plannedActivity?.title;
-    byId("nutritionDayTitle").textContent = plannedActivity && planMode === "default"
-      ? plannedTitle : plan.name;
-    byId("nutritionDayDescription").textContent = plannedActivity && planMode === "default"
+    byId("nutritionDayTitle").textContent = plannedActivity ? plannedTitle : plan.name;
+    byId("nutritionDayDescription").textContent = plannedActivity
       ? plannedActivity.isMatch
         ? [plannedActivity.summary, `Pauta ajustada a tu partido programado${plannedActivity.time ? ` a las ${plannedActivity.time}` : ""}.`].filter(Boolean).join(" · ")
         : [plannedActivity.summary, plan.detail].filter(Boolean).join(" · ")
@@ -616,10 +614,6 @@ export function createNutritionUI(repository, {
     const activities = repository.list().filter(item => item.dateISO === selectedDate);
     const primaryActivities = activities.filter(isMainDayRecord);
     const complements = activities.filter(isComplementaryActivity);
-    const mainActivity = primaryActivities.find(item => item.category === "tennis")
-      || primaryActivities.find(item => item.category === "physical")
-      || primaryActivities.find(item => item.category === "cardio")
-      || primaryActivities.find(item => item.category === "rest");
     const activityLine = document.createElement("p");
     activityLine.textContent = primaryActivities.length
       ? `Actividad principal registrada: ${primaryActivities.map(recordTitle).join(" · ")}.${complements.length ? ` Además, ${complements.length} sesión${complements.length === 1 ? "" : "es"} complementaria${complements.length === 1 ? "" : "s"}.` : ""}`
@@ -654,27 +648,6 @@ export function createNutritionUI(repository, {
     const caveat = document.createElement("small");
     caveat.textContent = "Estos datos de la pulsera son contexto: no se descuentan de las comidas ni cambian por sí solos tu pauta de alimentación o hidratación.";
     context.append(caveat);
-    const day = new Date(`${selectedDate}T12:00:00Z`).getUTCDay();
-    const expected = plannedActivity?.mode || ["recovery", "physicalLegs", "tennis", "physicalUpper", "tennis", "physicalPower", "other"][day];
-    const actual = mainActivity?.category === "rest" ? "recovery"
-      : mainActivity?.cardioTypeId === "trekking" ? "trekking"
-        : mainActivity?.category === "cardio" ? "cardioSoft"
-          : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId !== "match" ? "tennisLight"
-            : mainActivity?.category === "tennis" && day === 6 && mainActivity.tennisTypeId === "match" ? ""
-            : mainActivity?.category === "physical" ? nutritionModeForPhysicalRoutine(mainActivity.routineId)
-              : mainActivity?.category === "tennis" ? "tennis" : "";
-    if (actual && actual !== expected && planMode === "default") {
-      const hint = document.createElement("div"); hint.className = "nutrition-plan-adjust";
-      const message = document.createElement("span");
-      message.textContent = "Tu actividad real cambió respecto a la semana base. Puedes ajustar la guía, sin alterar lo que ya registraste.";
-      const change = document.createElement("button"); change.type = "button"; change.textContent = "Usar guía para hoy";
-      change.addEventListener("click", () => {
-        const id = `nutrition-plan-${selectedDate}`; const now = new Date().toISOString();
-        repository.saveNutritionEntry({ id, dateISO: selectedDate, kind: "plan", planMode: actual, createdAt: now, updatedAt: now });
-        render();
-      });
-      hint.append(message, change); context.append(hint);
-    }
     const entries = allEntries.filter(entry => entry.kind !== "plan");
     const totals = nutritionDayTotals(entries.map(nutritionEntryWithEstimate));
     const summary = byId("nutritionSummary");
@@ -802,13 +775,6 @@ export function createNutritionUI(repository, {
     byId("nutritionPreviousDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, -1); render(); });
     byId("nutritionNextDay").addEventListener("click", () => { selectedDate = addDaysISO(selectedDate, 1); render(); });
     byId("nutritionDate").addEventListener("change", event => { if (event.target.value) { selectedDate = event.target.value; render(); } });
-    byId("nutritionDayMode").addEventListener("change", event => {
-      const id = `nutrition-plan-${selectedDate}`;
-      const previous = repository.getNutritionEntry(id);
-      repository.saveNutritionEntry({ id, dateISO: selectedDate, kind: "plan", planMode: event.target.value,
-        createdAt: previous?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
-      render();
-    });
     document.querySelectorAll("[data-water-ml]").forEach(button => button.addEventListener("click", () => addWater(button.dataset.waterMl)));
     byId("nutritionCustomWater").addEventListener("click", () => {
       const value = window.prompt("¿Cuántos ml de agua bebiste?", "300"); if (value !== null) addWater(value);
