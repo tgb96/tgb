@@ -52,8 +52,14 @@ test("la pulsera recupera sesiones aunque Health Connect use otra fuente para lo
 
 test("la interfaz usa módulos, cinco pestañas y ningún evento inline", async () => {
   const html = await readFile(resolve(root, "index.html"), "utf8");
+  const app = await readFile(resolve(root, "assets/js/app.js"), "utf8");
+  const styles = await readFile(resolve(root, "assets/css/styles.css"), "utf8");
   assert.match(html, /assets\/css\/styles\.css/);
   assert.match(html, /type="module" src="assets\/js\/app\.js\?v=\d+"/);
+  assert.match(app, /\$\("quickPlanRoutine"\)\.disabled = !isPhysical/);
+  assert.match(styles, /\.quick-plan-form > \[hidden\].*display: none !important/);
+  assert.match(html, /<option value="trekking">Trekking<\/option>/);
+  assert.doesNotMatch(html, /Trekking (?:corto|largo)/i);
   assert.doesNotMatch(html, /\son(?:click|change|submit)=/i);
   assert.equal([...html.matchAll(/class="nav-item/g)].length, 5);
   assert.doesNotMatch(html, /class="nav-item"[^>]+data-view-target="routines"/);
@@ -643,7 +649,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=159/);
+  assert.match(html, /assets\/js\/app\.js\?v=160/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

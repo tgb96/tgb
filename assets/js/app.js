@@ -25,11 +25,11 @@ import {
   withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=100";
+} from "./coach-plan.js?v=101";
 import { createRepository } from "./storage.js?v=121";
 import { createCloudSync } from "./cloud.js?v=76";
 import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=124";
-import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=101";
+import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=102";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
 import { createGuidedUI } from "./guided-ui.js?v=101";
 import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=116";
@@ -681,7 +681,9 @@ function matchPeriodForOption(option, session) {
 
 function updateQuickPlanPreview() {
   const scenario = $("quickPlanScenario").value;
-  $("quickPlanRoutineRow").hidden = scenario !== "physical";
+  const isPhysical = scenario === "physical";
+  $("quickPlanRoutineRow").hidden = !isPhysical;
+  $("quickPlanRoutine").disabled = !isPhysical;
   $("quickPlanMatchFields").hidden = scenario !== "match";
   const draft = quickPlanDraft({
     dateISO: quickPlanDateISO,

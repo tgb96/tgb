@@ -30,7 +30,7 @@ const baseCoachTrainingBlock = {
   rules: [
     "Si hay partido el sábado: viernes sin fuerza pesada, jueves solo tenis suave o activación y miércoles tren superior reducido.",
     "Con entrenamientos grupales martes y jueves: no sumar trote fuerte el martes y mantener reducido el Día 3 durante la primera semana.",
-    "Después de un trekking largo: domingo de descanso y Día 1 del lunes solo si las piernas están recuperadas.",
+    "Después de un trekking: domingo de descanso y Día 1 del lunes solo si las piernas están recuperadas.",
     "Si no haces tenis el jueves: puedes realizar Día 3 completo el viernes y dejar tenis, trekking o cardio para el sábado.",
     "Si una semana especial interrumpe el plan: prioriza continuidad y recuperación por sobre completar el 100%."
   ],

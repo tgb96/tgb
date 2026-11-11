@@ -94,8 +94,8 @@ const tennisLight = {
 };
 
 const trekking = {
-  name: "Trekking largo", detail: "La duración, el desnivel y el clima elevan la demanda: prepara, abastece durante y recupera después.",
-  fuelFocus: "Carbohidrato alto antes y durante recorridos largos; combina carbohidrato y proteína al terminar.",
+  name: "Trekking", detail: "La duración, el desnivel y el clima determinan la demanda: prepara, abastece durante y recupera después.",
+  fuelFocus: "Ajusta el carbohidrato antes y durante según la duración; combina carbohidrato y proteína al terminar.",
   waterMinMl: 2500, waterMaxMl: 3500, caloriesMinKcal: 2500, caloriesMaxKcal: 2800,
   slots: [
     breakfast(["Huevos + pan + fruta", "Yogurt alto en proteína + granola + fruta"], "2–3 h antes"),
