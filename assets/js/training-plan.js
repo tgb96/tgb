@@ -4,7 +4,7 @@ import {
   restTypes,
   tennisTypeById
 } from "./data.js?v=72";
-import { isValidISODate, isoWeekInfo } from "./utils.js?v=75";
+import { isValidISODate, isoWeekInfo } from "./utils.js?v=79";
 
 const text = (value, max = 500) => String(value || "").trim().slice(0, max);
 const list = (value, maxItems = 20, maxLength = 500) => Array.isArray(value)
@@ -209,6 +209,45 @@ const quickCardioIntensities = {
   high: { label: "Exigente", nutritionMode: "cardioHigh", objective: "Realizar un estímulo cardiovascular exigente con recuperación y alimentación acordes." }
 };
 
+const quickRestReasons = {
+  planned: {
+    title: "Día de descanso",
+    summary: "Recuperación planificada",
+    restTypeId: "planned",
+    reason: "descanso planificado"
+  },
+  pain: {
+    title: "Descanso por dolor o molestia",
+    summary: "Carga suspendida para proteger la recuperación",
+    restTypeId: "discomfort",
+    reason: "dolor o molestia"
+  },
+  time: {
+    title: "Descanso por falta de tiempo",
+    summary: "La sesión no pudo realizarse por disponibilidad de tiempo",
+    restTypeId: "planned",
+    reason: "falta de tiempo"
+  },
+  energy: {
+    title: "Descanso por falta de energía",
+    summary: "Recuperación priorizada por baja energía",
+    restTypeId: "planned",
+    reason: "falta de energía"
+  },
+  weather: {
+    title: "Descanso por clima",
+    summary: "La actividad prevista no pudo realizarse por el clima",
+    restTypeId: "weather",
+    reason: "clima"
+  },
+  other: {
+    title: "Descanso por otro motivo",
+    summary: "La sesión prevista fue reemplazada por descanso",
+    restTypeId: "planned",
+    reason: "otro motivo"
+  }
+};
+
 function physicalNutritionMode(routineId) {
   if (routineId === "legs") return "physicalLegs";
   if (["upper", "right-upper-maintenance"].includes(routineId)) return "physicalUpper";
@@ -217,14 +256,28 @@ function physicalNutritionMode(routineId) {
   return "physical";
 }
 
-export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod = "afternoon", opponent = "", startTime = "", cardioTypeId = "stationary-bike", cardioIntensity = "moderate" } = {}) {
+export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod = "afternoon", opponent = "", startTime = "", cardioTypeId = "stationary-bike", cardioIntensity = "moderate", restReason = "planned", restNote = "" } = {}) {
   if (!isValidISODate(dateISO)) return null;
   const cleanTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(startTime || "")) ? String(startTime) : "";
   const base = { id: `quick-${dateISO}-${scenario}`, manualOverride: true, startTime: cleanTime, details: [], prefill: {} };
-  if (scenario === "rest") return {
-    scenario, nutritionMode: "recovery", objective: "Recuperar y mantener disponibilidad para la siguiente sesión.",
-    option: { ...base, title: "Día de descanso", category: "rest", summary: "Recuperación planificada", details: ["Priorizar sueño, hidratación y comidas regulares"], prefill: { restTypeId: "planned" } }
-  };
+  if (scenario === "rest") {
+    const selectedReason = quickRestReasons[restReason] || quickRestReasons.planned;
+    const cleanNote = text(restNote, 500);
+    return {
+      scenario,
+      nutritionMode: "recovery",
+      objective: "Recuperar y mantener disponibilidad para la siguiente sesión.",
+      changeReason: `Motivo informado: ${selectedReason.reason}${cleanNote ? `. ${cleanNote}` : "."}`,
+      option: {
+        ...base,
+        title: selectedReason.title,
+        category: "rest",
+        summary: selectedReason.summary,
+        details: ["Priorizar sueño, hidratación y comidas regulares", ...(cleanNote ? [`Detalle informado: ${cleanNote}`] : [])],
+        prefill: { restTypeId: selectedReason.restTypeId }
+      }
+    };
+  }
   if (scenario === "physical") {
     const routine = physicalRoutineById(routineId);
     if (!routine) return null;
@@ -263,6 +316,52 @@ export function quickPlanDraft({ dateISO, scenario, routineId = "", matchPeriod 
     option: { ...base, title: "Trekking", category: "cardio", summary: "Ruta y desnivel por definir", details: ["Ajustar duración a la recuperación y al calendario de tenis"], prefill: { cardioTypeId: "trekking", cardioIntensity: "moderate", distanceKm: "" } }
   };
   return null;
+}
+
+export function quickPlanAdjustment({ dateISO, draft, previousOption = null, id = "", timestamp = new Date().toISOString() } = {}) {
+  if (!isValidISODate(dateISO) || !draft?.option) return null;
+  const previousTitle = text(previousOption?.title, 200) || "Sin actividad definida";
+  const currentTitle = text(draft.option.title, 200) || "Actividad planificada";
+  const reason = text(draft.changeReason, 1000) || `Cambio manual desde «${previousTitle}» a «${currentTitle}».`;
+  const settings = draft.option.prefill?.settings || {};
+  const omitted = new Set(draft.option.prefill?.omitExerciseIds || []);
+  const exerciseSettings = Object.entries(settings).map(([exerciseId, value]) => ({
+    exerciseId,
+    sets: value?.sets,
+    target: value?.target,
+    weightKg: value?.weightKg,
+    omit: false
+  }));
+  for (const exerciseId of omitted) exerciseSettings.push({ exerciseId, sets: 1, target: "", weightKg: null, omit: true });
+  return {
+    id: text(id, 120) || `quick-plan-${dateISO}-${String(timestamp).replace(/[^0-9]/g, "").slice(0, 17)}`,
+    question: `Cambio manual de planificación del ${dateISO}: ${previousTitle} → ${currentTitle}.`,
+    answer: reason,
+    source: "plan-change",
+    planAdjustment: {
+      targetDateISO: dateISO,
+      startTime: draft.option.startTime || "",
+      title: currentTitle,
+      reason,
+      category: draft.option.category,
+      summary: draft.option.summary,
+      details: draft.option.details || [],
+      routineId: draft.option.prefill?.routineId || "",
+      cardioTypeId: draft.option.prefill?.cardioTypeId || "",
+      cardioIntensity: draft.option.prefill?.cardioIntensity || "",
+      tennisTypeId: draft.option.prefill?.tennisTypeId || "",
+      restTypeId: draft.option.prefill?.restTypeId || "",
+      exerciseSettings,
+      nutritionMode: draft.nutritionMode,
+      nutritionReason: `La pauta nutricional se coordinó automáticamente con «${currentTitle}».`
+    },
+    adjustmentStatus: "applied",
+    appliedOptionId: draft.option.id,
+    originalOptionId: previousOption?.id || "",
+    appliedAt: timestamp,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
 }
 
 export function applyQuickPlanDraft(sourceBlock, dateISO, draft, updatedAt = new Date().toISOString()) {

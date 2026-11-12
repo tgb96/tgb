@@ -398,6 +398,7 @@ function adjustmentOption(item) {
     id: optionId,
     title: adjustment.title,
     category: adjustment.category,
+    manualOverride: true,
     startTime: adjustment.startTime || "",
     summary: adjustment.summary,
     details: adjustment.details || [],
@@ -410,6 +411,7 @@ function adjustmentOption(item) {
       }])),
       omitExerciseIds: exerciseSettings.filter(setting => setting.omit).map(setting => setting.exerciseId),
       cardioTypeId: adjustment.category === "cardio" ? adjustment.cardioTypeId : "",
+      cardioIntensity: adjustment.category === "cardio" ? adjustment.cardioIntensity : "",
       tennisTypeId: adjustment.category === "tennis" ? adjustment.tennisTypeId : "",
       restTypeId: adjustment.category === "rest" ? adjustment.restTypeId : "",
       distanceKm: ""

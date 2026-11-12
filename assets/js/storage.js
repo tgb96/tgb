@@ -1,5 +1,5 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=75";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=103";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=79";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=104";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=103";
 import { describeParts, normalizeNutritionFoods, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { normalizeRecoveryContext } from "./recovery-context.js?v=100";
@@ -112,6 +112,8 @@ export function normalizeCoachQuestions(value) {
         .map(value => String(value || "").trim().slice(0, 500)).filter(Boolean),
       routineId: String(rawAdjustment?.routineId || "").slice(0, 100),
       cardioTypeId: String(rawAdjustment?.cardioTypeId || "").slice(0, 100),
+      cardioIntensity: ["low", "moderate", "high"].includes(rawAdjustment?.cardioIntensity)
+        ? rawAdjustment.cardioIntensity : "",
       tennisTypeId: String(rawAdjustment?.tennisTypeId || "").slice(0, 100),
       restTypeId: String(rawAdjustment?.restTypeId || "").slice(0, 100),
       exerciseSettings,
@@ -171,7 +173,7 @@ export function normalizeCoachQuestions(value) {
       question,
       answer: String(item?.answer || "").trim().slice(0, 6000),
       deleted: Boolean(item?.deleted),
-      source: item?.source === "voice" ? "voice" : "text",
+      source: ["voice", "plan-change"].includes(item?.source) ? item.source : "text",
       recoveryContext: normalizeRecoveryContext(item?.recoveryContext),
       planAdjustment,
       recordAdjustment,
@@ -457,7 +459,7 @@ export function createRepository(storage) {
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     },
     clearCoachQuestions() {
-      const live = this.listCoachQuestions();
+      const live = this.listCoachQuestions().filter(question => question.source !== "plan-change");
       if (!live.length) return 0;
       const updatedAt = new Date().toISOString();
       const coachQuestions = { ...state.coachQuestions };

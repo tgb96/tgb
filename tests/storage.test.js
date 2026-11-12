@@ -226,6 +226,25 @@ test("limpiar preguntas deja marcas de borrado para que no reaparezcan desde la 
   assert.equal(repository.clearCoachQuestions(), 0);
 });
 
+test("limpiar la conversación conserva el historial de cambios manuales del plan", () => {
+  const repository = createRepository(new FakeStorage());
+  repository.saveCoachQuestion({
+    id: "quick-plan-1",
+    question: "Cambio manual: tenis → descanso",
+    source: "plan-change",
+    planAdjustment: { targetDateISO: "2026-11-10", title: "Descanso por falta de tiempo", category: "rest", restTypeId: "planned" },
+    adjustmentStatus: "applied",
+    createdAt: "2026-11-09T20:00:00.000Z",
+    updatedAt: "2026-11-09T20:00:00.000Z"
+  });
+  repository.saveCoachQuestion({ id: "q-1", question: "¿Cómo voy?", createdAt: "2026-11-09T21:00:00.000Z" });
+  assert.equal(repository.clearCoachQuestions(), 1);
+  const remaining = repository.listCoachQuestions();
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].source, "plan-change");
+  assert.equal(remaining[0].adjustmentStatus, "applied");
+});
+
 test("conserva la auditoría necesaria para deshacer un ajuste del plan", () => {
   const storage = new FakeStorage();
   const repository = createRepository(storage);

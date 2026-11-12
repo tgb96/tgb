@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { withCoachPlanAdjustments, withMatchCalendar } from "../assets/js/coach-plan.js";
-import { applyQuickPlanDraft, normalizeTrainingBlock, quickPlanDraft } from "../assets/js/training-plan.js";
+import { applyQuickPlanDraft, normalizeTrainingBlock, quickPlanAdjustment, quickPlanDraft } from "../assets/js/training-plan.js";
+import { normalizeCoachQuestions } from "../assets/js/storage.js";
 
 const option = (id, title, category = "tennis") => ({
   id,
@@ -131,6 +132,62 @@ test("Inicio cambia lo previsto y coordina el escenario nutricional", () => {
   assert.equal(matchDraft.nutritionMode, "late");
   assert.equal(match.startTime, "20:30");
   assert.equal(match.options.find(item => item.id === match.primaryOptionId).title, "Partido vs. Nicolás");
+});
+
+test("el descanso cambiado desde Inicio conserva el motivo y deja un ajuste persistente", () => {
+  const original = normalizeTrainingBlock({
+    id: "plan-noviembre",
+    title: "Plan de noviembre",
+    weeks: [{ weekKey: "2026-W46", sessions: [{ dateISO: "2026-11-10", primaryOptionId: "tennis", options: [option("tennis", "Entrenamiento grupal")] }] }]
+  });
+  const previous = original.weeks[0].sessions[0].options[0];
+  const draft = quickPlanDraft({
+    dateISO: "2026-11-10",
+    scenario: "rest",
+    restReason: "time",
+    restNote: "Tuve que estudiar para una prueba"
+  });
+  const historyItem = quickPlanAdjustment({
+    dateISO: "2026-11-10",
+    draft,
+    previousOption: previous,
+    id: "quick-plan-time",
+    timestamp: "2026-11-09T20:00:00.000Z"
+  });
+
+  assert.equal(draft.option.title, "Descanso por falta de tiempo");
+  assert.match(historyItem.planAdjustment.reason, /falta de tiempo/i);
+  assert.match(historyItem.planAdjustment.reason, /estudiar/i);
+  assert.match(historyItem.question, /Entrenamiento grupal/);
+
+  // Simula que la nube vuelve a entregar el bloque original al día siguiente:
+  // el historial aplicado debe volver a imponer el cambio manual.
+  const restored = withCoachPlanAdjustments(original, [historyItem]);
+  const session = restored.weeks[0].sessions[0];
+  const selected = session.options.find(item => item.id === session.primaryOptionId);
+  assert.equal(selected.title, "Descanso por falta de tiempo");
+  assert.equal(selected.manualOverride, true);
+  assert.equal(selected.prefill.restTypeId, "planned");
+});
+
+test("el ajuste persistente conserva la intensidad elegida para cardio", () => {
+  const draft = quickPlanDraft({
+    dateISO: "2026-11-12",
+    scenario: "cardio",
+    cardioTypeId: "running",
+    cardioIntensity: "high"
+  });
+  const adjustment = quickPlanAdjustment({ dateISO: "2026-11-12", draft, id: "quick-cardio", timestamp: "2026-11-11T20:00:00.000Z" });
+  const block = normalizeTrainingBlock({
+    id: "base-cardio",
+    title: "Base",
+    weeks: [{ weekKey: "2026-W46", sessions: [{ dateISO: "2026-11-12", primaryOptionId: "rest", options: [option("rest", "Descanso", "rest")] }] }]
+  });
+  const stored = Object.values(normalizeCoachQuestions([adjustment]));
+  const restored = withCoachPlanAdjustments(block, stored);
+  const session = restored.weeks[0].sessions[0];
+  const selected = session.options.find(item => item.id === session.primaryOptionId);
+  assert.equal(selected.prefill.cardioIntensity, "high");
 });
 
 test("el editor rápido ofrece rutinas físicas concretas y no solo una categoría genérica", () => {

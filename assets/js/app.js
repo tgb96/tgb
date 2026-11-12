@@ -25,20 +25,20 @@ import {
   withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=102";
-import { createRepository } from "./storage.js?v=122";
+} from "./coach-plan.js?v=103";
+import { createRepository } from "./storage.js?v=123";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=125";
+import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=126";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=103";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
-import { createGuidedUI } from "./guided-ui.js?v=101";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=117";
-import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=103";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=102";
+import { createGuidedUI } from "./guided-ui.js?v=102";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=118";
+import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanAdjustment, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=104";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=103";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordedRoutineForActiveSession, recordWorkflowState } from "./coach-tracking.js?v=77";
-import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=63";
+import { activityBurnedCalories, activityTiming, durationModeFor } from "./training-metrics.js?v=64";
 import { buildProgressionEvidence, fallbackProgressionChanges, sanitizeProgressionChanges } from "./progression.js?v=3";
 import { normalizeWearableSnapshot, refreshedWearableLink, wearableAutolinks, wearableCandidates, wearableComparison, wearableInbox, wearableSummaryText } from "./wearable-link.js?v=72";
 import { createTechniqueVideoPlayer, exerciseTechniqueGuide } from "./exercise-technique.js?v=3";
@@ -68,7 +68,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=78";
+} from "./utils.js?v=79";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);
@@ -679,16 +679,35 @@ function matchPeriodForOption(option, session) {
   return "afternoon";
 }
 
+function restReasonForOption(option) {
+  const text = `${option?.title || ""} ${option?.summary || ""}`.toLocaleLowerCase("es");
+  if (option?.prefill?.restTypeId === "discomfort" || /dolor|molestia/.test(text)) return "pain";
+  if (option?.prefill?.restTypeId === "weather" || /clima|lluvia/.test(text)) return "weather";
+  if (/falta de tiempo|sin tiempo|disponibilidad de tiempo/.test(text)) return "time";
+  if (/falta de energ[ií]a|baja energ[ií]a|fatiga/.test(text)) return "energy";
+  if (/otro motivo/.test(text)) return "other";
+  return "planned";
+}
+
+function restNoteForOption(option) {
+  const detail = (option?.details || []).find(item => /^detalle informado:/i.test(item));
+  return detail ? detail.replace(/^detalle informado:\s*/i, "") : "";
+}
+
 function updateQuickPlanPreview() {
   const scenario = $("quickPlanScenario").value;
   const isPhysical = scenario === "physical";
   const isCardio = scenario === "cardio";
+  const isRest = scenario === "rest";
   $("quickPlanRoutineRow").hidden = !isPhysical;
   $("quickPlanRoutine").disabled = !isPhysical;
   $("quickPlanMatchFields").hidden = scenario !== "match";
   $("quickPlanCardioFields").hidden = !isCardio;
+  $("quickPlanRestFields").hidden = !isRest;
   $("quickPlanCardioType").disabled = !isCardio;
   $("quickPlanCardioIntensity").disabled = !isCardio;
+  $("quickPlanRestReason").disabled = !isRest;
+  $("quickPlanRestNote").disabled = !isRest;
   const draft = quickPlanDraft({
     dateISO: quickPlanDateISO,
     scenario,
@@ -697,7 +716,9 @@ function updateQuickPlanPreview() {
     opponent: $("quickPlanOpponent").value,
     startTime: $("quickPlanTime").value,
     cardioTypeId: $("quickPlanCardioType").value,
-    cardioIntensity: $("quickPlanCardioIntensity").value
+    cardioIntensity: $("quickPlanCardioIntensity").value,
+    restReason: $("quickPlanRestReason").value,
+    restNote: $("quickPlanRestNote").value
   });
   const preview = $("quickPlanPreview");
   preview.replaceChildren();
@@ -737,6 +758,8 @@ function openQuickPlanEditor(dateISO, session) {
   });
   $("quickPlanDialogTitle").textContent = `Cambiar ${formatLongDate(dateISO)}`;
   $("quickPlanScenario").value = quickScenarioForOption(primary);
+  $("quickPlanRestReason").value = restReasonForOption(primary);
+  $("quickPlanRestNote").value = restNoteForOption(primary);
   routineSelect.value = physicalRoutineById(primary?.prefill?.routineId)?.id || "legs";
   $("quickPlanMatchPeriod").value = matchPeriodForOption(primary, session);
   $("quickPlanTime").value = primary?.startTime || session?.startTime || "";
@@ -752,6 +775,9 @@ function openQuickPlanEditor(dateISO, session) {
 
 function saveQuickPlanChange(event) {
   event.preventDefault();
+  const currentBlock = activeTrainingBlock(quickPlanDateISO);
+  const currentSession = currentBlock?.weeks?.flatMap(week => week.sessions || []).find(session => session.dateISO === quickPlanDateISO);
+  const previousOption = currentSession ? coachOption(currentSession, currentSession.primaryOptionId) || currentSession.options?.[0] : null;
   const draft = quickPlanDraft({
     dateISO: quickPlanDateISO,
     scenario: $("quickPlanScenario").value,
@@ -760,15 +786,25 @@ function saveQuickPlanChange(event) {
     opponent: $("quickPlanOpponent").value,
     startTime: $("quickPlanTime").value,
     cardioTypeId: $("quickPlanCardioType").value,
-    cardioIntensity: $("quickPlanCardioIntensity").value
+    cardioIntensity: $("quickPlanCardioIntensity").value,
+    restReason: $("quickPlanRestReason").value,
+    restNote: $("quickPlanRestNote").value
   });
-  const adjusted = applyQuickPlanDraft(activeTrainingBlock(quickPlanDateISO), quickPlanDateISO, draft);
+  const adjusted = applyQuickPlanDraft(currentBlock, quickPlanDateISO, draft);
   if (!adjusted) return showToast("No se pudo preparar ese cambio de planificación.");
   try {
     const now = new Date().toISOString();
+    const adjustment = quickPlanAdjustment({
+      dateISO: quickPlanDateISO,
+      draft,
+      previousOption,
+      id: `quick-plan-${quickPlanDateISO}-${globalThis.crypto?.randomUUID?.() || String(Date.now())}`,
+      timestamp: now
+    });
     repository.listCoachQuestions().filter(item => item.adjustmentStatus === "applied" && item.planAdjustment?.targetDateISO === quickPlanDateISO)
       .forEach(item => repository.saveCoachQuestion({ ...item, adjustmentStatus: "reverted", revertedAt: now, updatedAt: now }));
     repository.saveTrainingBlock(adjusted);
+    repository.saveCoachQuestion(adjustment);
     const planId = `nutrition-plan-${quickPlanDateISO}`;
     const previous = repository.getNutritionEntry(planId);
     repository.saveNutritionEntry({ id: planId, dateISO: quickPlanDateISO, kind: "plan", planMode: draft.nutritionMode,
@@ -777,7 +813,7 @@ function saveQuickPlanChange(event) {
     renderHome();
     renderCoachPlanDialog();
     nutritionUI.render();
-    showToast("Plan semanal y pauta nutricional actualizados.");
+    showToast("Cambio guardado en el plan, la nutrición y el historial del entrenador.");
   } catch (error) {
     showToast(error.message || "No se pudo guardar el cambio.");
   }
@@ -1349,7 +1385,7 @@ function renderCoachQuestions() {
   }
   const questions = (coachHistoryExpanded ? allQuestions : allQuestions.slice(0, 3)).reverse();
   const toggle = $("coachHistoryToggle");
-  $("coachHistoryClear").classList.toggle("hidden", allQuestions.length === 0);
+  $("coachHistoryClear").classList.toggle("hidden", !allQuestions.some(item => item.source !== "plan-change"));
   toggle.classList.toggle("hidden", allQuestions.length <= 3);
   toggle.textContent = coachHistoryExpanded ? "Mostrar solo los 3 mensajes más recientes" : `Ver toda la conversación (${allQuestions.length})`;
   if (!questions.length) {
@@ -7207,7 +7243,7 @@ function bindEvents() {
     renderCoachQuestions();
   });
   $("coachHistoryClear").addEventListener("click", () => {
-    const count = repository.listCoachQuestions().length;
+    const count = repository.listCoachQuestions().filter(item => item.source !== "plan-change").length;
     if (!count || !window.confirm(`¿Limpiar ${count} pregunta${count === 1 ? "" : "s"} y sus respuestas? También desaparecerán de tus otros dispositivos al sincronizar.`)) return;
     repository.clearCoachQuestions();
     coachHistoryExpanded = false;
@@ -7232,8 +7268,8 @@ function bindEvents() {
   });
   $("quickPlanDialogClose").addEventListener("click", () => $("quickPlanDialog").close());
   $("quickPlanForm").addEventListener("submit", saveQuickPlanChange);
-  for (const id of ["quickPlanScenario", "quickPlanRoutine", "quickPlanMatchPeriod", "quickPlanTime", "quickPlanOpponent", "quickPlanCardioType", "quickPlanCardioIntensity"]) {
-    $(id).addEventListener(id === "quickPlanOpponent" ? "input" : "change", updateQuickPlanPreview);
+  for (const id of ["quickPlanScenario", "quickPlanRoutine", "quickPlanMatchPeriod", "quickPlanTime", "quickPlanOpponent", "quickPlanCardioType", "quickPlanCardioIntensity", "quickPlanRestReason", "quickPlanRestNote"]) {
+    $(id).addEventListener(["quickPlanOpponent", "quickPlanRestNote"].includes(id) ? "input" : "change", updateQuickPlanPreview);
   }
   $("openAiPlanButton").addEventListener("click", openAiPlanDialog);
   $("coachPlanDialogClose").addEventListener("click", () => $("coachPlanDialog").close());

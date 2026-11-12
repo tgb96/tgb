@@ -466,6 +466,21 @@
       <label id="quickPlanRoutineRow" for="quickPlanRoutine">Rutina física
         <select id="quickPlanRoutine"></select>
       </label>
+      <div id="quickPlanRestFields" class="quick-plan-match-fields">
+        <label for="quickPlanRestReason">Motivo del descanso
+          <select id="quickPlanRestReason">
+            <option value="planned">Descanso planificado</option>
+            <option value="pain">Dolor o molestia</option>
+            <option value="time">Falta de tiempo</option>
+            <option value="energy">Falta de energía</option>
+            <option value="weather">Clima</option>
+            <option value="other">Otro motivo</option>
+          </select>
+        </label>
+        <label for="quickPlanRestNote">Detalle (opcional)
+          <input id="quickPlanRestNote" type="text" maxlength="500" placeholder="Ej.: dormí poco o me molestó la rodilla">
+        </label>
+      </div>
       <div id="quickPlanMatchFields" class="quick-plan-match-fields">
         <label for="quickPlanMatchPeriod">Horario del partido
           <select id="quickPlanMatchPeriod">
@@ -636,6 +651,6 @@
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script type="module" src="assets/js/app.js?v=161"></script>
+<script type="module" src="assets/js/app.js?v=163"></script>
 </body>
 </html>
