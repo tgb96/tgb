@@ -1,5 +1,5 @@
-import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=79";
-import { normalizeTrainingBlocks } from "./training-plan.js?v=104";
+import { isValidISODate, normalizeRecord, validateRecord } from "./utils.js?v=80";
+import { normalizeTrainingBlocks } from "./training-plan.js?v=105";
 import { normalizeNutritionEntries, nutritionModes } from "./nutrition.js?v=103";
 import { describeParts, normalizeNutritionFoods, nutritionEntryWithEstimate } from "./nutrition-presets.js?v=105";
 import { normalizeRecoveryContext } from "./recovery-context.js?v=100";

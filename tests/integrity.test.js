@@ -139,6 +139,16 @@ test("hay catorce rutinas físicas base y complementarias configurables", async 
   const data = await import("../assets/js/data.js");
   assert.equal(data.physicalRoutines.length, 14);
   assert.deepEqual(data.physicalRoutines.map(routine => routine.exercises.length), [10, 10, 11, 12, 11, 10, 8, 8, 5, 9, 9, 7, 10, 9]);
+  const legs = data.physicalRoutines.find(routine => routine.id === "legs");
+  const upper = data.physicalRoutines.find(routine => routine.id === "upper");
+  const agility = data.physicalRoutines.find(routine => routine.id === "agility");
+  assert.ok(legs.exercises.some(exercise => exercise.id === "hip-flexor-external-rotation"));
+  assert.ok(legs.exercises.some(exercise => exercise.id === "kickstand-romanian-deadlift"));
+  assert.ok(legs.exercises.some(exercise => exercise.id === "calf-tibialis-superset"));
+  assert.ok(upper.exercises.some(exercise => exercise.id === "single-arm-scapular-activation"));
+  assert.ok(agility.exercises.some(exercise => exercise.id === "diagonal-single-leg-hops"));
+  assert.ok(agility.exercises.some(exercise => exercise.id === "standing-band-rotation"));
+  assert.ok([legs, upper, agility].every(routine => routine.equipment.some(item => /banda/i.test(item))));
   assert.ok(data.physicalRoutines.slice(0, 4).every(routine => {
     const warmup = routine.exercises[0];
     return warmup.name === "Bicicleta estática" && warmup.sets === 1 && warmup.target === "10 min";
@@ -490,7 +500,7 @@ test("el perfil maestro de Tomás guía siempre al entrenador y no depende de un
   assert.match(app, /coachProfilePrompt\(\)\.slice\(0, 40000\)/);
   assert.doesNotMatch(app, /Configura primero el perfil|openCoachProfileDialog/);
   assert.doesNotMatch(html, /Perfil del entrenador IA|coachProfileDialog|coachProfileText/);
-  assert.match(worker, /master-coach-profile\.js\?v=4/);
+  assert.match(worker, /master-coach-profile\.js\?v=5/);
 });
 
 test("la guía registra comentarios nutricionales, pliega el historial y prepara el resumen mensual", async () => {
@@ -656,7 +666,7 @@ test("la guía decide la progresión con técnica, reserva, historial y límites
   assert.match(progression, /recommendedChange/);
   assert.match(app, /Afinar por ejercicio \(opcional\)/);
   assert.match(app, /Resultado del ajuste anterior/);
-  assert.match(html, /assets\/js\/app\.js\?v=163/);
+  assert.match(html, /assets\/js\/app\.js\?v=164/);
 });
 
 test("plan y realidad conservan alternativas, contexto del día y un cierre sobrio", async () => {

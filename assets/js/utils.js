@@ -7,7 +7,7 @@ import {
   tennisTypeById,
   trekkingRoutes,
   TZ
-} from "./data.js?v=72";
+} from "./data.js?v=73";
 import { normalizeWearableSnapshot, wearableSummaryText } from "./wearable-link.js?v=70";
 import { activityBurnedCalories, activityTiming } from "./training-metrics.js?v=64";
 

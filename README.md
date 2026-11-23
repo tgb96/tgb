@@ -57,6 +57,8 @@ Incluye catorce rutinas configuradas en `assets/js/data.js`:
 
 Cada ejercicio permite elegir entre 1 y 10 series desde un desplegable, además de modificar repeticiones o tiempo y peso. El editor distingue si el objetivo corresponde a repeticiones, segundos o minutos y permite borrar y sobrescribir el valor con normalidad. Los ajustes se conservan para futuras sesiones y el avance de cada serie se guarda por fecha en el dispositivo. Desde Registrar se elige Entrenamiento físico y luego una rutina; esa elección abre una vista previa para revisar ejercicios y preparar implementos, sin iniciar el cronómetro. Al pulsar Iniciar entrenamiento comienza el seguimiento. Al finalizar se seleccionan sensaciones, esfuerzo, técnica y molestias; la duración y las calorías se completan al vincular la sesión de la pulsera. El entrenador IA puede recomendar una rutina según el tiempo disponible, carga, sueño, molestias, clima informado, equipamiento y calendario, pero no reemplaza una actividad planificada sin confirmación. El cierre registra el entrenamiento y entrega un balance de tiempo, series, ejercicios, repeticiones y volumen de carga estimado.
 
+Las tres rutinas principales incorporan adaptaciones específicas para tenis y para la condición unilateral de Tomás. El Día 1 activa flexores y rotadores de cadera, usa peso muerto kickstand y termina con gemelo y tibial anterior. El Día 2 prepara el hombro derecho con activación escapular unilateral. El Día 3 prioriza saltos unilaterales cortos y potencia rotacional de pie con banda, con alternativas sin resistencia y reducción obligatoria ante molestias o competencia cercana.
+
 ### Cardio
 
 - Bicicleta al aire libre.

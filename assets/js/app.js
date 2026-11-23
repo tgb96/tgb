@@ -15,7 +15,7 @@ import {
   trekkingLocations,
   trekkingRoutes,
   trainingCategories
-} from "./data.js?v=72";
+} from "./data.js?v=73";
 import {
   coachOption,
   coachBaseTrainingBlock,
@@ -25,16 +25,16 @@ import {
   withCoachPlanAdjustments,
   withMatchCalendar,
   withWeeklyCadenceForDate
-} from "./coach-plan.js?v=103";
-import { createRepository } from "./storage.js?v=123";
+} from "./coach-plan.js?v=104";
+import { createRepository } from "./storage.js?v=124";
 import { createCloudSync } from "./cloud.js?v=76";
-import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=126";
+import { createNutritionUI, DAILY_INTAKE_ITEMS, dailyIntakeRecord } from "./nutrition-ui.js?v=127";
 import { nutritionDayTotals, nutritionPlanForDate, plannedNutritionContext } from "./nutrition.js?v=103";
 import { nutritionEntryWithEstimate } from "./nutrition-presets.js?v=106";
-import { createGuidedUI } from "./guided-ui.js?v=102";
-import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=118";
-import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanAdjustment, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=104";
-import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=103";
+import { createGuidedUI } from "./guided-ui.js?v=103";
+import { COACH_EQUIPMENT_OPTIONS, COACH_PROFILE_VERSION, DEFAULT_COACH_EQUIPMENT, MASTER_COACH_PROFILE, createAiClient } from "./ai.js?v=119";
+import { applyQuickPlanDraft, newestTrainingBlock, normalizeTrainingBlock, quickPlanAdjustment, quickPlanDraft, summarizeTrainingBlock, weekDisplayTitle } from "./training-plan.js?v=105";
+import { syncOpenTennisMatches } from "./open-tennis-sync.js?v=104";
 import { dailyBrief, rollingFourWeekSummary } from "./daily-insights.js?v=96";
 import { recoveryContextsFromQuestions, strongestRecoveryImpact } from "./recovery-context.js?v=100";
 import { analysisMatchesCurrentPlan, canQuickRegisterRest, comparableActivity, dayActivitySummary, dayPlanOverview, isComplementaryActivity, isMainDayRecord, plannedContextForRecord, planAssessment, planNeedsSeparateLine, recordedRoutineForActiveSession, recordWorkflowState } from "./coach-tracking.js?v=77";
@@ -68,7 +68,7 @@ import {
   weekDays,
   weeklyEvolution,
   weeklyReport
-} from "./utils.js?v=79";
+} from "./utils.js?v=80";
 
 const $ = id => document.getElementById(id);
 const repository = createRepository(window.localStorage);

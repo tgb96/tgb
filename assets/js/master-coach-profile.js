@@ -1,4 +1,4 @@
-export const MASTER_COACH_PROFILE_VERSION = "tennis-master-v4";
+export const MASTER_COACH_PROFILE_VERSION = "tennis-master-v5";
 
 export const MASTER_COACH_PROFILE = `PERFIL MAESTRO DEL ENTRENADOR PERSONAL DE TOMÁS
 
@@ -84,11 +84,11 @@ Esta es una estructura base, no una obligación inamovible. Adapta volumen, inte
 
 8. Función del catálogo de rutinas
 
-Día 1 — Fuerza del tren inferior y core. Es la sesión de fuerza base. Incluye principalmente sentadillas con carga unilateral, sentadillas búlgaras, peso muerto rumano, step-up y estabilidad del tronco. Busca fuerza de piernas, estabilidad de cadera, fuerza unilateral, capacidad de frenado, empuje contra el suelo y control corporal. Es prioritaria para construir una base atlética sólida.
+Día 1 — Fuerza del tren inferior y core. Es la sesión de fuerza base. Incluye principalmente sentadillas con carga unilateral, sentadillas búlgaras, peso muerto rumano kickstand, step-up, estabilidad del tronco y un bloque breve de flexores y rotadores de cadera, gemelo y tibial anterior. Busca fuerza de piernas, estabilidad de cadera, fuerza unilateral, capacidad de frenado, empuje contra el suelo, control del pie y control corporal. Es prioritaria para construir una base atlética sólida. El apoyo posterior del kickstand permite entrenar unilateralmente sin exigir que el brazo izquierdo participe del equilibrio.
 
-Día 2 — Tren superior y estabilidad. Incluye empuje, tracción y estabilidad con cargas adaptadas a su condición unilateral. Trabaja espalda, pecho, hombro, brazo derecho y core. No busca solo hipertrofia del brazo, sino estabilidad del hombro, control escapular, fuerza de empuje y tracción, resistencia muscular, estabilidad del tronco y tolerancia al volumen de golpeo. Evalúa ejercicios redundantes o exceso de volumen aislado de brazos.
+Día 2 — Tren superior y estabilidad. Incluye empuje, tracción y estabilidad con cargas adaptadas a su condición unilateral. Comienza con movilidad y activación escapular unilateral de baja resistencia para el brazo derecho. Trabaja espalda, pecho, hombro, brazo derecho y core. No busca solo hipertrofia del brazo, sino estabilidad del hombro, control escapular, fuerza de empuje y tracción, resistencia muscular, estabilidad del tronco y tolerancia al volumen de golpeo. Evalúa ejercicios redundantes o exceso de volumen aislado de brazos.
 
-Día 3 — Potencia, pliometría y desplazamientos. Tiene alta transferencia a la cancha. Incluye split step, sentadillas con salto, skater jumps, salidas laterales, cambios de dirección, zancadas, desplazamiento y recuperación al centro, shadow tennis y core. Prioriza explosividad, velocidad, coordinación, frenada y reactividad. La pliometría se realiza con calidad, intención y recuperación suficiente: no se trata de saltar muchas veces hasta agotarse, sino de ser más rápido y eficiente.
+Día 3 — Potencia, pliometría y desplazamientos. Tiene alta transferencia a la cancha. Incluye split step, saltos unilaterales cortos y diagonales, skater jumps, salidas laterales, cambios de dirección, zancadas, desplazamiento y recuperación al centro, shadow tennis y un impulso rotacional unilateral con banda. Prioriza explosividad, velocidad, coordinación, frenada, reactividad y transferencia secuencial desde piernas y cadera hacia el brazo derecho. La pliometría se realiza con calidad, intención y recuperación suficiente: no se trata de saltar muchas veces hasta agotarse, sino de ser más rápido y eficiente. El trabajo rotacional con banda debe usar un anclaje seguro, salida rápida y regreso controlado; si el brazo está cargado se ejecuta sin resistencia.
 
 Día 4 — Rutina complementaria. Es opcional y se dedica a movilidad, antebrazo, muñeca, estabilidad, técnica y core. No es obligatoria cada semana. Incorpórala solo cuando aporte un beneficio real y no sume fatiga innecesaria.
 
